@@ -478,14 +478,71 @@ public final class Parser {
         var elements = new Element[(int) elementCount];
 
         for (var i = 0; i < elementCount; i++) {
-            var tableIndex = readVarUInt32(buffer);
-            var expr = parseExpression(buffer);
-            var funcIndexCount = readVarUInt32(buffer);
-            var funcIndices = new long[(int) funcIndexCount];
-            for (var j = 0; j < funcIndexCount; j++) {
-                funcIndices[j] = readVarUInt32(buffer);
+            var elem = (int) readVarUInt32(buffer);
+            switch (elem) {
+                case 0:
+                    {
+                        var expr = parseExpression(buffer);
+                        var funcIndexCount = readVarUInt32(buffer);
+                        var funcIndices = new long[(int) funcIndexCount];
+                        for (var j = 0; j < funcIndexCount; j++) {
+                            funcIndices[j] = readVarUInt32(buffer);
+                        }
+                        elements[i] = new Element(-1, expr, funcIndices);
+                        break;
+                    }
+                case 1:
+                    {
+                        assert 0x00L == readVarUInt32(buffer);
+                        var funcIndexCount = readVarUInt32(buffer);
+                        var funcIndices = new long[(int) funcIndexCount];
+                        for (var j = 0; j < funcIndexCount; j++) {
+                            funcIndices[j] = readVarUInt32(buffer);
+                        }
+                        elements[i] = new Element(-1, new Instruction[] {}, funcIndices);
+                        break;
+                    }
+                case 2:
+                    {
+                        var tableIdx = readVarUInt32(buffer);
+                        var expr = parseExpression(buffer);
+                        assert 0x00L == readVarUInt32(buffer);
+                        var funcIndexCount = readVarUInt32(buffer);
+                        var funcIndices = new long[(int) funcIndexCount];
+                        for (var j = 0; j < funcIndexCount; j++) {
+                            funcIndices[j] = readVarUInt32(buffer);
+                        }
+                        elements[i] = new Element(tableIdx, expr, funcIndices);
+                        break;
+                    }
+                case 4:
+                    {
+                        var expr = parseExpression(buffer);
+                        var exprIndexCount = readVarUInt32(buffer);
+                        var exprs = new Instruction[(int) exprIndexCount];
+                        for (var j = 0; j < exprIndexCount; j++) {
+                            // TODO: too naive to be correct
+                            exprs[j] = parseExpression(buffer)[0];
+                        }
+                        elements[i] = new Element(-1, expr, new long[] {});
+                        break;
+                    }
+                case 5:
+                    {
+                        var reftype = readVarUInt32(buffer);
+                        var exprIndexCount = readVarUInt32(buffer);
+                        var exprs = new Instruction[(int) exprIndexCount];
+                        for (var j = 0; j < exprIndexCount; j++) {
+                            // TODO: too naive to be correct
+                            exprs[j] = parseExpression(buffer)[0];
+                        }
+                        elements[i] = new Element(-1, exprs, new long[] {});
+                        break;
+                    }
+                default:
+                    throw new IllegalArgumentException(
+                            "Unrecognized element section element [outside 0-7]: " + elem);
             }
-            elements[i] = new Element(tableIndex, expr, funcIndices);
         }
 
         return new ElementSection(sectionId, sectionSize, elements);
@@ -715,7 +772,6 @@ public final class Parser {
     }
 
     private static Instruction[] parseExpression(ByteBuffer buffer) {
-
         var expr = new ArrayList<Instruction>();
         while (true) {
             var i = parseInstruction(buffer);

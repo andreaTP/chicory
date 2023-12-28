@@ -73,7 +73,10 @@
             conversions.wast,
             if.wast,
             float_misc.wast,
-            table.wast</wastToProcess>
+            data.wast,
+            table.wast,
+            table_copy.wast,
+            unwind.wast</wastToProcess>
           <orderedWastToProcess>memory_grow.wast,
             memory_size.wast,
             stack.wast,

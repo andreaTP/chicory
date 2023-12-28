@@ -5,6 +5,10 @@ loop <varuint>  	$03
 if <varuint>	    $04
 else 	$05 		can only be used with if. Only single else is allowed per if
 end 	$0B 		end can only close block or loop clocks
+try	$6
+catch	$7
+throw	$8
+rethrow	$9
 br <varuint> 	$0C labelidx
 br_if <varuint> 	$0D labelidx
 br_table vec(<varuint>) <varuint> 	$0E

@@ -99,7 +99,11 @@ public final class Memory {
                 var offsetExpr = segment.getOffset();
                 var offsetInstr = offsetExpr[0];
                 // TODO how flexible can this be? Do we need to dynamically eval the expression?
-                if (offsetInstr.getOpcode() != OpCode.I32_CONST) {
+                // apparently yes:
+                if (offsetInstr.getOpcode() == OpCode.GLOBAL_GET) {
+
+                    continue;
+                } else if (offsetInstr.getOpcode() != OpCode.I32_CONST) {
                     throw new RuntimeException(
                             "Don't support data segment expressions other than i32.const yet,"
                                     + " found: "
