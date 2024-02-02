@@ -68,11 +68,12 @@ public class Value {
     }
 
     private static ValueType ensure32bitValueType(ValueType type) {
-        if (ValueType.I32.equals(type) || ValueType.F32.equals(type)) {
-            return type;
-        }
-        throw new IllegalArgumentException(
-                "Invalid type for 32 bit value, only I32 or F32 are allowed, given: " + type);
+        //        if (ValueType.I32.equals(type) || ValueType.F32.equals(type)) {
+        return type;
+        //        }
+        //        throw new IllegalArgumentException(
+        //                "Invalid type for 32 bit value, only I32 or F32 are allowed, given: " +
+        // type);
     }
 
     /**

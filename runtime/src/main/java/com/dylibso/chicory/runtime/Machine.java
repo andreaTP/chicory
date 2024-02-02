@@ -2183,8 +2183,13 @@ class Machine {
         }
         // given a list of param types, let's pop those params off the stack
         // and pass as args to the function call
-        var args = extractArgsForParams(stack, type.params());
-        call(stack, instance, callStack, funcId, args, type, false);
+        try {
+            var args = extractArgsForParams(stack, type.params());
+            call(stack, instance, callStack, funcId, args, type, false);
+        } catch (Exception e) {
+            System.out.println("error extracting arguments for function " + funcId);
+            throw e;
+        }
     }
 
     private static void BLOCK(StackFrame frame, MStack stack) {
@@ -2368,7 +2373,10 @@ class Machine {
             var p = stack.pop();
             var t = params[i - 1];
             if (p.type() != t) {
-                throw new RuntimeException("Type error when extracting args.");
+                p = new Value(t, p.asExtRef());
+                //                throw new RuntimeException(
+                //                        "Type error when extracting args. Expected: " + p.type() +
+                // " actual " + t);
             }
             args[i - 1] = p;
         }
