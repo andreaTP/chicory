@@ -64,4 +64,21 @@ public class WasiPreview1Test {
 
         assertEquals(fakeStdout.output(), "{\"foo\":3,\"newBar\":\"baz!\"}");
     }
+
+    @Test
+    public void shouldRunWasiDemoCSharpModule() {
+//        var fakeStdout = new MockPrintStream();
+        var wasiOpts = WasiOptions.builder().inheritSystem().build();
+        var wasi = new WasiPreview1(this.logger, wasiOpts);
+        var imports = new HostImports(wasi.toHostFunctions());
+        var module = Module.builder(new File("/Users/aperuffo/workspace/Strathweb.Samples.DotnetWasi/src/WasiExport/bin/Release/net8.0/wasi-wasm/AppBundle/WasiExport.wasm")).build();
+        // var module = Module.builder(new File("/Users/aperuffo/workspace/chicory/hello-csharp/bin/Release/net8.0/wasi-wasm/AppBundle/hello-csharp.wasm")).build();
+        var instance = module.instantiate(imports);
+
+        var hello = instance.export("hello");
+
+        var result = hello.apply();
+
+        System.out.println(result[0]);
+    }
 }
