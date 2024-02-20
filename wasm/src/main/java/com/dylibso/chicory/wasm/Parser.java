@@ -167,6 +167,7 @@ public final class Parser {
                     "unexpected token: unsupported version, found: " + version + " expected: " + 1);
         }
 
+        var firstTime = true;
         while (buffer.hasRemaining()) {
             var sectionId = buffer.get();
             //            var sectionId = (int) readVarUInt32(buffer);
@@ -177,7 +178,8 @@ public final class Parser {
                 switch (sectionId) {
                     case SectionId.CUSTOM:
                         {
-                            var customSection = parseCustomSection(buffer, sectionSize);
+                            var customSection = parseCustomSection(buffer, sectionSize, firstTime);
+                            firstTime = false;
                             listener.onSection(customSection);
                             break;
                         }
@@ -278,8 +280,9 @@ public final class Parser {
         return this.includeSections.get(sectionId);
     }
 
-    private CustomSection parseCustomSection(ByteBuffer buffer, long sectionSize) {
-        var name = readName(buffer, false);
+    private CustomSection parseCustomSection(
+            ByteBuffer buffer, long sectionSize, boolean firstTime) {
+        var name = readName(buffer, !firstTime);
         var byteLen = name.getBytes().length;
         var size = (sectionSize - byteLen - Encoding.computeLeb128Size(byteLen));
         var remaining = buffer.limit() - buffer.position();
