@@ -1,7 +1,5 @@
 package com.dylibso.chicory.wasm;
 
-import java.nio.charset.StandardCharsets;
-
 public class ParserUtil {
 
     private ParserUtil() {}
@@ -13,7 +11,7 @@ public class ParserUtil {
     public static boolean isValidIdentifier(byte[] bytes) {
         try {
             if (bytes.length <= 0) {
-                return false;
+                //                return false;
             }
 
             for (int i = 0; i < bytes.length; i++) {
@@ -31,7 +29,6 @@ public class ParserUtil {
                     if (c1 > 0x800) { // two bytes encoding
                         continue;
                     } else {
-
                         var b3 = getByte(bytes[i++]);
                         if (b3 >= 0xc0) {
                             return false;

@@ -279,7 +279,7 @@ public final class Parser {
     }
 
     private CustomSection parseCustomSection(ByteBuffer buffer, long sectionSize) {
-        var name = readName(buffer);
+        var name = readName(buffer, false);
         var byteLen = name.getBytes().length;
         var size = (sectionSize - byteLen - Encoding.computeLeb128Size(byteLen));
         var remaining = buffer.limit() - buffer.position();
@@ -338,8 +338,8 @@ public final class Parser {
 
         // Parse individual imports in the import section
         for (int i = 0; i < importCount; i++) {
-            String moduleName = readName(buffer);
-            String importName = readName(buffer);
+            String moduleName = readName(buffer, false);
+            String importName = readName(buffer, false);
             var descType = ExternalType.byId((int) readVarUInt32(buffer));
             switch (descType) {
                 case FUNCTION:
@@ -481,7 +481,7 @@ public final class Parser {
 
         // Parse individual functions in the function section
         for (int i = 0; i < exportCount; i++) {
-            var name = readName(buffer);
+            var name = readName(buffer, true);
             var exportType = ExternalType.byId((int) readVarUInt32(buffer));
             var index = (int) readVarUInt32(buffer);
             exportSection.addExport(new Export(name, index, exportType));
@@ -928,10 +928,14 @@ public final class Parser {
      * @return
      */
     public static String readName(ByteBuffer buffer) {
+        return readName(buffer, false);
+    }
+
+    public static String readName(ByteBuffer buffer, boolean allow) {
         var length = (int) readVarUInt32(buffer);
         byte[] bytes = new byte[length];
         buffer.get(bytes);
-        if (!ParserUtil.isValidIdentifier(bytes)) {
+        if (!ParserUtil.isValidIdentifier(bytes) && !allow) {
             throw new MalformedException("malformed UTF-8 encoding");
         }
         return new String(bytes, StandardCharsets.UTF_8);
