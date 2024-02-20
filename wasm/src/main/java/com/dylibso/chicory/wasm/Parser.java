@@ -280,9 +280,6 @@ public final class Parser {
 
     private CustomSection parseCustomSection(ByteBuffer buffer, long sectionSize) {
         var name = readName(buffer);
-        if (!ParserUtil.isValidIdentifier(name)) {
-            throw new MalformedException("malformed UTF-8 encoding");
-        }
         var byteLen = name.getBytes().length;
         var size = (sectionSize - byteLen - Encoding.computeLeb128Size(byteLen));
         var remaining = buffer.limit() - buffer.position();
@@ -934,6 +931,9 @@ public final class Parser {
         var length = (int) readVarUInt32(buffer);
         byte[] bytes = new byte[length];
         buffer.get(bytes);
+        if (!ParserUtil.isValidIdentifier(bytes)) {
+            throw new MalformedException("malformed UTF-8 encoding");
+        }
         return new String(bytes, StandardCharsets.UTF_8);
     }
 }
