@@ -132,11 +132,11 @@ public class WasmValue {
                     return "new Value[]{}";
                 }
 
-                return "new Value[]{ "
+                return "Value.vec( "
                         + Arrays.stream(value)
-                                .map(v -> fromValue(v, laneType).toJavaValue())
+                                .map(v -> fromValue(v, laneType).toWasmValue())
                                 .collect(Collectors.joining(", "))
-                        + "}";
+                        + ")";
             default:
                 throw new IllegalArgumentException("Type not recognized " + laneType);
         }
@@ -162,7 +162,7 @@ public class WasmValue {
                 case FUNC_REF:
                     return ".asFuncRef()";
                 case VEC_REF:
-                    return ".asVecRef()";
+                    return ".asVec()";
                 default:
                     throw new IllegalArgumentException("Type not recognized " + type);
             }

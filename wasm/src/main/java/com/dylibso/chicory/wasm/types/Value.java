@@ -22,6 +22,13 @@ public class Value {
 
     private long data;
 
+    // used for Vec types (i128)
+    private Value[] values;
+
+    public static Value fromVec(Value[] values) {
+        return Value.vec(values);
+    }
+
     public static Value fromFloat(float data) {
         return Value.f32(Float.floatToRawIntBits(data));
     }
@@ -38,6 +45,10 @@ public class Value {
         return new Value(ValueType.I64, data);
     }
 
+    public static Value vec(Value... values) {
+        return new Value(values);
+    }
+
     public static Value f32(long data) {
         return new Value(ValueType.F32, data);
     }
@@ -50,12 +61,13 @@ public class Value {
         return new Value(ValueType.ExternRef, data);
     }
 
-    public static Value vecRef(long data) {
-        return new Value(ValueType.VecRef, data);
-    }
-
     public static Value funcRef(long data) {
         return new Value(ValueType.FuncRef, data);
+    }
+
+    public Value(Value... values) {
+        this.type = ValueType.VecRef;
+        this.values = values;
     }
 
     public Value(ValueType type, int value) {
@@ -182,6 +194,10 @@ public class Value {
 
     public double asDouble() {
         return Double.longBitsToDouble(asLong());
+    }
+
+    public Value[] asVec() {
+        return values;
     }
 
     public ValueType type() {

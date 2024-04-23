@@ -11,7 +11,7 @@ public enum ValueType {
     V128(ID.V128),
     FuncRef(ID.FuncRef),
     ExternRef(ID.ExternRef),
-    VecRef(ID.ExternRef);
+    VecRef(ID.VecRef);
 
     private final int id;
 
