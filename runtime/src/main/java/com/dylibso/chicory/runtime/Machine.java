@@ -46,6 +46,7 @@ class Machine {
             boolean popResults)
             throws ChicoryException {
 
+        checkInterruption();
         var typeId = instance.functionType(funcId);
         var type = instance.type(typeId);
 
@@ -131,6 +132,7 @@ class Machine {
                         break;
                     case ELSE:
                     case BR:
+                        checkInterruption();
                         prepareControlTransfer(frame, stack, false);
                         frame.jumpTo(instruction.labelTrue());
                         break;
@@ -2397,6 +2399,12 @@ class Machine {
             throws ChicoryException {
         if (!actual.typesMatch(expected)) {
             throw new ChicoryException("indirect call type mismatch");
+        }
+    }
+
+    private static void checkInterruption() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new ChicoryException("Thread interrupted");
         }
     }
 }
