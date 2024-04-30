@@ -45,7 +45,7 @@ class Machine {
             FunctionType callType,
             boolean popResults)
             throws ChicoryException {
-
+        checkInterruption();
         var typeId = instance.functionType(funcId);
         var type = instance.type(typeId);
 
