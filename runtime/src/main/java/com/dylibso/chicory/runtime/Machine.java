@@ -46,7 +46,6 @@ class Machine {
             boolean popResults)
             throws ChicoryException {
 
-        checkInterruption();
         var typeId = instance.functionType(funcId);
         var type = instance.type(typeId);
 
@@ -132,7 +131,6 @@ class Machine {
                         break;
                     case ELSE:
                     case BR:
-                        checkInterruption();
                         prepareControlTransfer(frame, stack, false);
                         frame.jumpTo(instruction.labelTrue());
                         break;
@@ -2268,6 +2266,7 @@ class Machine {
 
     private static Value prepareControlTransfer(StackFrame frame, MStack stack, boolean consume) {
         frame.doControlTransfer = true;
+        checkInterruption();
         return consume ? stack.pop() : null;
     }
 
