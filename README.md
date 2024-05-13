@@ -90,13 +90,16 @@ copyFileFromWasmCorpus("iterfact.wat.wasm", "factorial.wasm");
 
 Now let's load this module and instantiate it:
 
+<!--
 ```java
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.wasm.types.Value;
 import com.dylibso.chicory.runtime.Module;
 import com.dylibso.chicory.runtime.Instance;
 import java.io.File;
-
+```
+-->
+```java
 // point this to your path on disk
 Module module = Module.builder(new File("./factorial.wasm")).build();
 Instance instance = module.instantiate();
