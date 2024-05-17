@@ -335,4 +335,8 @@ public final class Memory {
     public void drop(int segment) {
         dataSegments[segment] = PassiveDataSegment.EMPTY;
     }
+
+    public DataSegment[] dataSegments() {
+        return dataSegments;
+    }
 }
