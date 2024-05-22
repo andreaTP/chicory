@@ -178,12 +178,7 @@
             <wast>left-to-right.wast</wast>
             <wast>linking.wast</wast>
             <wast>load.wast</wast>
-            <wast>local_get.wast</wast>
-            <wast>local_set.wast</wast>
-            <wast>local_tee.wast</wast>
             <wast>loop.wast</wast>
-            <wast>memory_grow.wast</wast>
-            <wast>memory_size.wast</wast>
             <wast>nop.wast</wast>
             <wast>ref_func.wast</wast>
             <wast>ref_is_null.wast</wast>

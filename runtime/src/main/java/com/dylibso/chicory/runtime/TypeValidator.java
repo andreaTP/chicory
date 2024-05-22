@@ -20,8 +20,12 @@ public class TypeValidator {
     private Deque<Deque<ValueType>> unwindStack = new ArrayDeque<>();
 
     private void popAndVerifyType(ValueType expected) {
+        popAndVerifyType(expected, stackLimit.peek());
+    }
+
+    private void popAndVerifyType(ValueType expected, int limit) {
         ValueType have = null;
-        if (valueTypeStack.size() > stackLimit.peek()) {
+        if (valueTypeStack.size() > limit) {
             have = valueTypeStack.poll();
         } else if (valueTypeStack.size() > 0) {
             // a block can consume elements outside of it
@@ -67,7 +71,7 @@ public class TypeValidator {
         }
 
         for (var ret : returns) {
-            popAndVerifyType(ret);
+            popAndVerifyType(ret, limit);
         }
 
         for (int j = 0; j < returns.size(); j++) {
@@ -98,6 +102,14 @@ public class TypeValidator {
         return offset + currentPos - 1;
     }
 
+    public ValueType getLocal(List<ValueType> locals, int index) {
+        try {
+            return locals.get(index);
+        } catch (IndexOutOfBoundsException e) {
+            throw new InvalidException("unknown local", e);
+        }
+    }
+
     public void validate(FunctionBody body, FunctionType functionType, Instance instance) {
         var localTypes = body.localTypes();
         var inputLen = functionType.params().size();
@@ -110,6 +122,11 @@ public class TypeValidator {
 
             // control flow instructions handling
             switch (op.opcode()) {
+                case IF:
+                    {
+                        popAndVerifyType(ValueType.I32);
+                        // fallthrough
+                    }
                 case LOOP:
                 case BLOCK:
                     {
@@ -125,22 +142,13 @@ public class TypeValidator {
                         unwindStack.push(new ArrayDeque<>());
                         break;
                     }
-                case IF:
-                    {
-                        popAndVerifyType(ValueType.I32);
-                        stackLimit.push(valueTypeStack.size());
-                        returns.push(List.of());
-                        unwindStack.push(new ArrayDeque<>());
-                        break;
-                    }
                 case ELSE:
                     {
-                        var limit = stackLimit.pop();
+                        var limit = stackLimit.peek();
                         // remove anything evaluated in the IF branch
                         while (valueTypeStack.size() > limit) {
                             valueTypeStack.pop();
                         }
-                        stackLimit.push(limit);
                         break;
                     }
                 case RETURN:
@@ -159,7 +167,7 @@ public class TypeValidator {
                         var expected = returns.peek();
                         var limit = stackLimit.peek();
 
-                        //                    validateReturns(expected, limit);
+                        validateReturns(expected, limit);
 
                         // the remaining instructions are not going to be evaluated ever
                         // but, if we are in an IF we should validate the other branch
@@ -175,7 +183,7 @@ public class TypeValidator {
                         var expected = returns.peek();
                         var limit = stackLimit.peek();
 
-                        //                    validateReturns(expected, limit);
+                        validateReturns(expected, limit);
                         break;
                     }
                 case END:
@@ -183,7 +191,13 @@ public class TypeValidator {
                         var expected = returns.pop();
                         var limit = stackLimit.pop();
 
-                        // TODO: here there are a ton of missing checks
+                        validateReturns(expected, limit);
+
+                        // no leftovers allowed
+                        if (returns.isEmpty() && valueTypeStack.size() != expected.size()) {
+                            throw new InvalidException(
+                                    "type mismatch, leftovers before last return");
+                        }
                         while (valueTypeStack.size() > limit) {
                             valueTypeStack.pop();
                         }
@@ -608,10 +622,12 @@ public class TypeValidator {
                 case LOCAL_GET:
                     {
                         var index = (int) op.operands()[0];
+
                         ValueType expectedType =
                                 (index < inputLen)
                                         ? functionType.params().get(index)
-                                        : localTypes.get(index - inputLen);
+                                        : getLocal(localTypes, index - inputLen);
+
                         valueTypeStack.push(expectedType);
                         break;
                     }
