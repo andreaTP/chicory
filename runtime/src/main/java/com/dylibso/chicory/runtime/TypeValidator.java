@@ -96,6 +96,22 @@ public class TypeValidator {
         for (int j = 0; j < returns.size(); j++) {
             valueTypeStack.push(returns.get(j));
         }
+
+        if (!unwind.isEmpty()) {
+            // reset to limit
+            while (valueTypeStack.size() > limit) {
+                valueTypeStack.pop();
+            }
+            // restore unwinded values
+            // TODO: verify order
+            for (int j = 0; j < unwind.size(); j++) {
+                valueTypeStack.push(unwind.get(j));
+            }
+
+            for (int j = 0; j < returns.size(); j++) {
+                valueTypeStack.push(returns.get(j));
+            }
+        }
     }
 
     private int jumpToNextEndOrElse(
