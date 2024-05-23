@@ -85,9 +85,9 @@ public class TypeValidator {
     }
 
     private void validateReturns(List<ValueType> returns, int limit, List<ValueType> unwind) {
-        //        if (returns.size() > (valueTypeStack.size() - limit - unwind.size())) {
-        //            throw new InvalidException("type mismatch, not enough values to return");
-        //        }
+        if (returns.size() > (valueTypeStack.size() - limit - unwind.size())) {
+            throw new InvalidException("type mismatch, not enough values to return");
+        }
 
         for (int j = returns.size() - 1; j >= 0; j--) {
             popAndVerifyType(returns.get(j), limit, unwind);
@@ -189,7 +189,11 @@ public class TypeValidator {
                 case BR:
                     {
                         // TODO: port to the other BR instructions
-                        var targetInstruction = body.instructions().get(op.labelTrue());
+                        var targetIdx = op.labelTrue();
+                        if (targetIdx == null) {
+                            throw new InvalidException("unknown label");
+                        }
+                        var targetInstruction = body.instructions().get(targetIdx);
                         var targetDepth = targetInstruction.depth();
 
                         var expected = returns.get(targetDepth);
@@ -203,14 +207,33 @@ public class TypeValidator {
                         break;
                     }
                 case BR_IF:
+                    {
+                        popAndVerifyType(ValueType.I32);
+                        for (var label : List.of(op.labelTrue(), op.labelFalse())) {
+                            if (label == null) {
+                                throw new InvalidException("unknown label");
+                            }
+                            var targetInstruction = body.instructions().get(label);
+                            var targetDepth = targetInstruction.depth();
+
+                            if (targetDepth >= returns.size()) {
+                                // TODO
+                                // It's a branch defined ahead in the program,
+                                // we have a callback to perform this check when we reach that point
+                            } else {
+                                var expected = returns.get(targetDepth);
+                                var limit = stackLimit.get(targetDepth);
+                                var unwind = unwindStack.get(targetDepth);
+
+                                validateReturns(expected, limit, unwind);
+                            }
+                        }
+                        break;
+                    }
                 case BR_TABLE:
                     {
                         popAndVerifyType(ValueType.I32);
-                        var expected = peek(returns);
-                        var limit = peek(stackLimit);
-                        var unwind = peek(unwindStack);
-
-                        validateReturns(expected, limit, unwind);
+                        // TODO: implement validation of the jumps
                         break;
                     }
                 case END:
@@ -238,11 +261,9 @@ public class TypeValidator {
                             }
                         }
                         // no leftovers allowed
-                        //                        if (returns.isEmpty() && valueTypeStack.size() !=
-                        // expected.size()) {
-                        //                            throw new InvalidException("type mismatch,
-                        // leftovers before last return");
-                        //                        }
+                        if (returns.isEmpty() && valueTypeStack.size() != expected.size()) {
+                            throw new InvalidException("type mismatch, leftovers before last return");
+                        }
                         break;
                     }
                 default:
