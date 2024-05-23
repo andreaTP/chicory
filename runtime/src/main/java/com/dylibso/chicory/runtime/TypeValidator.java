@@ -178,7 +178,7 @@ public class TypeValidator {
                         var unwind = peek(unwindStack);
 
                         // unwinding should not kick in RETURN
-                        // TODO: verify if this should be refactored somehow
+                        // TODO: verify if this should be refactored somewhere
                         if (valueTypeStack.size() < (functionType.returns().size() + limit)) {
                             throw new InvalidException("type mismatch, not enough return values");
                         }
@@ -199,7 +199,11 @@ public class TypeValidator {
                 case BR:
                     {
                         // TODO: port to the other BR instructions
-                        var targetInstruction = body.instructions().get(op.labelTrue());
+                        var targetIdx = op.labelTrue();
+                        if (targetIdx == null) {
+                            throw new InvalidException("unknown label");
+                        }
+                        var targetInstruction = body.instructions().get(targetIdx);
                         var targetDepth = targetInstruction.depth();
 
                         var expected = returns.get(targetDepth);
@@ -214,14 +218,32 @@ public class TypeValidator {
                         break;
                     }
                 case BR_IF:
+                    {
+                        popAndVerifyType(ValueType.I32);
+
+                        for (var label : List.of(op.labelTrue(), op.labelFalse())) {
+                            if (label == null) {
+                                throw new InvalidException("unknown label");
+                            }
+                            var targetInstruction = body.instructions().get(label);
+                            var targetDepth = targetInstruction.depth();
+
+                            if (targetDepth >= returns.size()) {
+                                // It's a branch defined ahead in the program,
+                                // we have a callback to perform this check when we reach that point
+                            } else {
+                                var expected = returns.get(targetDepth);
+                                var limit = stackLimit.get(targetDepth);
+                                var unwind = unwindStack.get(targetDepth);
+
+                                validateReturns(expected, limit, unwind);
+                            }
+                        }
+                        break;
+                    }
                 case BR_TABLE:
                     {
                         popAndVerifyType(ValueType.I32);
-                        var expected = peek(returns);
-                        var limit = peek(stackLimit);
-                        var unwind = peek(unwindStack);
-
-                        validateReturns(expected, limit, unwind);
                         break;
                     }
                 case END:
@@ -230,6 +252,11 @@ public class TypeValidator {
                         var limit = pop(stackLimit);
                         var unwind = pop(unwindStack);
 
+                        //                        if (returns.isEmpty() && expected.size() == 0 &&
+                        // valueTypeStack.size() != 0) {
+                        //                            throw new InvalidException("type mismatch,
+                        // leftovers on the stack");
+                        //                        }
                         validateReturns(expected, limit, unwind);
                         break;
                     }
