@@ -7,6 +7,7 @@ import com.dylibso.chicory.wasm.types.Instruction;
 import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.ValueType;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
@@ -70,17 +71,11 @@ public class TypeValidator {
             throw new InvalidException("type mismatch, not enough values to return");
         }
 
-        for (var ret : returns) {
-            popAndVerifyType(ret, limit);
+        for (int j = returns.size() - 1; j >= 0; j--) {
+            popAndVerifyType(returns.get(j), limit);
         }
-
         for (int j = 0; j < returns.size(); j++) {
-            ValueType valueType = returns.get(returns.size() - 1 - j);
-            if (valueType != null) {
-                valueTypeStack.push(valueType);
-            } else {
-                throw new IllegalArgumentException("should not happen");
-            }
+            valueTypeStack.push(returns.get(j));
         }
     }
 
@@ -171,10 +166,17 @@ public class TypeValidator {
                     }
                 case BR:
                     {
-                        // targetReturn should come from the label
-                        // peek is likely wrong, we should check the tracking destination label
-                        var expected = returns.peek();
-                        var limit = stackLimit.peek();
+                        // we should check the target block where the jump is going to land
+                        var targetInstruction = body.instructions().get(op.labelTrue());
+                        var targetDepth = returns.size() - targetInstruction.depth() - 1;
+
+                        // this is probably horribly inefficient ...
+                        var listReturns = new ArrayList<List<ValueType>>();
+                        listReturns.addAll(returns);
+                        List<ValueType> expected = listReturns.get(targetDepth);
+                        var listLimits = new ArrayList<Integer>();
+                        listLimits.addAll(stackLimit);
+                        var limit = listLimits.get(targetDepth);
 
                         validateReturns(expected, limit);
 
