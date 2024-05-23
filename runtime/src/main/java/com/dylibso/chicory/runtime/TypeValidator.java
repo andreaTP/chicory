@@ -157,6 +157,15 @@ public class TypeValidator {
 
                         validateReturns(functionType.returns(), limit);
 
+                        // clean up leftovers in the stack
+                        while (valueTypeStack.size() > limit) {
+                            valueTypeStack.pop();
+                        }
+                        // restore the expected types we already validated
+                        for (var ret : functionType.returns()) {
+                            valueTypeStack.push(ret);
+                        }
+
                         i = jumpToNextEndOrElse(body.instructions(), op, i);
                         break;
                     }
@@ -615,7 +624,7 @@ public class TypeValidator {
                         ValueType expectedType =
                                 (index < inputLen)
                                         ? functionType.params().get(index)
-                                        : localTypes.get(index - inputLen);
+                                        : getLocal(localTypes, index - inputLen);
                         popAndVerifyType(expectedType);
                         break;
                     }
@@ -637,7 +646,7 @@ public class TypeValidator {
                         ValueType expectedType =
                                 (index < inputLen)
                                         ? functionType.params().get(index)
-                                        : localTypes.get(index - inputLen);
+                                        : getLocal(localTypes, index - inputLen);
                         popAndVerifyType(expectedType);
                         valueTypeStack.push(expectedType);
                         break;
