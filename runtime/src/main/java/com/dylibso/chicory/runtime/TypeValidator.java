@@ -89,29 +89,35 @@ public class TypeValidator {
         //            throw new InvalidException("type mismatch, not enough values to return");
         //        }
 
+        //        for (int j = returns.size() - 1; j >= 0; j--) {
+        //            popAndVerifyType(returns.get(j), limit, unwind);
+        //        }
+        //
+        //        for (int j = 0; j < returns.size(); j++) {
+        //            valueTypeStack.push(returns.get(j));
+        //        }
+
+        // verify the results
         for (int j = returns.size() - 1; j >= 0; j--) {
             popAndVerifyType(returns.get(j), limit, unwind);
         }
 
+        // reset the stack back to limit
+        while (valueTypeStack.size() > limit) {
+            valueTypeStack.pop();
+        }
+        // restore unwinded values
+        for (int j = 0; j < unwind.size(); j++) {
+            valueTypeStack.push(unwind.get(j));
+        }
+        // push back the results
         for (int j = 0; j < returns.size(); j++) {
             valueTypeStack.push(returns.get(j));
         }
 
-        if (!unwind.isEmpty()) {
-            // reset to limit
-            while (valueTypeStack.size() > limit) {
-                valueTypeStack.pop();
-            }
-            // restore unwinded values
-            // TODO: verify order
-            for (int j = 0; j < unwind.size(); j++) {
-                valueTypeStack.push(unwind.get(j));
-            }
-
-            for (int j = 0; j < returns.size(); j++) {
-                valueTypeStack.push(returns.get(j));
-            }
-        }
+        //        if (valueTypeStack.size() != (limit + returns.size())) {
+        //            throw new InvalidException("type mismatch, a good error message");
+        //        }
     }
 
     private int jumpToNextEndOrElse(
@@ -212,6 +218,7 @@ public class TypeValidator {
                         var limit = stackLimit.get(targetDepth);
                         var unwind = unwindStack.get(targetDepth);
 
+                        // TODO: should discard?
                         validateReturns(expected, limit, unwind);
 
                         // TODO: double check targetDepth!
@@ -236,29 +243,11 @@ public class TypeValidator {
                         var unwind = pop(unwindStack);
 
                         validateReturns(expected, limit, unwind);
-
-                        // TODO: check if this can be applied to all the validateResults
-                        if (!unwind.isEmpty()) {
-                            // reset to limit
-                            while (valueTypeStack.size() > limit) {
-                                valueTypeStack.pop();
-                            }
-                            // restore unwinded values
-                            // TODO: verify order
-                            for (int j = 0; j < unwind.size(); j++) {
-                                valueTypeStack.push(unwind.get(j));
-                            }
-
-                            for (int j = 0; j < expected.size(); j++) {
-                                valueTypeStack.push(expected.get(j));
-                            }
+                        // no leftovers allowed at the top level
+                        if (returns.isEmpty() && valueTypeStack.size() != expected.size()) {
+                            throw new InvalidException(
+                                    "type mismatch, leftovers before last return");
                         }
-                        // no leftovers allowed
-                        //                        if (returns.isEmpty() && valueTypeStack.size() !=
-                        // expected.size()) {
-                        //                            throw new InvalidException("type mismatch,
-                        // leftovers before last return");
-                        //                        }
                         break;
                     }
                 default:
