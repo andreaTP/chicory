@@ -16,12 +16,26 @@ import java.util.List;
 public class TypeValidator {
 
     private Deque<ValueType> valueTypeStack = new ArrayDeque<>();
-    private Deque<Integer> stackLimit = new ArrayDeque<>();
-    private Deque<List<ValueType>> returns = new ArrayDeque<>();
-    private Deque<Deque<ValueType>> unwindStack = new ArrayDeque<>();
+    private List<Integer> stackLimit = new ArrayList<>();
+    private List<List<ValueType>> returns = new ArrayList<>();
+    private List<List<ValueType>> unwindStack = new ArrayList<>();
+
+    private static <T> T peek(List<T> list) {
+        return list.get(list.size() - 1);
+    }
+
+    private static <T> T pop(List<T> list) {
+        var val = list.get(list.size() - 1);
+        list.remove(list.size() - 1);
+        return val;
+    }
+
+    private static <T> void push(List<T> list, T elem) {
+        list.add(elem);
+    }
 
     private void popAndVerifyType(ValueType expected) {
-        popAndVerifyType(expected, stackLimit.peek());
+        popAndVerifyType(expected, peek(stackLimit));
     }
 
     private void popAndVerifyType(ValueType expected, int limit) {
@@ -32,7 +46,7 @@ public class TypeValidator {
             // a block can consume elements outside of it
             // but they should be restored on exit
             have = valueTypeStack.poll();
-            unwindStack.peek().push(have);
+            push(peek(unwindStack), have);
         }
         verifyType(expected, have);
     }
@@ -71,11 +85,13 @@ public class TypeValidator {
             throw new InvalidException("type mismatch, not enough values to return");
         }
 
-        for (int j = returns.size() - 1; j >= 0; j--) {
-            popAndVerifyType(returns.get(j), limit);
+        for (var ret : returns) {
+            popAndVerifyType(ret, limit);
         }
+
         for (int j = 0; j < returns.size(); j++) {
-            valueTypeStack.push(returns.get(j));
+            ValueType valueType = returns.get(returns.size() - 1 - j);
+            valueTypeStack.push(valueType);
         }
     }
 
@@ -108,9 +124,9 @@ public class TypeValidator {
     public void validate(FunctionBody body, FunctionType functionType, Instance instance) {
         var localTypes = body.localTypes();
         var inputLen = functionType.params().size();
-        stackLimit.push(0);
-        returns.push(functionType.returns());
-        unwindStack.push(new ArrayDeque<>());
+        push(stackLimit, 0);
+        push(returns, functionType.returns());
+        push(unwindStack, new ArrayList<>());
 
         for (var i = 0; i < body.instructions().size(); i++) {
             var op = body.instructions().get(i);
@@ -126,20 +142,20 @@ public class TypeValidator {
                 case BLOCK:
                     {
                         var typeId = (int) op.operands()[0];
-                        stackLimit.push(valueTypeStack.size());
+                        push(stackLimit, valueTypeStack.size());
                         if (typeId == 0x40) { // epsilon
-                            returns.push(List.of());
+                            push(returns, List.of());
                         } else if (ValueType.isValid(typeId)) {
-                            returns.push(List.of(ValueType.forId(typeId)));
+                            push(returns, List.of(ValueType.forId(typeId)));
                         } else {
-                            returns.push(instance.type(typeId).returns());
+                            push(returns, instance.type(typeId).returns());
                         }
-                        unwindStack.push(new ArrayDeque<>());
+                        push(unwindStack, new ArrayList<>());
                         break;
                     }
                 case ELSE:
                     {
-                        var limit = stackLimit.peek();
+                        var limit = peek(stackLimit);
                         // remove anything evaluated in the IF branch
                         while (valueTypeStack.size() > limit) {
                             valueTypeStack.pop();
@@ -148,7 +164,7 @@ public class TypeValidator {
                     }
                 case RETURN:
                     {
-                        var limit = stackLimit.peek();
+                        var limit = peek(stackLimit);
 
                         validateReturns(functionType.returns(), limit);
 
@@ -166,17 +182,13 @@ public class TypeValidator {
                     }
                 case BR:
                     {
-                        // we should check the target block where the jump is going to land
+                        // TODO: port to the other BR instructions
                         var targetInstruction = body.instructions().get(op.labelTrue());
                         var targetDepth = returns.size() - targetInstruction.depth() - 1;
 
-                        // this is probably horribly inefficient ...
-                        var listReturns = new ArrayList<List<ValueType>>();
-                        listReturns.addAll(returns);
-                        List<ValueType> expected = listReturns.get(targetDepth);
-                        var listLimits = new ArrayList<Integer>();
-                        listLimits.addAll(stackLimit);
-                        var limit = listLimits.get(targetDepth);
+                        var expected = returns.get(targetDepth);
+                        var limit = stackLimit.get(targetDepth);
+                        var unwind = unwindStack.get(targetDepth);
 
                         validateReturns(expected, limit);
 
@@ -191,16 +203,17 @@ public class TypeValidator {
                 case BR_TABLE:
                     {
                         popAndVerifyType(ValueType.I32);
-                        var expected = returns.peek();
-                        var limit = stackLimit.peek();
+                        var expected = peek(returns);
+                        var limit = peek(stackLimit);
 
                         validateReturns(expected, limit);
                         break;
                     }
                 case END:
                     {
-                        var expected = returns.pop();
-                        var limit = stackLimit.pop();
+                        var expected = pop(returns);
+                        var limit = pop(stackLimit);
+                        var unwind = pop(unwindStack);
 
                         validateReturns(expected, limit);
 
@@ -212,9 +225,9 @@ public class TypeValidator {
                         while (valueTypeStack.size() > limit) {
                             valueTypeStack.pop();
                         }
-                        var unwind = unwindStack.pop();
+
                         while (unwind.size() > 0) {
-                            valueTypeStack.push(unwind.pop());
+                            valueTypeStack.push(pop(unwind));
                         }
 
                         // need to push on the stack the results
