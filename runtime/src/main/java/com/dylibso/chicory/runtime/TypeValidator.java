@@ -194,6 +194,10 @@ public class TypeValidator {
                         var limit = peek(stackLimit);
                         var unwind = peek(unwindStack);
 
+                        // unwinding should not kick in RETURN
+                        if (valueTypeStack.size() < (functionType.returns().size() + limit)) {
+                            throw new InvalidException("type mismatch, not enough return values");
+                        }
                         validateReturns(functionType.returns(), limit, unwind);
 
                         // clean up leftovers in the stack
