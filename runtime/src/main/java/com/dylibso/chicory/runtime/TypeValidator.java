@@ -159,10 +159,12 @@ public class TypeValidator {
                 case ELSE:
                     {
                         var limit = peek(stackLimit);
+                        var unwind = peek(unwindStack);
                         // remove anything evaluated in the IF branch
                         while (valueTypeStack.size() > limit) {
                             valueTypeStack.pop();
                         }
+                        unwind.clear();
                         break;
                     }
                 case RETURN:
@@ -196,12 +198,8 @@ public class TypeValidator {
 
                         validateReturns(expected, limit, unwind);
 
-                        // the remaining instructions are not going to be evaluated ever
-                        // but, if we are in an IF we should validate the other branch
-                        // if we are in a BLOCK should we follow the jump out instead?
                         // TODO: double check targetDepth!
                         i = jumpToNextEndOrElse(body.instructions(), op, i);
-                        // i = op.labelTrue() - 1;
                         break;
                     }
                 case BR_IF:
@@ -223,12 +221,27 @@ public class TypeValidator {
 
                         validateReturns(expected, limit, unwind);
 
+                        // TODO: check if this can be applied to all the validateResults
+                        if (!unwind.isEmpty()) {
+                            // reset to limit
+                            while (valueTypeStack.size() > limit) {
+                                valueTypeStack.pop();
+                            }
+                            // restore unwinded values
+                            // TODO: verify order
+                            for (int j = 0; j < unwind.size(); j++) {
+                                valueTypeStack.push(unwind.get(j));
+                            }
+
+                            for (int j = 0; j < expected.size(); j++) {
+                                valueTypeStack.push(expected.get(j));
+                            }
+                        }
                         // no leftovers allowed
                         //                        if (returns.isEmpty() && valueTypeStack.size() !=
                         // expected.size()) {
-                        //                            throw new InvalidException(
-                        //                                    "type mismatch, leftovers before last
-                        // return");
+                        //                            throw new InvalidException("type mismatch,
+                        // leftovers before last return");
                         //                        }
                         break;
                     }
