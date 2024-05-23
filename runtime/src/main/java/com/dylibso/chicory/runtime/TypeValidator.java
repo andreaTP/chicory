@@ -35,10 +35,14 @@ public class TypeValidator {
     }
 
     private void popAndVerifyType(ValueType expected) {
-        popAndVerifyType(expected, peek(stackLimit));
+        popAndVerifyType(expected, peek(stackLimit), peek(unwindStack));
     }
 
     private void popAndVerifyType(ValueType expected, int limit) {
+        popAndVerifyType(expected, limit, peek(unwindStack));
+    }
+
+    private void popAndVerifyType(ValueType expected, int limit, List<ValueType> unwind) {
         ValueType have = null;
         if (valueTypeStack.size() > limit) {
             have = valueTypeStack.poll();
@@ -46,7 +50,7 @@ public class TypeValidator {
             // a block can consume elements outside of it
             // but they should be restored on exit
             have = valueTypeStack.poll();
-            push(peek(unwindStack), have);
+            push(unwind, have);
         }
         verifyType(expected, have);
     }
@@ -80,18 +84,17 @@ public class TypeValidator {
         }
     }
 
-    private void validateReturns(List<ValueType> returns, int limit) {
-        if (returns.size() > (valueTypeStack.size() - limit)) {
-            throw new InvalidException("type mismatch, not enough values to return");
-        }
+    private void validateReturns(List<ValueType> returns, int limit, List<ValueType> unwind) {
+        //        if (returns.size() > (valueTypeStack.size() - limit - unwind.size())) {
+        //            throw new InvalidException("type mismatch, not enough values to return");
+        //        }
 
-        for (var ret : returns) {
-            popAndVerifyType(ret, limit);
+        for (int j = returns.size() - 1; j >= 0; j--) {
+            popAndVerifyType(returns.get(j), limit, unwind);
         }
 
         for (int j = 0; j < returns.size(); j++) {
-            ValueType valueType = returns.get(returns.size() - 1 - j);
-            valueTypeStack.push(valueType);
+            valueTypeStack.push(returns.get(j));
         }
     }
 
@@ -165,8 +168,9 @@ public class TypeValidator {
                 case RETURN:
                     {
                         var limit = peek(stackLimit);
+                        var unwind = peek(unwindStack);
 
-                        validateReturns(functionType.returns(), limit);
+                        validateReturns(functionType.returns(), limit, unwind);
 
                         // clean up leftovers in the stack
                         while (valueTypeStack.size() > limit) {
@@ -184,17 +188,18 @@ public class TypeValidator {
                     {
                         // TODO: port to the other BR instructions
                         var targetInstruction = body.instructions().get(op.labelTrue());
-                        var targetDepth = returns.size() - targetInstruction.depth() - 1;
+                        var targetDepth = targetInstruction.depth();
 
                         var expected = returns.get(targetDepth);
                         var limit = stackLimit.get(targetDepth);
                         var unwind = unwindStack.get(targetDepth);
 
-                        validateReturns(expected, limit);
+                        validateReturns(expected, limit, unwind);
 
                         // the remaining instructions are not going to be evaluated ever
                         // but, if we are in an IF we should validate the other branch
                         // if we are in a BLOCK should we follow the jump out instead?
+                        // TODO: double check targetDepth!
                         i = jumpToNextEndOrElse(body.instructions(), op, i);
                         // i = op.labelTrue() - 1;
                         break;
@@ -205,8 +210,9 @@ public class TypeValidator {
                         popAndVerifyType(ValueType.I32);
                         var expected = peek(returns);
                         var limit = peek(stackLimit);
+                        var unwind = peek(unwindStack);
 
-                        validateReturns(expected, limit);
+                        validateReturns(expected, limit, unwind);
                         break;
                     }
                 case END:
@@ -215,25 +221,15 @@ public class TypeValidator {
                         var limit = pop(stackLimit);
                         var unwind = pop(unwindStack);
 
-                        validateReturns(expected, limit);
+                        validateReturns(expected, limit, unwind);
 
                         // no leftovers allowed
-                        if (returns.isEmpty() && valueTypeStack.size() != expected.size()) {
-                            throw new InvalidException(
-                                    "type mismatch, leftovers before last return");
-                        }
-                        while (valueTypeStack.size() > limit) {
-                            valueTypeStack.pop();
-                        }
-
-                        while (unwind.size() > 0) {
-                            valueTypeStack.push(pop(unwind));
-                        }
-
-                        // need to push on the stack the results
-                        for (var ret : expected) {
-                            valueTypeStack.push(ret);
-                        }
+                        //                        if (returns.isEmpty() && valueTypeStack.size() !=
+                        // expected.size()) {
+                        //                            throw new InvalidException(
+                        //                                    "type mismatch, leftovers before last
+                        // return");
+                        //                        }
                         break;
                     }
                 default:
