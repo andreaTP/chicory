@@ -252,11 +252,6 @@ public class TypeValidator {
                         var limit = pop(stackLimit);
                         var unwind = pop(unwindStack);
 
-                        //                        if (returns.isEmpty() && expected.size() == 0 &&
-                        // valueTypeStack.size() != 0) {
-                        //                            throw new InvalidException("type mismatch,
-                        // leftovers on the stack");
-                        //                        }
                         validateReturns(expected, limit, unwind);
                         break;
                     }
