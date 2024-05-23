@@ -85,23 +85,10 @@ public class TypeValidator {
     }
 
     private void validateReturns(List<ValueType> returns, int limit, List<ValueType> unwind) {
-        //        if (returns.size() > (valueTypeStack.size() - limit - unwind.size())) {
-        //            throw new InvalidException("type mismatch, not enough values to return");
-        //        }
-
-        //        for (int j = returns.size() - 1; j >= 0; j--) {
-        //            popAndVerifyType(returns.get(j), limit, unwind);
-        //        }
-        //
-        //        for (int j = 0; j < returns.size(); j++) {
-        //            valueTypeStack.push(returns.get(j));
-        //        }
-
         // verify the results
         for (int j = returns.size() - 1; j >= 0; j--) {
             popAndVerifyType(returns.get(j), limit, unwind);
         }
-
         // reset the stack back to limit
         while (valueTypeStack.size() > limit) {
             valueTypeStack.pop();
@@ -114,10 +101,6 @@ public class TypeValidator {
         for (int j = 0; j < returns.size(); j++) {
             valueTypeStack.push(returns.get(j));
         }
-
-        //        if (valueTypeStack.size() != (limit + returns.size())) {
-        //            throw new InvalidException("type mismatch, a good error message");
-        //        }
     }
 
     private int jumpToNextEndOrElse(
@@ -195,6 +178,7 @@ public class TypeValidator {
                         var unwind = peek(unwindStack);
 
                         // unwinding should not kick in RETURN
+                        // TODO: verify if this should be refactored somehow
                         if (valueTypeStack.size() < (functionType.returns().size() + limit)) {
                             throw new InvalidException("type mismatch, not enough return values");
                         }
@@ -247,11 +231,6 @@ public class TypeValidator {
                         var unwind = pop(unwindStack);
 
                         validateReturns(expected, limit, unwind);
-                        // no leftovers allowed at the top level
-                        if (returns.isEmpty() && valueTypeStack.size() != expected.size()) {
-                            throw new InvalidException(
-                                    "type mismatch, leftovers before last return");
-                        }
                         break;
                     }
                 default:
