@@ -201,12 +201,6 @@ public final class Parser {
                             listener.onSection(importSection);
                             break;
                         }
-                    case SectionId.FUNCTION:
-                        {
-                            var funcSection = parseFunctionSection(buffer);
-                            listener.onSection(funcSection);
-                            break;
-                        }
                     case SectionId.TABLE:
                         {
                             var tableSection = parseTableSection(buffer);
@@ -407,20 +401,6 @@ public final class Parser {
         }
 
         return importSection;
-    }
-
-    private static FunctionSection parseFunctionSection(ByteBuffer buffer) {
-
-        var functionCount = readVarUInt32(buffer);
-        FunctionSection functionSection = new FunctionSection((int) functionCount);
-
-        // Parse individual functions in the function section
-        for (int i = 0; i < functionCount; i++) {
-            var typeIndex = readVarUInt32(buffer);
-            functionSection.addFunctionType((int) typeIndex);
-        }
-
-        return functionSection;
     }
 
     private static TableSection parseTableSection(ByteBuffer buffer) {

@@ -365,9 +365,6 @@ class InterpreterMachine implements Machine {
                     case I32_POPCNT:
                         I32_POPCNT(stack);
                         break;
-                    case I32_ADD:
-                        I32_ADD(stack);
-                        break;
                     case I64_ADD:
                         I64_ADD(stack);
                         break;
