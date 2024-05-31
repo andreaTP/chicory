@@ -109,7 +109,6 @@ public class TypeValidator {
                         valueTypeStack.push(ValueType.I32);
                         break;
                     }
-                case I32_ADD:
                 case I32_SUB:
                 case I32_MUL:
                 case I32_DIV_S:
