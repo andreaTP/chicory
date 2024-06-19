@@ -821,8 +821,8 @@ public final class Parser {
 
         var address = buffer.position();
         var b = (int) buffer.get() & 0xff;
-        if (b == 0xfc) { // is multi-byte
-            b = (int) ((0xfc << 8) + Encoding.readUnsignedLeb128(buffer));
+        if (b >= 0xfc) { // is multi-byte
+            b = (int) ((b << 8) + Encoding.readUnsignedLeb128(buffer));
         }
         var op = OpCode.byOpCode(b);
         if (op == null) {

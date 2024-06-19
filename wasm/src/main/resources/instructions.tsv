@@ -200,4 +200,5 @@ table.copy <varuint> <varuint>	$FC0E
 table.grow <varuint>	$FC0F
 table.size <varuint>	$FC10
 table.fill <varuint>	$FC11
+v128.load <varuint> <varuint>	$FD00
 v128.const vec(<varuint>)	$FD0C
