@@ -55,39 +55,48 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Stream;
 
-public class WasiPreview1 implements Closeable {
+public class WasiPreview1 {
+    // TODO: move also logger in the context?
     private final Logger logger;
-    private final List<byte[]> arguments;
-    private final List<Entry<byte[], byte[]>> environment;
-    private final Descriptors descriptors = new Descriptors();
 
     public WasiPreview1(Logger logger) {
-        // TODO by default everything should by blocked
-        // this works now because streams are null.
-        // maybe we want a more explicit way of doing this though
-        this(logger, WasiOptions.builder().build());
+        this.logger = requireNonNull(logger);
     }
 
-    public WasiPreview1(Logger logger, WasiOptions opts) {
-        this.logger = requireNonNull(logger);
-        this.arguments =
-                opts.arguments().stream().map(value -> value.getBytes(UTF_8)).collect(toList());
-        this.environment =
-                opts.environment().entrySet().stream()
-                        .map(
-                                x ->
-                                        Map.entry(
-                                                x.getKey().getBytes(UTF_8),
-                                                x.getValue().getBytes(UTF_8)))
-                        .collect(toList());
+    public static WasiCtx context(WasiOptions opts) {
+        return new WasiCtx(opts);
+    }
 
-        descriptors.allocate(new InStream(opts.stdin()));
-        descriptors.allocate(new OutStream(opts.stdout()));
-        descriptors.allocate(new OutStream(opts.stderr()));
+    public static class WasiCtx implements AutoCloseable {
+        private final List<byte[]> arguments;
+        private final List<Entry<byte[], byte[]>> environment;
 
-        for (var entry : opts.directories().entrySet()) {
-            byte[] name = entry.getKey().getBytes(UTF_8);
-            descriptors.allocate(new PreopenedDirectory(name, entry.getValue()));
+        private final Descriptors descriptors = new Descriptors();
+
+        private WasiCtx(WasiOptions opts) {
+            arguments =
+                    opts.arguments().stream().map(value -> value.getBytes(UTF_8)).collect(toList());
+            environment =
+                    opts.environment().entrySet().stream()
+                            .map(
+                                    x ->
+                                            Map.entry(
+                                                    x.getKey().getBytes(UTF_8),
+                                                    x.getValue().getBytes(UTF_8)))
+                            .collect(toList());
+            descriptors.allocate(new InStream(opts.stdin()));
+            descriptors.allocate(new OutStream(opts.stdout()));
+            descriptors.allocate(new OutStream(opts.stderr()));
+
+            for (var entry : opts.directories().entrySet()) {
+                byte[] name = entry.getKey().getBytes(UTF_8);
+                descriptors.allocate(new PreopenedDirectory(name, entry.getValue()));
+            }
+        }
+
+        @Override
+        public void close() {
+            descriptors.closeAll();
         }
     }
 
@@ -97,7 +106,6 @@ public class WasiPreview1 implements Closeable {
 
     public static class Builder {
         private Logger logger;
-        private WasiOptions opts;
 
         private Builder() {}
 
@@ -106,25 +114,12 @@ public class WasiPreview1 implements Closeable {
             return this;
         }
 
-        public Builder withOpts(WasiOptions opts) {
-            this.opts = opts;
-            return this;
-        }
-
         public WasiPreview1 build() {
             if (logger == null) {
                 logger = new SystemLogger();
             }
-            if (opts == null) {
-                opts = WasiOptions.builder().build();
-            }
-            return new WasiPreview1(logger, opts);
+            return new WasiPreview1(logger);
         }
-    }
-
-    @Override
-    public void close() {
-        descriptors.closeAll();
     }
 
     public HostFunction adapterCloseBadfd() {
@@ -155,7 +150,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction argsGet() {
+    public HostFunction argsGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("args_get: " + Arrays.toString(args));
@@ -163,7 +158,7 @@ public class WasiPreview1 implements Closeable {
                     int argvBuf = args[1].asInt();
 
                     Memory memory = instance.memory();
-                    for (byte[] argument : arguments) {
+                    for (byte[] argument : ctx.arguments) {
                         memory.writeI32(argv, argvBuf);
                         argv += 4;
                         memory.write(argvBuf, argument);
@@ -179,16 +174,16 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction argsSizesGet() {
+    public HostFunction argsSizesGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("args_sizes_get: " + Arrays.toString(args));
                     int argc = args[0].asInt();
                     int argvBufSize = args[1].asInt();
 
-                    int bufSize = arguments.stream().mapToInt(x -> x.length + 1).sum();
+                    int bufSize = ctx.arguments.stream().mapToInt(x -> x.length + 1).sum();
                     Memory memory = instance.memory();
-                    memory.writeI32(argc, arguments.size());
+                    memory.writeI32(argc, ctx.arguments.size());
                     memory.writeI32(argvBufSize, bufSize);
                     return wasiResult(WasiErrno.ESUCCESS);
                 },
@@ -261,7 +256,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction environGet() {
+    public HostFunction environGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("environ_get: " + Arrays.toString(args));
@@ -269,7 +264,7 @@ public class WasiPreview1 implements Closeable {
                     int environBuf = args[1].asInt();
 
                     Memory memory = instance.memory();
-                    for (var entry : environment) {
+                    for (var entry : ctx.environment) {
                         byte[] name = entry.getKey();
                         byte[] value = entry.getValue();
                         byte[] data = new byte[name.length + value.length + 2];
@@ -291,7 +286,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction environSizesGet() {
+    public HostFunction environSizesGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("environ_sizes_get: " + Arrays.toString(args));
@@ -299,11 +294,11 @@ public class WasiPreview1 implements Closeable {
                     int environBufSize = args[1].asInt();
 
                     int bufSize =
-                            environment.stream()
+                            ctx.environment.stream()
                                     .mapToInt(x -> x.getKey().length + x.getValue().length + 2)
                                     .sum();
                     Memory memory = instance.memory();
-                    memory.writeI32(environCount, environment.size());
+                    memory.writeI32(environCount, ctx.environment.size());
                     memory.writeI32(environBufSize, bufSize);
                     return wasiResult(WasiErrno.ESUCCESS);
                 },
@@ -313,7 +308,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdAdvise() {
+    public HostFunction fdAdvise(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_advise: " + Arrays.toString(args));
@@ -341,18 +336,18 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdClose() {
+    public HostFunction fdClose(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_close: " + Arrays.toString(args));
                     int fd = args[0].asInt();
 
-                    Descriptor descriptor = descriptors.get(fd);
+                    Descriptor descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
 
-                    descriptors.free(fd);
+                    ctx.descriptors.free(fd);
 
                     try {
                         if (descriptor instanceof Closeable) {
@@ -383,7 +378,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdFdstatGet() {
+    public HostFunction fdFdstatGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_fdstat_get: " + Arrays.toString(args));
@@ -393,7 +388,7 @@ public class WasiPreview1 implements Closeable {
                     int rightsBase;
                     int rightsInheriting = 0;
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -431,14 +426,14 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdFdstatSetFlags() {
+    public HostFunction fdFdstatSetFlags(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_fdstat_set_flags: " + Arrays.toString(args));
                     int fd = args[0].asInt();
                     int flags = args[1].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -481,14 +476,14 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdFilestatGet() {
+    public HostFunction fdFilestatGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_filestat_get: " + Arrays.toString(args));
                     int fd = args[0].asInt();
                     int buf = args[1].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -576,7 +571,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdPrestatDirName() {
+    public HostFunction fdPrestatDirName(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_prestat_dir_name: " + Arrays.toString(args));
@@ -584,7 +579,7 @@ public class WasiPreview1 implements Closeable {
                     int path = args[1].asInt();
                     int pathLen = args[2].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -607,14 +602,14 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdPrestatGet() {
+    public HostFunction fdPrestatGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_prestat_get: " + Arrays.toString(args));
                     int fd = args[0].asInt();
                     int buf = args[1].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -649,7 +644,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdRead() {
+    public HostFunction fdRead(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_read: " + Arrays.toString(args));
@@ -658,7 +653,7 @@ public class WasiPreview1 implements Closeable {
                     var iovsLen = args[2].asInt();
                     var nreadPtr = args[3].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -705,7 +700,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdReaddir() {
+    public HostFunction fdReaddir(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_readdir: " + Arrays.toString(args));
@@ -719,7 +714,7 @@ public class WasiPreview1 implements Closeable {
                         return wasiResult(WasiErrno.EINVAL);
                     }
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -800,7 +795,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdSeek() {
+    public HostFunction fdSeek(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_seek: " + Arrays.toString(args));
@@ -813,7 +808,7 @@ public class WasiPreview1 implements Closeable {
                         return wasiResult(WasiErrno.EINVAL);
                     }
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -871,14 +866,14 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdTell() {
+    public HostFunction fdTell(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_tell: " + Arrays.toString(args));
                     int fd = args[0].asInt();
                     int offsetPtr = args[1].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -910,7 +905,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction fdWrite() {
+    public HostFunction fdWrite(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_write: " + Arrays.toString(args));
@@ -919,7 +914,7 @@ public class WasiPreview1 implements Closeable {
                     var iovsLen = args[2].asInt();
                     var nwrittenPtr = args[3].asInt();
 
-                    var descriptor = descriptors.get(fd);
+                    var descriptor = ctx.descriptors.get(fd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -962,7 +957,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathCreateDirectory() {
+    public HostFunction pathCreateDirectory(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_create_directory: " + Arrays.toString(args));
@@ -970,7 +965,7 @@ public class WasiPreview1 implements Closeable {
                     int pathPtr = args[1].asInt();
                     int pathLen = args[2].asInt();
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1003,7 +998,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathFilestatGet() {
+    public HostFunction pathFilestatGet(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_filestat_get: " + Arrays.toString(args));
@@ -1013,7 +1008,7 @@ public class WasiPreview1 implements Closeable {
                     int pathLen = args[3].asInt();
                     int buf = args[4].asInt();
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1079,7 +1074,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathOpen() {
+    public HostFunction pathOpen(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_open: " + Arrays.toString(args));
@@ -1093,7 +1088,7 @@ public class WasiPreview1 implements Closeable {
                     int fdFlags = args[7].asInt();
                     int fdPtr = args[8].asInt();
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1113,7 +1108,7 @@ public class WasiPreview1 implements Closeable {
                     LinkOption[] linkOptions = toLinkOptions(lookupFlags);
 
                     if (Files.isDirectory(path, linkOptions)) {
-                        int fd = descriptors.allocate(new OpenDirectory(path));
+                        int fd = ctx.descriptors.allocate(new OpenDirectory(path));
                         memory.writeI32(fdPtr, fd);
                         return wasiResult(WasiErrno.ESUCCESS);
                     }
@@ -1160,7 +1155,7 @@ public class WasiPreview1 implements Closeable {
                     int fd;
                     try {
                         SeekableByteChannel channel = Files.newByteChannel(path, openOptions);
-                        fd = descriptors.allocate(new OpenFile(path, channel, fdFlags));
+                        fd = ctx.descriptors.allocate(new OpenFile(path, channel, fdFlags));
                     } catch (FileAlreadyExistsException e) {
                         return wasiResult(WasiErrno.EEXIST);
                     } catch (NoSuchFileException e) {
@@ -1200,7 +1195,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathRemoveDirectory() {
+    public HostFunction pathRemoveDirectory(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_remove_directory: " + Arrays.toString(args));
@@ -1208,7 +1203,7 @@ public class WasiPreview1 implements Closeable {
                     int pathPtr = args[1].asInt();
                     int pathLen = args[2].asInt();
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1247,7 +1242,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathRename() {
+    public HostFunction pathRename(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_rename: " + Arrays.toString(args));
@@ -1258,7 +1253,7 @@ public class WasiPreview1 implements Closeable {
                     int newPathPtr = args[4].asInt();
                     int newPathLen = args[5].asInt();
 
-                    var oldDescriptor = descriptors.get(oldFd);
+                    var oldDescriptor = ctx.descriptors.get(oldFd);
                     if (oldDescriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1267,7 +1262,7 @@ public class WasiPreview1 implements Closeable {
                     }
                     Path oldDirectory = ((Directory) oldDescriptor).path();
 
-                    var newDescriptor = descriptors.get(newFd);
+                    var newDescriptor = ctx.descriptors.get(newFd);
                     if (newDescriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1334,7 +1329,7 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction pathUnlinkFile() {
+    public HostFunction pathUnlinkFile(WasiCtx ctx) {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_unlink_file: " + Arrays.toString(args));
@@ -1342,7 +1337,7 @@ public class WasiPreview1 implements Closeable {
                     int pathPtr = args[1].asInt();
                     int pathLen = args[2].asInt();
 
-                    var descriptor = descriptors.get(dirFd);
+                    var descriptor = ctx.descriptors.get(dirFd);
                     if (descriptor == null) {
                         return wasiResult(WasiErrno.EBADF);
                     }
@@ -1550,47 +1545,47 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
-    public HostFunction[] toHostFunctions() {
+    public HostFunction[] toHostFunctions(WasiCtx ctx) {
         return new HostFunction[] {
             adapterCloseBadfd(),
             adapterOpenBadfd(),
-            argsGet(),
-            argsSizesGet(),
+            argsGet(ctx),
+            argsSizesGet(ctx),
             clockResGet(),
             clockTimeGet(),
-            environGet(),
-            environSizesGet(),
-            fdAdvise(),
+            environGet(ctx),
+            environSizesGet(ctx),
+            fdAdvise(ctx),
             fdAllocate(),
-            fdClose(),
+            fdClose(ctx),
             fdDatasync(),
-            fdFdstatGet(),
-            fdFdstatSetFlags(),
+            fdFdstatGet(ctx),
+            fdFdstatSetFlags(ctx),
             fdFdstatSetRights(),
-            fdFilestatGet(),
+            fdFilestatGet(ctx),
             fdFilestatSetSize(),
             fdFilestatSetTimes(),
             fdPread(),
-            fdPrestatDirName(),
-            fdPrestatGet(),
+            fdPrestatDirName(ctx),
+            fdPrestatGet(ctx),
             fdPwrite(),
-            fdRead(),
-            fdReaddir(),
+            fdRead(ctx),
+            fdReaddir(ctx),
             fdRenumber(),
-            fdSeek(),
+            fdSeek(ctx),
             fdSync(),
-            fdTell(),
-            fdWrite(),
-            pathCreateDirectory(),
-            pathFilestatGet(),
+            fdTell(ctx),
+            fdWrite(ctx),
+            pathCreateDirectory(ctx),
+            pathFilestatGet(ctx),
             pathFilestatSetTimes(),
             pathLink(),
-            pathOpen(),
+            pathOpen(ctx),
             pathReadlink(),
-            pathRemoveDirectory(),
-            pathRename(),
+            pathRemoveDirectory(ctx),
+            pathRename(ctx),
             pathSymlink(),
-            pathUnlinkFile(),
+            pathUnlinkFile(ctx),
             pollOneoff(),
             procExit(),
             procRaise(),

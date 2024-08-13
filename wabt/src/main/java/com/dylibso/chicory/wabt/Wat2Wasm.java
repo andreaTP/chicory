@@ -32,6 +32,13 @@ public final class Wat2Wasm {
     private static final Logger logger = new SystemLogger();
     private static final Module MODULE =
             Module.builder(Wat2Wasm.class.getResourceAsStream("/wat2wasm")).build();
+    private static final WasiPreview1 WASI = WasiPreview1.builder().withLogger(logger).build();
+    private static final Instance INSTANCE =
+            Instance.builder(MODULE)
+                    .withTypeValidation(false)
+                    .withStart(false)
+                    .withHostImports(new HostImports(WASI.toHostFunctions(null)))
+                    .build();
 
     private Wat2Wasm() {}
 
@@ -72,13 +79,9 @@ public final class Wat2Wasm {
                                 .withArguments(List.of("wat2wasm", path.toString(), "--output=-"))
                                 .build();
 
-                try (var wasi =
-                        WasiPreview1.builder().withLogger(logger).withOpts(wasiOpts).build()) {
-                    HostImports imports = new HostImports(wasi.toHostFunctions());
-                    Instance.builder(MODULE)
-                            .withTypeValidation(false)
-                            .withHostImports(imports)
-                            .build();
+                try (var ctx = WasiPreview1.context(wasiOpts)) {
+                    HostImports imports = new HostImports(WASI.toHostFunctions(ctx));
+                    INSTANCE.withNewHostImports(imports).export("_start").apply();
                 }
 
                 return stdoutStream.toByteArray();

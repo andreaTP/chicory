@@ -150,6 +150,47 @@ public class Instance {
         }
     }
 
+    // deep-clone to swap HostImports without re-initializing
+    private Instance(
+            HostImports imports,
+            Module module,
+            Machine machine,
+            FunctionBody[] functions,
+            Memory memory,
+            DataSegment[] dataSegments,
+            Global[] globalInitializers,
+            GlobalInstance[] globals,
+            int importedGlobalsOffset,
+            int importedFunctionsOffset,
+            int importedTablesOffset,
+            FunctionType[] types,
+            int[] functionTypes,
+            Table[] roughTables,
+            TableInstance[] tables,
+            Element[] elements,
+            Map<String, Export> exports,
+            ExecutionListener listener) {
+        this.module = module;
+        this.machine = new InterpreterMachine(this);
+        this.functions = functions.clone();
+        this.globalInitializers = globalInitializers.clone();
+        this.globals = globals.clone();
+        this.importedGlobalsOffset = importedGlobalsOffset;
+        this.importedFunctionsOffset = importedFunctionsOffset;
+        this.importedTablesOffset = importedTablesOffset;
+        this.memory = memory;
+        this.dataSegments = dataSegments.clone();
+        this.types = types.clone();
+        this.functionTypes = functionTypes.clone();
+        this.imports = imports;
+        this.roughTables = roughTables.clone();
+        this.elements = elements.clone();
+        this.exports = exports;
+        this.start = false;
+        this.listener = listener;
+        this.typeValidation = false;
+    }
+
     public Instance initialize(boolean start) {
         this.tables = new TableInstance[this.roughTables.length];
         for (var i = 0; i < this.roughTables.length; i++) {
@@ -284,6 +325,28 @@ public class Instance {
         }
 
         return this;
+    }
+
+    public Instance withNewHostImports(HostImports newImports) {
+        return new Instance(
+                newImports,
+                this.module,
+                this.machine,
+                this.functions,
+                this.memory,
+                this.dataSegments,
+                this.globalInitializers,
+                this.globals,
+                this.importedGlobalsOffset,
+                this.importedFunctionsOffset,
+                this.importedTablesOffset,
+                this.types,
+                this.functionTypes,
+                this.roughTables,
+                this.tables,
+                this.elements,
+                this.exports,
+                this.listener);
     }
 
     public FunctionType exportType(String name) {

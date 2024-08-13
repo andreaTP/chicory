@@ -58,36 +58,34 @@ public class Cli implements Runnable {
         }
         var logger = new SystemLogger();
         var module = Module.builder(file).build();
-        var imports =
-                wasi
-                        ? new HostImports(
-                                new WasiPreview1(
-                                                logger,
-                                                WasiOptions.builder().inheritSystem().build())
-                                        .toHostFunctions())
-                        : new HostImports();
-        var instance =
-                Instance.builder(module)
-                        .withInitialize(true)
-                        .withStart(false)
-                        .withHostImports(imports)
-                        .build();
+        try (var ctx = WasiPreview1.context(WasiOptions.builder().inheritSystem().build())) {
+            var imports =
+                    wasi
+                            ? new HostImports(new WasiPreview1(logger).toHostFunctions(ctx))
+                            : new HostImports();
+            var instance =
+                    Instance.builder(module)
+                            .withInitialize(true)
+                            .withStart(false)
+                            .withHostImports(imports)
+                            .build();
 
-        if (functionName != null) {
-            var type = instance.exportType(functionName);
-            var export = instance.export(functionName);
-            var params = new Value[type.params().size()];
-            for (var i = 0; i < type.params().size(); i++) {
-                params[i] = new Value(type.params().get(i), Long.valueOf(arguments[i]));
-            }
+            if (functionName != null) {
+                var type = instance.exportType(functionName);
+                var export = instance.export(functionName);
+                var params = new Value[type.params().size()];
+                for (var i = 0; i < type.params().size(); i++) {
+                    params[i] = new Value(type.params().get(i), Long.valueOf(arguments[i]));
+                }
 
-            var result = export.apply(params);
-            if (result != null) {
-                for (var r : result) {
-                    if (result == null) {
-                        System.out.println(0);
-                    } else {
-                        System.out.println(r.asLong()); // Check floating point results
+                var result = export.apply(params);
+                if (result != null) {
+                    for (var r : result) {
+                        if (result == null) {
+                            System.out.println(0);
+                        } else {
+                            System.out.println(r.asLong()); // Check floating point results
+                        }
                     }
                 }
             }

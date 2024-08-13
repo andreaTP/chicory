@@ -36,6 +36,13 @@ public class Wast2Json {
             };
     private static final Module MODULE =
             Module.builder(Wast2Json.class.getResourceAsStream("/wast2json")).build();
+    private static final WasiPreview1 WASI = WasiPreview1.builder().withLogger(logger).build();
+    private static final Instance INSTANCE =
+            Instance.builder(MODULE)
+                    .withTypeValidation(false)
+                    .withStart(false)
+                    .withHostImports(new HostImports(WASI.toHostFunctions(null)))
+                    .build();
 
     private final File input;
     private final File output;
@@ -84,16 +91,9 @@ public class Wast2Json {
                 args.addAll(List.of(options));
                 wasiOpts.withArguments(args);
 
-                try (var wasi =
-                        WasiPreview1.builder()
-                                .withLogger(logger)
-                                .withOpts(wasiOpts.build())
-                                .build()) {
-                    HostImports imports = new HostImports(wasi.toHostFunctions());
-                    Instance.builder(MODULE)
-                            .withTypeValidation(false)
-                            .withHostImports(imports)
-                            .build();
+                try (var ctx = WasiPreview1.context(wasiOpts.build())) {
+                    HostImports imports = new HostImports(WASI.toHostFunctions(ctx));
+                    INSTANCE.withNewHostImports(imports).export("_start").apply();
                 }
 
                 createDirectories(output.toPath().getParent());
