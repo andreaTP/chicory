@@ -15,3 +15,8 @@ scripts/jmh-tmp
 
 /*.wasm
 readmes/*/current
+
+zig-install
+zig-source
+zig-testsuite
+binaryen-install
