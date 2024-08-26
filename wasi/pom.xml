@@ -65,8 +65,7 @@
             <excludes>
               <!-- pread is not implemented -->
               <exclude>tests/c/testsuite/pread-with-access.wasm</exclude>
-              <!-- pwrite is not implemented -->
-              <exclude>tests/c/testsuite/pwrite-with-access.wasm</exclude>
+              <!-- pwrite is implemented but should be verified on streams -->
               <exclude>tests/c/testsuite/pwrite-with-append.wasm</exclude>
               <!-- sockets are not implemented -->
               <exclude>tests/c/testsuite/sock_shutdown-invalid_fd.wasm</exclude>

@@ -32,9 +32,10 @@ fi
 PATH=${PWD}/${ZIG_INSTALL}:${PWD}/${BINARYEN_INSTALL}/bin:$PATH
 
 # --test-no-exec allows building of the test Wasm binary without executing command.
+# --force-link-libc attempt to fix: 719/2552 test.openat smoke test... reached unreachable code
 (
     cd ${ZIG_SOURCE} && \
-        zig test --test-no-exec -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig
+        zig test --test-no-exec -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig --force-link-libc
 )
 
 mkdir -p ${ZIG_TESTSUITE}

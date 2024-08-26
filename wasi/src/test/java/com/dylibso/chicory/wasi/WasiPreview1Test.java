@@ -10,9 +10,14 @@ import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasm.Module;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.types.Value;
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
 import java.util.List;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class WasiPreview1Test {
@@ -125,17 +130,28 @@ public class WasiPreview1Test {
     }
 
     @Test
+    @Disabled
     public void shouldRunZigStdlibTestsuite() throws Exception {
-        var wasiOpts =
-                WasiOptions.builder()
-                        .inheritSystem()
-                        .withArguments(List.of(""))
-                        .build();
-        var wasi = new WasiPreview1(this.logger, wasiOpts);
-        var imports = new HostImports(wasi.toHostFunctions());
+        try (FileSystem fs =
+                Jimfs.newFileSystem(
+                        Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
+            Path target = fs.getPath(".");
 
-        // var module = Parser.parse(new File("/home/aperuffo/workspace/chicory/zig-testsuite/test.wasm"));
-        var module = Parser.parse(new File("/home/aperuffo/workspace/chicory/zig-testsuite/test-opt.wasm"));
-        Instance.builder(module).withHostImports(imports).build();
+            var wasiOpts =
+                    WasiOptions.builder()
+                            .inheritSystem()
+                            .withArguments(List.of("test.wasm"))
+                            .withDirectory(target.toString(), target)
+                            .build();
+            var wasi = new WasiPreview1(this.logger, wasiOpts);
+            var imports = new HostImports(wasi.toHostFunctions());
+
+            var module =
+                    Parser.parse(
+                            new File("/home/aperuffo/workspace/chicory/zig-testsuite/test.wasm"));
+            // var module = Parser.parse(new
+            // File("/home/aperuffo/workspace/chicory/zig-testsuite/test-opt.wasm"));
+            Instance.builder(module).withHostImports(imports).build();
+        }
     }
 }

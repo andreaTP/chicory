@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Optional;
 import java.util.TreeSet;
 
 final class Descriptors {
@@ -68,7 +69,7 @@ final class Descriptors {
     }
 
     interface DataWriter {
-        int write(byte[] data) throws IOException;
+        int write(byte[] data, Optional<Long> offset) throws IOException;
     }
 
     interface Directory {
@@ -96,8 +97,12 @@ final class Descriptors {
         }
 
         @Override
-        public int write(byte[] data) throws IOException {
-            out.write(data);
+        public int write(byte[] data, Optional<Long> offset) throws IOException {
+            if (offset.isEmpty()) {
+                out.write(data);
+            } else {
+                out.write(data, offset.get().intValue(), data.length);
+            }
             return data.length;
         }
     }
@@ -163,8 +168,16 @@ final class Descriptors {
         }
 
         @Override
-        public int write(byte[] data) throws IOException {
-            return channel.write(ByteBuffer.wrap(data));
+        public int write(byte[] data, Optional<Long> offset) throws IOException {
+            var prevPos = channel.position();
+            if (offset.isPresent()) {
+                channel.position(offset.get());
+                var res = channel.write(ByteBuffer.wrap(data));
+                channel.position(prevPos);
+                return res;
+            } else {
+                return channel.write(ByteBuffer.wrap(data));
+            }
         }
 
         @Override

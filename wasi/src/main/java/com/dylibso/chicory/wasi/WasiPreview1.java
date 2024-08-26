@@ -53,7 +53,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 
 public class WasiPreview1 implements Closeable {
@@ -636,13 +638,21 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
+    // Except for handling offset, this implementation is identical to fdWrite.
+    //
+    // See
+    // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_pwritefd-fd-iovs-ciovec_array-offset-filesize---errno-size
     public HostFunction fdPwrite() {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_pwrite: " + Arrays.toString(args));
-                    throw new WASMRuntimeException(
-                            "We don't yet support this WASI call: fd_pwrite");
-                    // return new Value[] { Value.i32(0) };
+                    return fdWrite(
+                            instance,
+                            args[0].asInt(),
+                            args[1].asInt(),
+                            args[2].asInt(),
+                            Optional.of(args[3].asLong()),
+                            args[4].asInt());
                 },
                 "wasi_snapshot_preview1",
                 "fd_pwrite",
@@ -911,51 +921,62 @@ public class WasiPreview1 implements Closeable {
                 List.of(I32));
     }
 
+    private Value[] fdWrite(
+            Instance instance,
+            int fd,
+            int iovs,
+            int iovsLen,
+            Optional<Long> offset,
+            int newWrittenPtr) {
+        var descriptor = descriptors.get(fd);
+        if (descriptor == null) {
+            return wasiResult(WasiErrno.EBADF);
+        }
+
+        if (descriptor instanceof InStream) {
+            return wasiResult(WasiErrno.EBADF);
+        }
+        if (descriptor instanceof Directory) {
+            return wasiResult(WasiErrno.EISDIR);
+        }
+        if (!(descriptor instanceof DataWriter)) {
+            throw unhandledDescriptor(descriptor);
+        }
+        DataWriter writer = (DataWriter) descriptor;
+
+        var totalWritten = 0;
+        Memory memory = instance.memory();
+        for (var i = 0; i < iovsLen; i++) {
+            var base = iovs + (i * 8);
+            var iovBase = memory.readI32(base).asInt();
+            var iovLen = memory.readI32(base + 4).asInt();
+            var data = memory.readBytes(iovBase, iovLen);
+            try {
+                int written = writer.write(data, offset);
+                totalWritten += written;
+                if (written < iovLen) {
+                    break;
+                }
+            } catch (IOException e) {
+                return wasiResult(WasiErrno.EIO);
+            }
+        }
+
+        memory.writeI32(newWrittenPtr, totalWritten);
+        return wasiResult(WasiErrno.ESUCCESS);
+    }
+
     public HostFunction fdWrite() {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("fd_write: " + Arrays.toString(args));
-                    var fd = args[0].asInt();
-                    var iovs = args[1].asInt();
-                    var iovsLen = args[2].asInt();
-                    var nwrittenPtr = args[3].asInt();
-
-                    var descriptor = descriptors.get(fd);
-                    if (descriptor == null) {
-                        return wasiResult(WasiErrno.EBADF);
-                    }
-
-                    if (descriptor instanceof InStream) {
-                        return wasiResult(WasiErrno.EBADF);
-                    }
-                    if (descriptor instanceof Directory) {
-                        return wasiResult(WasiErrno.EISDIR);
-                    }
-                    if (!(descriptor instanceof DataWriter)) {
-                        throw unhandledDescriptor(descriptor);
-                    }
-                    DataWriter writer = (DataWriter) descriptor;
-
-                    var totalWritten = 0;
-                    Memory memory = instance.memory();
-                    for (var i = 0; i < iovsLen; i++) {
-                        var base = iovs + (i * 8);
-                        var iovBase = memory.readI32(base).asInt();
-                        var iovLen = memory.readI32(base + 4).asInt();
-                        var data = memory.readBytes(iovBase, iovLen);
-                        try {
-                            int written = writer.write(data);
-                            totalWritten += written;
-                            if (written < iovLen) {
-                                break;
-                            }
-                        } catch (IOException e) {
-                            return wasiResult(WasiErrno.EIO);
-                        }
-                    }
-
-                    memory.writeI32(nwrittenPtr, totalWritten);
-                    return wasiResult(WasiErrno.ESUCCESS);
+                    return fdWrite(
+                            instance,
+                            args[0].asInt(),
+                            args[1].asInt(),
+                            args[2].asInt(),
+                            Optional.empty(),
+                            args[3].asInt());
                 },
                 "wasi_snapshot_preview1",
                 "fd_write",
@@ -1326,8 +1347,49 @@ public class WasiPreview1 implements Closeable {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
                     logger.info("path_symlink: " + Arrays.toString(args));
-                    throw new WASMRuntimeException(
-                            "We don't yet support this WASI call: path_symlink");
+                    // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_symlink
+
+                    var oldPathPtr = args[0].asInt();
+                    var oldPathLen = args[1].asInt();
+                    var fd = args[2].asInt();
+                    var newPathPtr = args[3].asInt();
+                    var newPathLen = args[4].asInt();
+
+                    var descriptor = descriptors.get(fd);
+                    if (descriptor == null) {
+                        return wasiResult(WasiErrno.EBADF);
+                    }
+                    if (!(descriptor instanceof Directory)) {
+                        return wasiResult(WasiErrno.ENOTDIR);
+                    }
+
+                    if (oldPathLen == 0 || newPathLen == 0) {
+                        return wasiResult(WasiErrno.EINVAL);
+                    }
+
+                    Path directory = ((Directory) descriptor).path();
+
+                    String oldRawPath = instance.memory().readString(oldPathPtr, oldPathLen);
+                    Path oldPath = resolvePath(directory, oldRawPath);
+                    if (oldPath == null) {
+                        return wasiResult(WasiErrno.EACCES);
+                    }
+
+                    String newRawPath = instance.memory().readString(newPathPtr, newPathLen);
+                    Path newPath = resolvePath(directory, newRawPath);
+                    if (newPath == null) {
+                        return wasiResult(WasiErrno.EACCES);
+                    }
+
+                    try {
+                        Files.createLink(newPath, oldPath);
+                    } catch (IOException e) {
+                        // TODO: FIXME!
+                        // java.nio.file.NoSuchFileException:
+                        // fs-tests.dir/./path_symlink_trailing_slashes_dir.cleanup/source
+                        throw new RuntimeException(e);
+                    }
+                    return wasiResult(WasiErrno.ESUCCESS);
                 },
                 "wasi_snapshot_preview1",
                 "path_symlink",
@@ -1401,8 +1463,12 @@ public class WasiPreview1 implements Closeable {
 
     private int processClockEvent(byte[] inBuf) {
         var id = ByteBuffer.wrap(Arrays.copyOfRange(inBuf, 0, 8)).asIntBuffer().get(); // See below
-        var timeout = ByteBuffer.wrap(Arrays.copyOfRange(inBuf, 8, 16)).asIntBuffer().get(); // nanos if relative
-        var precision = ByteBuffer.wrap(Arrays.copyOfRange(inBuf, 16, 24)).asLongBuffer().get(); // Unused
+        var timeout =
+                ByteBuffer.wrap(Arrays.copyOfRange(inBuf, 8, 16))
+                        .asIntBuffer()
+                        .get(); // nanos if relative
+        var precision =
+                ByteBuffer.wrap(Arrays.copyOfRange(inBuf, 16, 24)).asLongBuffer().get(); // Unused
 
         // https://linux.die.net/man/3/clock_settime says relative timers are
         // unaffected. Since this function only supports relative timeout, we can
@@ -1410,10 +1476,10 @@ public class WasiPreview1 implements Closeable {
         return timeout;
     }
 
-
     // writeEvent writes the event corresponding to the processed subscription.
     // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-    private void writeEvent(byte[] outBuf, int offset, byte eventType, WasiErrno errno, byte[] userData) {
+    private void writeEvent(
+            byte[] outBuf, int offset, byte eventType, WasiErrno errno, byte[] userData) {
         // userdata
         for (int i = 0; i < userData.length; i++) {
             outBuf[offset + i] = userData[i];
@@ -1427,6 +1493,7 @@ public class WasiPreview1 implements Closeable {
         // TODO: When FD events are supported, write outOffset+16
     }
 
+    // Seems enough to continue with the Zig testsuite ...
     public HostFunction pollOneoff() {
         return new HostFunction(
                 (Instance instance, Value... args) -> {
@@ -1465,12 +1532,14 @@ public class WasiPreview1 implements Closeable {
 
                     // Extract FS context, used in the body of the for loop for FS access.
                     // fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-                    // Slice of events that are processed out of the loop (blocking stdin subscribers).
+                    // Slice of events that are processed out of the loop (blocking stdin
+                    // subscribers).
                     // var blockingStdinSubs []*event
                     // The timeout is initialized at max Duration, the loop will find the minimum.
                     var timeout = 1 << 63 - 1;
                     // Count of all the subscriptions that have been already written back to outBuf.
-                    // nevents*32 returns at all times the offset where the next event should be written:
+                    // nevents*32 returns at all times the offset where the next event should be
+                    // written:
                     // this way we ensure that there are no gaps between records.
                     var nevents = 0;
 
@@ -1480,107 +1549,131 @@ public class WasiPreview1 implements Closeable {
                         var inOffset = i * 40;
                         var outOffset = nevents * 32;
 
-                        var eventType = inBuf[inOffset+8]; // +8 past userdata
+                        var eventType = inBuf[inOffset + 8]; // +8 past userdata
                         // +8 past userdata +8 contents_offset
                         // inBuf[inOffset+8+8:]
-                        var argBuf = Arrays.copyOfRange(inBuf, inOffset+8+8, inBuf.length);
+                        var argBuf = Arrays.copyOfRange(inBuf, inOffset + 8 + 8, inBuf.length);
                         var userData = Arrays.copyOfRange(inBuf, inOffset, inOffset + 8);
 
                         switch (eventType) {
-                            case WasiEventType.Clock: {
-                                var clockEventErrno = errnoClockEvent(argBuf);
-                                if (clockEventErrno != WasiErrno.ESUCCESS) {
-                                    return wasiResult(clockEventErrno);
+                            case WasiEventType.Clock:
+                                {
+                                    var clockEventErrno = errnoClockEvent(argBuf);
+                                    if (clockEventErrno != WasiErrno.ESUCCESS) {
+                                        return wasiResult(clockEventErrno);
+                                    }
+
+                                    var newTimeout = processClockEvent(argBuf);
+                                    // Min timeout.
+                                    timeout = Math.min(newTimeout, timeout);
+                                    // Ack the clock event to the outBuf.
+
+                                    writeEvent(
+                                            outBuf,
+                                            outOffset,
+                                            eventType,
+                                            WasiErrno.ESUCCESS,
+                                            userData);
+                                    memory.write(out, outBuf);
+                                    nevents++;
+                                    break;
                                 }
+                            case WasiEventType.FdRead:
+                                {
+                                    // TODO: either complete the implementation or throw an
+                                    // Exception
+                                    var fd = ByteBuffer.wrap(argBuf).asIntBuffer().get();
+                                    var descriptor = descriptors.get(fd);
+                                    if (descriptor == null) {
+                                        return wasiResult(WasiErrno.EBADF);
+                                    }
 
-                                var newTimeout = processClockEvent(argBuf);
-                                // Min timeout.
-                                timeout = Math.min(newTimeout, timeout);
-                                // Ack the clock event to the outBuf.
+                                    if (descriptor instanceof OpenFile) {}
 
-                                writeEvent(outBuf, outOffset, eventType, WasiErrno.ESUCCESS, userData);
-                                nevents++;
-                                break;
-                            }
-                            case WasiEventType.FdRead: {
-                            }
-                            case WasiEventType.FdWrite: {
-                            }
+                                    //                                if file, ok :=
+                                    // fsc.LookupFile(fd); !ok {
+                                    //                                    evt.errno =
+                                    // wasip1.ErrnoBadf
+                                    //
+                                    // writeEvent(outBuf[outOffset:], evt)
+                                    //                                    nevents++
+                                    //                                } else if fd !=
+                                    // internalsys.FdStdin && file.File.IsNonblock() {
+                                    //
+                                    // writeEvent(outBuf[outOffset:], evt)
+                                    //                                    nevents++
+                                    //                                } else {
+                                    //                                    // if the fd is Stdin, and
+                                    // it is in blocking mode,
+                                    //                                    // do not ack yet, append
+                                    // to a slice for delayed evaluation.
+                                    //                                    blockingStdinSubs =
+                                    // append(blockingStdinSubs, evt)
+                                    //                                }
+                                    break;
+                                }
+                            case WasiEventType.FdWrite:
+                                {
+                                    // TODO: either complete the implementation or throw an
+                                    // Exception
+
+                                    //                            case wasip1.EventTypeFdWrite:
+                                    //                                fd := int32(le.Uint32(argBuf))
+                                    //                                if fd < 0 {
+                                    //                                return sys.EBADF
+                                    //                            }
+                                    //                            if _, ok := fsc.LookupFile(fd); ok
+                                    // {
+                                    //                                evt.errno = wasip1.ErrnoNotsup
+                                    //                            } else {
+                                    //                                evt.errno = wasip1.ErrnoBadf
+                                    //                            }
+                                    //                            nevents++
+                                    //                            writeEvent(outBuf[outOffset:],
+                                    // evt)
+                                    //                            default:
+                                    //                                return sys.EINVAL
+                                    //                        }
+                                }
                         }
                     }
 
-//                        switch eventType {
-//                            case wasip1.EventTypeFdRead:
-//                                fd := int32(le.Uint32(argBuf))
-//                                if fd < 0 {
-//                                return sys.EBADF
-//                            }
-//                            if file, ok := fsc.LookupFile(fd); !ok {
-//                                evt.errno = wasip1.ErrnoBadf
-//                                writeEvent(outBuf[outOffset:], evt)
-//                                nevents++
-//                            } else if fd != internalsys.FdStdin && file.File.IsNonblock() {
-//                                writeEvent(outBuf[outOffset:], evt)
-//                                nevents++
-//                            } else {
-//                                // if the fd is Stdin, and it is in blocking mode,
-//                                // do not ack yet, append to a slice for delayed evaluation.
-//                                blockingStdinSubs = append(blockingStdinSubs, evt)
-//                            }
-//                            case wasip1.EventTypeFdWrite:
-//                                fd := int32(le.Uint32(argBuf))
-//                                if fd < 0 {
-//                                return sys.EBADF
-//                            }
-//                            if _, ok := fsc.LookupFile(fd); ok {
-//                                evt.errno = wasip1.ErrnoNotsup
-//                            } else {
-//                                evt.errno = wasip1.ErrnoBadf
-//                            }
-//                            nevents++
-//                            writeEvent(outBuf[outOffset:], evt)
-//                            default:
-//                                return sys.EINVAL
-//                        }
-//                    }
-//
-//                    sysCtx := mod.(*wasm.ModuleInstance).Sys
-//                    if nevents == nsubscriptions {
-//                        // We already wrote back all the results. We already wrote this number
-//                        // earlier to offset `resultNevents`.
-//                        // We only need to observe the timeout (nonzero if there are clock subscriptions)
-//                        // and return.
-//                        if timeout > 0 {
-//                            sysCtx.Nanosleep(int64(timeout))
-//                        }
-//                        return 0
-//                    }
-//
-//                    // If there are blocking stdin subscribers, check for data with given timeout.
-//                    stdin, ok := fsc.LookupFile(internalsys.FdStdin)
-//                    if !ok {
-//                        return sys.EBADF
-//                    }
-//                    // Wait for the timeout to expire, or for some data to become available on Stdin.
-//
-//                    if stdinReady, errno := stdin.File.Poll(fsapi.POLLIN, int32(timeout.Milliseconds())); errno != 0 {
-//                        return errno
-//                    } else if stdinReady {
-//                        // stdin has data ready to for reading, write back all the events
-//                        for i := range blockingStdinSubs {
-//                            evt := blockingStdinSubs[i]
-//                            evt.errno = 0
-//                            writeEvent(outBuf[nevents*32:], evt)
-//                            nevents++
-//                        }
-//                    }
-//
-//                    if nevents != nsubscriptions {
-//                        if !mod.Memory().WriteUint32Le(resultNevents, nevents) {
-//                            return sys.EFAULT
-//                        }
-//                    }
+                    if (nevents == nsubscriptions) {
+                        // We already wrote back all the results. We already wrote this number
+                        // earlier to offset `resultNevents`.
+                        // We only need to observe the timeout (nonzero if there are clock
+                        // subscriptions)
+                        // and return.
+                        if (timeout > 0) {
+                            LockSupport.parkNanos(timeout);
+                        }
+                        return wasiResult(WasiErrno.ESUCCESS);
+                    }
 
+                    //
+                    //                    // If there are blocking stdin subscribers, check for data
+                    // with given timeout.
+                    //                    stdin, ok := fsc.LookupFile(internalsys.FdStdin)
+                    //                    if !ok {
+                    //                        return sys.EBADF
+                    //                    }
+                    //                    // Wait for the timeout to expire, or for some data to
+                    // become available on Stdin.
+                    //
+                    //                    if stdinReady, errno := stdin.File.Poll(fsapi.POLLIN,
+                    // int32(timeout.Milliseconds())); errno != 0 {
+                    //                        return errno
+                    //                    } else if stdinReady {
+                    //                        // stdin has data ready to for reading, write back all
+                    // the events
+                    //                        for i := range blockingStdinSubs {
+                    //                            evt := blockingStdinSubs[i]
+                    //                            evt.errno = 0
+                    //                            writeEvent(outBuf[nevents*32:], evt)
+                    //                            nevents++
+                    //                        }
+                    //                    }
+                    //
                     return wasiResult(WasiErrno.ESUCCESS);
                 },
                 "wasi_snapshot_preview1",
