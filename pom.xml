@@ -40,6 +40,7 @@
     <module>aot-tests</module>
     <module>bom</module>
     <module>cli</module>
+    <module>demo-plugin-gen-aot</module>
     <module>function-annotations</module>
     <module>function-processor</module>
     <module>fuzz</module>
