@@ -1,6 +1,7 @@
 package com.dylibso.chicory.wasi;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.copy;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,7 +15,15 @@ import com.dylibso.chicory.wasm.Module;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
 import com.dylibso.chicory.wasm.types.Value;
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -147,5 +156,70 @@ public class WasiPreview1Test {
 
         assertArrayEquals(first, memory.readBytes(0, 123_456));
         assertArrayEquals(second, memory.readBytes(222_222, 87_654));
+    }
+
+    @Test
+    public void shouldRunOcrs() throws Exception {
+        // ocrs /home/aperuffo/Pictures/build_test.png --detect-model
+        // /home/aperuffo/Downloads/text-detection.rten --rec-model
+        // /home/aperuffo/Downloads/text-recognition.rten
+        var module =
+                Parser.parse(
+                        new File(
+                                "/home/aperuffo/workspace/ocrs/target/wasm32-wasi/release/ocrs.wasm"));
+        var input = new File("/home/aperuffo/Pictures/build_test.png");
+        var detectionModel = new File("/home/aperuffo/Downloads/text-detection.rten");
+        var recognitionModel = new File("/home/aperuffo/Downloads/text-recognition.rten");
+        try (FileInputStream fis = new FileInputStream(input);
+                FileSystem fs =
+                        Jimfs.newFileSystem(
+                                Configuration.unix().toBuilder()
+                                        .setAttributeViews("unix")
+                                        .build())) {
+
+            var wasiOpts = WasiOptions.builder();
+
+            wasiOpts.inheritSystem();
+
+            Path inputFolder = fs.getPath("input");
+            java.nio.file.Files.createDirectory(inputFolder);
+            Path inputPath = inputFolder.resolve(input.getName());
+            copy(fis, inputPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // let see if we can re-use some cache ...
+            Path detectionModelPath = inputFolder.resolve(detectionModel.getName());
+            copy(detectionModel.toPath(), detectionModelPath, StandardCopyOption.REPLACE_EXISTING);
+
+            Path recognitionModelPath = inputFolder.resolve(recognitionModel.getName());
+            copy(
+                    recognitionModel.toPath(),
+                    recognitionModelPath,
+                    StandardCopyOption.REPLACE_EXISTING);
+
+            wasiOpts.withDirectory(inputFolder.toString(), inputFolder);
+
+            Path outputFolder = fs.getPath("output");
+            java.nio.file.Files.createDirectory(outputFolder);
+            wasiOpts.withDirectory(outputFolder.toString(), outputFolder);
+
+            List<String> args = new ArrayList<>();
+            args.add("ocrs");
+            args.add(inputPath.toString());
+            args.add("--detect-model");
+            args.add(detectionModelPath.toString());
+            args.add("--rec-model");
+            args.add(recognitionModelPath.toString());
+
+            wasiOpts.withArguments(args);
+
+            try (var wasi =
+                    WasiPreview1.builder().withLogger(logger).withOpts(wasiOpts.build()).build()) {
+                HostImports imports = new HostImports(wasi.toHostFunctions());
+                Instance.builder(module)
+                        .withMachineFactory(com.dylibso.chicory.aot.AotMachine::new)
+                        .withHostImports(imports)
+                        .build();
+            }
+        }
     }
 }

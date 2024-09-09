@@ -38,6 +38,11 @@
     </dependency>
     <dependency>
       <groupId>com.dylibso.chicory</groupId>
+      <artifactId>aot</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
       <artifactId>wasm-corpus</artifactId>
       <scope>test</scope>
     </dependency>
