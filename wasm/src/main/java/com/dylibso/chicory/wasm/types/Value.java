@@ -8,26 +8,34 @@ import java.util.Objects;
 
 public class Value {
 
-    public static final Value TRUE = Value.i32(1);
+    public static final long TRUE = 1L;
 
-    public static final Value FALSE = Value.i32(0);
+    public static final long FALSE = 0L;
 
-    public static final int REF_NULL_VALUE = -1;
+    public static final long REF_NULL_VALUE = -1L;
     public static final Value EXTREF_NULL = Value.externRef(REF_NULL_VALUE);
     public static final Value FUNCREF_NULL = Value.funcRef(REF_NULL_VALUE);
 
-    public static final Value[] EMPTY_VALUES = new Value[0];
+    public static final long[] EMPTY_VALUES = new long[0];
 
     private final ValueType type;
 
     private final long data;
 
     public static Value fromFloat(float data) {
-        return Value.f32(Float.floatToRawIntBits(data));
+        return Value.f32(toLong(data));
     }
 
     public static Value fromDouble(double data) {
-        return Value.f64(Double.doubleToRawLongBits(data));
+        return Value.f64(toLong(data));
+    }
+
+    public static long toLong(double data) {
+        return Double.doubleToRawLongBits(data);
+    }
+
+    public static long toLong(float data) {
+        return Float.floatToRawIntBits(data);
     }
 
     public static Value i32(int data) {
@@ -50,11 +58,11 @@ public class Value {
         return new Value(ValueType.F64, data);
     }
 
-    public static Value externRef(int data) {
+    public static Value externRef(long data) {
         return new Value(ValueType.ExternRef, data);
     }
 
-    public static Value funcRef(int data) {
+    public static Value funcRef(long data) {
         return new Value(ValueType.FuncRef, data);
     }
 
@@ -86,20 +94,20 @@ public class Value {
      * @param valueType must be a valid zeroable type.
      * @return a zero.
      */
-    public static Value zero(ValueType valueType) {
+    public static long zero(ValueType valueType) {
         switch (valueType) {
             case I32:
-                return Value.i32(0);
+                return 0;
             case F32:
-                return Value.f32(0);
+                return 0;
             case I64:
-                return Value.i64(0);
+                return 0;
             case F64:
-                return Value.f64(0);
+                return 0;
             case FuncRef:
-                return Value.FUNCREF_NULL;
+                return REF_NULL_VALUE;
             case ExternRef:
-                return Value.EXTREF_NULL;
+                return REF_NULL_VALUE;
             default:
                 throw new IllegalArgumentException(
                         "Can't create a zero value for type " + valueType);
@@ -138,8 +146,8 @@ public class Value {
     public long asLong() {
         switch (type) {
             case I32:
-            case F32:
             case I64:
+            case F32:
             case F64:
                 return data;
             default:
@@ -185,8 +193,16 @@ public class Value {
         return Float.intBitsToFloat(asInt());
     }
 
+    public static float asFloat(long data) {
+        return Float.intBitsToFloat((int) data);
+    }
+
     public double asDouble() {
         return Double.longBitsToDouble(asLong());
+    }
+
+    public static double asDouble(long data) {
+        return Double.longBitsToDouble(data);
     }
 
     public ValueType type() {

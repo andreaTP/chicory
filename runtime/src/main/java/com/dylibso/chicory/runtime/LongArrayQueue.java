@@ -34,8 +34,7 @@ import java.util.function.LongConsumer;
  * <p>
  * <b>Note:</b> This class is not threadsafe.
  */
-public class LongArrayQueue extends AbstractQueue<Long>
-{
+public class LongArrayQueue extends AbstractQueue<Long> {
     /**
      * Default representation of null for an element.
      */
@@ -65,8 +64,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @param value from which to search for next power of 2.
      * @return The next power of 2 or the value itself if it is a power of 2.
      */
-    public static int findNextPositivePowerOfTwo(final int value)
-    {
+    public static int findNextPositivePowerOfTwo(final int value) {
         return 1 << (Integer.SIZE - Integer.numberOfLeadingZeros(value - 1));
     }
 
@@ -74,8 +72,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * Construct a new queue defaulting to {@link #MIN_CAPACITY} capacity, {@link #DEFAULT_NULL_VALUE}
      * and cached iterators.
      */
-    public LongArrayQueue()
-    {
+    public LongArrayQueue() {
         this(MIN_CAPACITY, DEFAULT_NULL_VALUE, true);
     }
 
@@ -84,8 +81,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @param nullValue cannot be stored in the queue and used as a sentinel.
      */
-    public LongArrayQueue(final long nullValue)
-    {
+    public LongArrayQueue(final long nullValue) {
         this(MIN_CAPACITY, nullValue, true);
     }
 
@@ -95,10 +91,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @param initialCapacity for the queue which will be rounded up to the nearest power of 2.
      * @param nullValue       which cannot be stored in the queue and used as a sentinel.
      */
-    public LongArrayQueue(
-            final int initialCapacity,
-            final long nullValue)
-    {
+    public LongArrayQueue(final int initialCapacity, final long nullValue) {
         this(initialCapacity, nullValue, true);
     }
 
@@ -110,21 +103,17 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @param shouldAvoidAllocation true to cache the iterator otherwise false to allocate a new iterator each time.
      */
     public LongArrayQueue(
-            final int initialCapacity,
-            final long nullValue,
-            final boolean shouldAvoidAllocation)
-    {
+            final int initialCapacity, final long nullValue, final boolean shouldAvoidAllocation) {
         this.nullValue = nullValue;
         this.shouldAvoidAllocation = shouldAvoidAllocation;
 
-        if (initialCapacity < MIN_CAPACITY)
-        {
-            throw new IllegalArgumentException("initial capacity < MIN_INITIAL_CAPACITY : " + initialCapacity);
+        if (initialCapacity < MIN_CAPACITY) {
+            throw new IllegalArgumentException(
+                    "initial capacity < MIN_INITIAL_CAPACITY : " + initialCapacity);
         }
 
         final int capacity = findNextPositivePowerOfTwo(initialCapacity);
-        if (capacity < MIN_CAPACITY)
-        {
+        if (capacity < MIN_CAPACITY) {
             throw new IllegalArgumentException("invalid initial capacity: " + initialCapacity);
         }
 
@@ -137,8 +126,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @return value representing a null element.
      */
-    public long nullValue()
-    {
+    public long nullValue() {
         return nullValue;
     }
 
@@ -147,8 +135,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @return the current capacity for the collection.
      */
-    public int capacity()
-    {
+    public int capacity() {
         return elements.length;
     }
 
@@ -156,8 +143,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public int size()
-    {
+    public int size() {
         return (tail - head) & (elements.length - 1);
     }
 
@@ -165,8 +151,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public boolean isEmpty()
-    {
+    public boolean isEmpty() {
         return head == tail;
     }
 
@@ -174,10 +159,8 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public void clear()
-    {
-        if (head != tail)
-        {
+    public void clear() {
+        if (head != tail) {
             Arrays.fill(elements, nullValue);
             head = 0;
             tail = 0;
@@ -188,8 +171,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public boolean offer(final Long element)
-    {
+    public boolean offer(final Long element) {
         return offerLong(element);
     }
 
@@ -199,18 +181,15 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @param element to be offered to the queue.
      * @return will always be true as long as the underlying array can be expanded.
      */
-    public boolean offerLong(final long element)
-    {
-        if (nullValue == element)
-        {
+    public boolean offerLong(final long element) {
+        if (nullValue == element) {
             throw new NullPointerException(); // @DoNotSub
         }
 
         elements[tail] = element;
         tail = (tail + 1) & (elements.length - 1);
 
-        if (tail == head)
-        {
+        if (tail == head) {
             increaseCapacity();
         }
 
@@ -221,8 +200,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public boolean add(final Long element)
-    {
+    public boolean add(final Long element) {
         return offerLong(element);
     }
 
@@ -232,8 +210,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @param element to be offered to the queue.
      * @return will always be true as long as the underlying array can be expanded.
      */
-    public boolean addLong(final long element)
-    {
+    public boolean addLong(final long element) {
         return offerLong(element);
     }
 
@@ -241,8 +218,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public Long peek()
-    {
+    public Long peek() {
         final long element = elements[head];
 
         return element == nullValue ? null : element;
@@ -253,8 +229,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @return the element at the head of the queue without removing it.
      */
-    public long peekLong()
-    {
+    public long peekLong() {
         return elements[head];
     }
 
@@ -262,8 +237,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public Long poll()
-    {
+    public Long poll() {
         final long element = pollLong();
 
         return element == nullValue ? null : element;
@@ -274,11 +248,9 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @return the element at the head of the queue removing it. If empty then {@link #nullValue}.
      */
-    public long pollLong()
-    {
+    public long pollLong() {
         final long element = elements[head];
-        if (nullValue == element)
-        {
+        if (nullValue == element) {
             return nullValue;
         }
 
@@ -292,11 +264,9 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public Long remove()
-    {
+    public Long remove() {
         final long element = pollLong();
-        if (nullValue == element)
-        {
+        if (nullValue == element) {
             throw new NoSuchElementException();
         }
 
@@ -307,11 +277,9 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public Long element()
-    {
+    public Long element() {
         final long element = elements[head];
-        if (nullValue == element)
-        {
+        if (nullValue == element) {
             throw new NoSuchElementException();
         }
 
@@ -324,11 +292,9 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @return the element at the head of the queue without removing it.
      * @throws NoSuchElementException if the queue is empty.
      */
-    public long elementLong()
-    {
+    public long elementLong() {
         final long element = elements[head];
-        if (nullValue == element)
-        {
+        if (nullValue == element) {
             throw new NoSuchElementException();
         }
 
@@ -341,11 +307,9 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * @return the element at the head of the queue.
      * @throws NoSuchElementException if the queue is empty.
      */
-    public long removeLong()
-    {
+    public long removeLong() {
         final long element = pollLong();
-        if (nullValue == element)
-        {
+        if (nullValue == element) {
             throw new NoSuchElementException();
         }
 
@@ -356,19 +320,16 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public String toString()
-    {
+    public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append('[');
 
-        for (int i = head; i != tail; )
-        {
+        for (int i = head; i != tail; ) {
             sb.append(elements[i]).append(", ");
             i = (i + 1) & (elements.length - 1);
         }
 
-        if (sb.length() > 1)
-        {
+        if (sb.length() > 1) {
             sb.setLength(sb.length() - 2);
         }
 
@@ -381,10 +342,8 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public void forEach(final Consumer<? super Long> action)
-    {
-        for (int i = head; i != tail; )
-        {
+    public void forEach(final Consumer<? super Long> action) {
+        for (int i = head; i != tail; ) {
             action.accept(elements[i]);
             i = (i + 1) & (elements.length - 1);
         }
@@ -395,10 +354,8 @@ public class LongArrayQueue extends AbstractQueue<Long>
      *
      * @param action to be taken for each element.
      */
-    public void forEachLong(final LongConsumer action)
-    {
-        for (int i = head; i != tail; )
-        {
+    public void forEachLong(final LongConsumer action) {
+        for (int i = head; i != tail; ) {
             action.accept(elements[i]);
             i = (i + 1) & (elements.length - 1);
         }
@@ -408,14 +365,11 @@ public class LongArrayQueue extends AbstractQueue<Long>
      * {@inheritDoc}
      */
     @Override
-    public LongIterator iterator()
-    {
+    public LongIterator iterator() {
         LongIterator iterator = this.iterator;
-        if (null == iterator)
-        {
+        if (null == iterator) {
             iterator = new LongIterator();
-            if (shouldAvoidAllocation)
-            {
+            if (shouldAvoidAllocation) {
                 this.iterator = iterator;
             }
         }
@@ -423,15 +377,13 @@ public class LongArrayQueue extends AbstractQueue<Long>
         return iterator.reset();
     }
 
-    private void increaseCapacity()
-    {
+    private void increaseCapacity() {
         final int oldHead = head;
         final int oldCapacity = elements.length;
         final int toEndOfArray = oldCapacity - oldHead;
         final int newCapacity = oldCapacity << 1;
 
-        if (newCapacity < MIN_CAPACITY)
-        {
+        if (newCapacity < MIN_CAPACITY) {
             throw new IllegalStateException("max capacity reached");
         }
 
@@ -448,19 +400,15 @@ public class LongArrayQueue extends AbstractQueue<Long>
     /**
      * Specialised {@link Iterator} from which the value can be retrieved without boxing via {@link #nextValue()}.
      */
-    public final class LongIterator implements Iterator<Long>
-    {
+    public final class LongIterator implements Iterator<Long> {
         private int index;
 
         /**
          * Create a new instance.
          */
-        public LongIterator()
-        {
-        }
+        public LongIterator() {}
 
-        LongIterator reset()
-        {
+        LongIterator reset() {
             index = LongArrayQueue.this.head;
             return this;
         }
@@ -469,8 +417,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
          * {@inheritDoc}
          */
         @Override
-        public boolean hasNext()
-        {
+        public boolean hasNext() {
             return index != tail;
         }
 
@@ -478,8 +425,7 @@ public class LongArrayQueue extends AbstractQueue<Long>
          * {@inheritDoc}
          */
         @Override
-        public Long next()
-        {
+        public Long next() {
             return nextValue();
         }
 
@@ -488,10 +434,8 @@ public class LongArrayQueue extends AbstractQueue<Long>
          *
          * @return the next value from the queue.
          */
-        public long nextValue()
-        {
-            if (index == tail)
-            {
+        public long nextValue() {
+            if (index == tail) {
                 throw new NoSuchElementException();
             }
 

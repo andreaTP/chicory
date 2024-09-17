@@ -6,7 +6,6 @@ import com.dylibso.chicory.wasm.exceptions.ChicoryException;
 import com.dylibso.chicory.wasm.exceptions.UninstantiableException;
 import com.dylibso.chicory.wasm.types.Limits;
 import com.dylibso.chicory.wasm.types.Table;
-import com.dylibso.chicory.wasm.types.Value;
 import com.dylibso.chicory.wasm.types.ValueType;
 import java.util.Arrays;
 
@@ -20,7 +19,7 @@ public class TableInstance {
         this.table = table;
         this.instances = new Instance[(int) table.limits().min()];
         refs = new int[(int) table.limits().min()];
-        Arrays.fill(refs, REF_NULL_VALUE);
+        Arrays.fill(refs, (int) REF_NULL_VALUE);
     }
 
     public int size() {
@@ -50,16 +49,12 @@ public class TableInstance {
         return oldSize;
     }
 
-    public Value ref(int index) {
+    public long ref(int index) {
         if (index < 0 || index >= this.refs.length) {
             throw new ChicoryException("undefined element");
         }
         int res = this.refs[index];
-        if (this.elementType() == ValueType.FuncRef) {
-            return Value.funcRef(res);
-        } else {
-            return Value.externRef(res);
-        }
+        return res;
     }
 
     public void setRef(int index, int value, Instance instance) {
@@ -76,7 +71,7 @@ public class TableInstance {
 
     public void reset() {
         for (int i = 0; i < refs.length; i++) {
-            this.refs[i] = REF_NULL_VALUE;
+            this.refs[i] = (int) REF_NULL_VALUE;
         }
     }
 }

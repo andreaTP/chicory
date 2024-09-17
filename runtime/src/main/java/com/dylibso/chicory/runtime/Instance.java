@@ -335,12 +335,35 @@ public class Instance {
         return machine;
     }
 
-    public Value[] callHostFunction(int funcId, Value[] args) {
+    // TODO: verify if we can push even a bit more the boundary and avoid more boxing/unboxing
+    public long[] callHostFunction(int funcId, long[] args) {
         var imprt = imports.function(funcId);
         if (imprt == null) {
             throw new ChicoryException("Missing host import, number: " + funcId);
         }
-        return imprt.handle().apply(this, args);
+        var type = type(functionTypes[funcId]);
+        var boxedArgs = new Value[type.params().size()];
+        for (int i = 0; i < type.params().size(); i++) {
+            boxedArgs[i] = new Value(type.params().get(i), args[i]);
+        }
+        var result = imprt.handle().apply(this, boxedArgs);
+        var unboxedResult = new long[type.returns().size()];
+        for (int i = 0; i < type.returns().size(); i++) {
+            var t = type.returns().get(i);
+            switch (t) {
+                case I32:
+                case I64:
+                    unboxedResult[i] = result[i].asLong();
+                    break;
+                case F32:
+                    unboxedResult[i] = Value.toLong(result[i].asFloat());
+                    break;
+                case F64:
+                    unboxedResult[i] = Value.toLong(result[i].asDouble());
+                    break;
+            }
+        }
+        return unboxedResult;
     }
 
     public void onExecution(Instruction instruction, MStack stack) {

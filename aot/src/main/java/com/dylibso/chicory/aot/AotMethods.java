@@ -193,7 +193,7 @@ public final class AotMethods {
 
     @UsedByGeneratedCode
     public static int tableGet(int index, int tableIndex, Instance instance) {
-        return OpcodeImpl.TABLE_GET(instance, tableIndex, index).asFuncRef();
+        return (int) OpcodeImpl.TABLE_GET(instance, tableIndex, index);
     }
 
     @UsedByGeneratedCode
