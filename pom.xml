@@ -38,9 +38,8 @@
     <module>aot-tests</module>
     <module>bom</module>
     <module>cli</module>
-    <module>function-annotations</module>
-    <module>function-processor</module>
     <module>fuzz</module>
+    <module>host-module</module>
     <module>jmh</module>
     <module>log</module>
     <module>runtime</module>
@@ -106,6 +105,7 @@
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
     <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
     <maven-gpg-plugin.version>3.2.5</maven-gpg-plugin.version>
+    <maven-invoker-plugin.version>3.8.0</maven-invoker-plugin.version>
     <maven-install-plugin.version>3.1.3</maven-install-plugin.version>
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.10.0</maven-javadoc-plugin.version>
@@ -145,12 +145,12 @@
       </dependency>
       <dependency>
         <groupId>com.dylibso.chicory</groupId>
-        <artifactId>function-annotations</artifactId>
+        <artifactId>host-module-annotations</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.dylibso.chicory</groupId>
-        <artifactId>function-processor</artifactId>
+        <artifactId>host-module-processor</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
