@@ -8,5 +8,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface WasmImport {
-    String value() default "";
+    String moduleName() default "";
+
+    String fieldName() default "";
 }

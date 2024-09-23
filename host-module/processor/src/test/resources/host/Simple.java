@@ -7,7 +7,7 @@ import com.dylibso.chicory.function.annotations.CString;
 import com.dylibso.chicory.function.annotations.HostModule;
 import com.dylibso.chicory.function.annotations.WasmExport;
 import com.dylibso.chicory.runtime.HostFunction;
-import com.dylibso.chicory.runtime.Memory;
+import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasm.exceptions.ChicoryException;
 import java.util.Random;
 
@@ -31,10 +31,10 @@ public final class Simple {
     }
 
     @WasmExport
-    public void randomGet(Memory memory, int ptr, int len) {
+    public void randomGet(Instance instance, int ptr, int len) {
         byte[] data = new byte[len];
         random.nextBytes(data);
-        memory.write(ptr, data);
+        instance.memory().write(ptr, data);
     }
 
     @WasmExport

@@ -1,7 +1,6 @@
 package chicory.test;
 
 import com.dylibso.chicory.function.annotations.HostModule;
-import com.dylibso.chicory.runtime.Instance;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 

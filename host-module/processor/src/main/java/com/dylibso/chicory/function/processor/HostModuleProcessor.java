@@ -31,7 +31,9 @@ import com.github.javaparser.ast.stmt.ReturnStmt;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -63,6 +65,48 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
                 log(ERROR, "Couldn't load the wasm resource file: " + moduleFile, type);
                 throw new AbortProcessingException();
             }
+
+            // TODO: refactor and extract this validation logic
+            // TODO: it should be possible to toggle off the checks
+            Map<String, List<ValueType>> params = new HashMap<>();
+            Map<String, List<ValueType>> returns = new HashMap<>();
+            // now we can check that all the exports are implemented
+            for (var exportIdx = 0; exportIdx < module.exportSection().exportCount(); exportIdx++) {
+                var export = module.exportSection().getExport(exportIdx);
+                var functionType =
+                        module.typeSection()
+                                .getType(module.functionSection().getFunctionType(export.index()));
+                params.put(export.name(), functionType.params());
+                returns.put(export.name(), functionType.returns());
+            }
+
+            for (Element member : elements().getAllMembers(type)) {
+                if (member instanceof ExecutableElement
+                        && annotatedWith(member, WasmExport.class)) {
+                    var name = exportName((ExecutableElement) member);
+                    var expectedParameters = params.get(name);
+                    var receivedParameters = extractParameters((ExecutableElement) member);
+                    checkType(name, expectedParameters, receivedParameters);
+
+                    var expectedReturns = returns.get(name);
+                    var receivedReturns = extractReturns((ExecutableElement) member);
+                    if (expectedReturns.size() > 1) {
+                        if (!((ExecutableElement) member)
+                                .getReturnType()
+                                .toString()
+                                .equals("Value[]")) {
+                            log(
+                                    ERROR,
+                                    "When the WASM module declares a function returning multiple"
+                                            + " values, from JAva we need to fallback to Value[]",
+                                    member);
+                            throw new AbortProcessingException();
+                        }
+                    } else {
+                        checkType(name, expectedReturns, receivedReturns);
+                    }
+                }
+            }
         }
 
         var functions = new NodeList<Expression>();
@@ -70,12 +114,6 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
             if (member instanceof ExecutableElement && annotatedWith(member, WasmExport.class)) {
                 functions.add(processMethod((ExecutableElement) member, moduleName));
             }
-        }
-
-        // now we can check that all the exports are implemented
-        for (var exportIdx = 0; exportIdx < module.exportSection().exportCount(); exportIdx++) {
-            var export = module.exportSection().getExport(exportIdx);
-
         }
 
         var pkg = getPackageName(type);
@@ -108,6 +146,15 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
         writeSourceFile(cu, pkg, type, "_ModuleFactory");
     }
 
+    private void checkType(String name, List<ValueType> expected, List<ValueType> received) {
+        if (!expected.equals(received)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Function type mismatch for '%s': expected %s <=> actual %s",
+                            name, expected, received));
+        }
+    }
+
     private String exportName(ExecutableElement executable) {
         // compute function name
         var name = executable.getAnnotation(WasmExport.class).value();
@@ -115,6 +162,30 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
             name = camelCaseToSnakeCase(executable.getSimpleName().toString());
         }
         return name;
+    }
+
+    private List<ValueType> extractReturns(ExecutableElement executable) {
+        switch (executable.getReturnType().toString()) {
+            case "int":
+                return List.of(ValueType.I32);
+            case "long":
+                return List.of(ValueType.I64);
+            case "float":
+                return List.of(ValueType.F32);
+            case "double":
+                return List.of(ValueType.F64);
+            case "java.lang.String":
+                // TODO: FIXME
+                log(ERROR, "java.lang.String not supported as a return type", executable);
+                throw new AbortProcessingException();
+            default:
+                log(
+                        ERROR,
+                        "Cannot extract the Wasm Return type from "
+                                + executable.getReturnType().toString(),
+                        executable);
+                throw new AbortProcessingException();
+        }
     }
 
     private List<ValueType> extractParameters(ExecutableElement executable) {
@@ -134,9 +205,27 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
                 case "double":
                     params.add(ValueType.F64);
                     break;
-
+                case "java.lang.String":
+                    if (annotatedWith(parameter, Buffer.class)) {
+                        params.add(ValueType.I32);
+                        params.add(ValueType.I32);
+                    } else if (annotatedWith(parameter, CString.class)) {
+                        params.add(ValueType.I32);
+                    } else {
+                        log(ERROR, "Missing annotation for WASM type: java.lang.String", parameter);
+                        throw new AbortProcessingException();
+                    }
+                    break;
+                default:
+                    log(
+                            ERROR,
+                            "Cannot extract the Wasm Parameter type from "
+                                    + parameter.asType().toString(),
+                            parameter);
+                    throw new AbortProcessingException();
             }
         }
+        return params;
     }
 
     private Expression processMethod(ExecutableElement executable, String moduleName) {
@@ -178,7 +267,6 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
                                                 new MethodCallExpr(lenExpr, "asInt"))));
                     } else if (annotatedWith(parameter, CString.class)) {
                         paramTypes.add(valueType("I32"));
-                        paramTypes.add(valueType("I32"));
                         arguments.add(
                                 new MethodCallExpr(
                                         new MethodCallExpr(new NameExpr("instance"), "memory"),
@@ -191,9 +279,6 @@ public final class HostModuleProcessor extends AbstractModuleProcessor {
                     break;
                 case "com.dylibso.chicory.runtime.Instance":
                     arguments.add(new NameExpr("instance"));
-                    break;
-                case "com.dylibso.chicory.runtime.Memory":
-                    arguments.add(new MethodCallExpr(new NameExpr("instance"), "memory"));
                     break;
                 default:
                     log(ERROR, "Unsupported WASM type: " + parameter.asType(), parameter);
