@@ -13,7 +13,6 @@ import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.wasm.Module;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
-import com.dylibso.chicory.wasm.types.Value;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Random;
@@ -91,9 +90,9 @@ public class WasiPreview1Test {
         var module = loadModule("compiled/sum.go.tiny.wasm");
         var instance = Instance.builder(module).withExternalValues(imports).build();
         var sum = instance.export("add");
-        var result = sum.apply(Value.i32(20), Value.i32(22))[0];
+        var result = sum.apply(20, 22)[0];
 
-        assertEquals(result.asInt(), 42);
+        assertEquals(result, 42);
     }
 
     @Test
