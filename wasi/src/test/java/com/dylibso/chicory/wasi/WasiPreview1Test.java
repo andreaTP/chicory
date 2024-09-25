@@ -16,7 +16,6 @@ import com.dylibso.chicory.wasm.types.MemoryLimits;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Random;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class WasiPreview1Test {
@@ -65,8 +64,6 @@ public class WasiPreview1Test {
     }
 
     @Test
-    // TODO: re-enable me
-    @Disabled
     public void shouldRunWasiDemoJavyModule() {
         // check with: echo "{ \"n\": 2, \"bar\": \"baz\"}" | wasmtime
         // wasi/src/test/resources/compiled/javy-demo.js.wasm
