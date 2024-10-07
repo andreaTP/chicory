@@ -367,13 +367,15 @@ public final class AotMachine implements Machine {
         var classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         classWriter.visit(
                 Opcodes.V11,
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
                 internalClassName,
                 null,
                 getInternalName(Object.class),
                 new String[] {getInternalName(Machine.class)});
 
-        classWriter.visitSource("wasm", "wasm");
+        System.out.println("class name is" + className);
+
+        classWriter.visitSource(null, null);
 
         classWriter.visitField(
                 Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
