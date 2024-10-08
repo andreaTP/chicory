@@ -12,6 +12,9 @@ import com.dylibso.chicory.wasm.types.DataSegment;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
 import com.dylibso.chicory.wasm.types.PassiveDataSegment;
 import com.dylibso.chicory.wasm.types.ValueType;
+
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -42,19 +45,23 @@ public final class Memory {
 
     private DataSegment[] dataSegments;
 
-    private ByteBuffer buffer;
+    // private ByteBuffer buffer;
+    private MemorySegment segment;
 
     private int nPages;
 
     public Memory(MemoryLimits limits) {
         this.limits = limits;
-        this.buffer = allocateByteBuffer(PAGE_SIZE * limits.initialPages());
+        this.segment = Arena.global().allocate(PAGE_SIZE * limits.initialPages());
+        // this.buffer = allocateByteBuffer(PAGE_SIZE * limits.initialPages());
         this.nPages = limits.initialPages();
     }
 
-    private static ByteBuffer allocateByteBuffer(int capacity) {
-        return ByteBuffer.allocate(capacity).order(ByteOrder.LITTLE_ENDIAN);
-    }
+//    private static ByteBuffer allocateByteBuffer(int capacity) {
+//        // return ByteBuffer.allocateDirect(capacity).order(ByteOrder.LITTLE_ENDIAN);
+//        Arena.global().allocate(capacity);
+//        MemorySegment
+//    }
 
     /**
      * Gets the size of the memory in number of pages
