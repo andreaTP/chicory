@@ -373,8 +373,6 @@ public final class AotMachine implements Machine {
                 getInternalName(Object.class),
                 new String[] {getInternalName(Machine.class)});
 
-        System.out.println("class name is" + className);
-
         classWriter.visitSource(null, null);
 
         classWriter.visitField(
