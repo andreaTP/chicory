@@ -44,6 +44,7 @@ import com.dylibso.chicory.wasm.types.NameCustomSection;
 import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.PassiveDataSegment;
 import com.dylibso.chicory.wasm.types.PassiveElement;
+import com.dylibso.chicory.wasm.types.RawSection;
 import com.dylibso.chicory.wasm.types.Section;
 import com.dylibso.chicory.wasm.types.SectionId;
 import com.dylibso.chicory.wasm.types.StartSection;
@@ -195,6 +196,10 @@ public final class Parser {
     }
 
     public void parse(InputStream in, ParserListener listener) {
+        parse(in, listener, true);
+    }
+
+    private void parse(InputStream in, ParserListener listener, boolean decode) {
 
         requireNonNull(listener, "listener");
         var validator = new SectionsValidator();
@@ -225,6 +230,11 @@ public final class Parser {
             validator.validateSectionType(sectionId);
 
             if (shouldParseSection(sectionId)) {
+                if (!decode) {
+                    listener.onSection(parseRawSection(buffer, sectionId, sectionSize));
+                    continue;
+                }
+
                 // Process different section types based on the sectionId
                 switch (sectionId) {
                     case SectionId.CUSTOM:
@@ -318,6 +328,14 @@ public final class Parser {
         }
     }
 
+    public static void parseWithoutDecoding(byte[] bytes, RawParserListener listener) {
+        new Parser().parseWithoutDecoding(new ByteArrayInputStream(bytes), listener);
+    }
+
+    public void parseWithoutDecoding(InputStream in, RawParserListener listener) {
+        parse(in, section -> listener.onSection((RawSection) section), false);
+    }
+
     // https://webassembly.github.io/spec/core/binary/modules.html#binary-module
     private static class SectionsValidator {
         private boolean hasStart;
@@ -359,6 +377,12 @@ public final class Parser {
         return parser == null
                 ? UnknownCustomSection.builder().withName(name).withBytes(bytes).build()
                 : parser.apply(bytes);
+    }
+
+    private static RawSection parseRawSection(ByteBuffer buffer, byte sectionId, long sectionSize) {
+        var bytes = new byte[Math.toIntExact(sectionSize)];
+        readBytes(buffer, bytes);
+        return new RawSection(sectionId, bytes);
     }
 
     private static TypeSection parseTypeSection(ByteBuffer buffer) {
