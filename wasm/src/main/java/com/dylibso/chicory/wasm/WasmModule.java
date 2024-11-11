@@ -252,9 +252,9 @@ public final class WasmModule {
                             customSections,
                             ignoredSections);
 
-            var validator = new Validator(module);
-            validator.validateModule();
             if (validate) {
+                var validator = new Validator(module);
+                validator.validateModule();
                 validator.validateFunctions();
                 validator.validateGlobals();
                 validator.validateElements();

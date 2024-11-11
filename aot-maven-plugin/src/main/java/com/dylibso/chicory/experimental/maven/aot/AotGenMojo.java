@@ -1,6 +1,5 @@
 package com.dylibso.chicory.experimental.maven.aot;
 
-import static com.dylibso.chicory.wasm.WasmWriter.writeVarUInt32;
 import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
 import static com.github.javaparser.StaticJavaParser.parseType;
 
@@ -10,7 +9,6 @@ import com.dylibso.chicory.runtime.Machine;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.WasmWriter;
-import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.SectionId;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier.Keyword;
@@ -29,7 +27,6 @@ import com.github.javaparser.ast.stmt.ThrowStmt;
 import com.github.javaparser.ast.stmt.TryStmt;
 import com.github.javaparser.ast.type.VarType;
 import com.github.javaparser.utils.SourceRoot;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -129,7 +126,7 @@ public class AotGenMojo extends AbstractMojo {
             }
         }
 
-        var rewrittenWasm = rewriteWasm(wasmBytes, module);
+        var rewrittenWasm = rewriteWasm(wasmBytes);
         var newWasmFile =
                 targetClassFolder.toPath().resolve(packageName.replace('.', '/')).resolve(wasmName);
         try {
@@ -203,7 +200,10 @@ public class AotGenMojo extends AbstractMojo {
                         new MethodCallExpr()
                                 .setScope(new NameExpr("Parser"))
                                 .setName("parse")
-                                .addArgument(new NameExpr("in")));
+                                .addArgument(new NameExpr("in"))
+                                .addArgument(
+                                        new NameExpr(
+                                                "WasmModule.builder().withValidation(false)")));
 
         var newException =
                 new ObjectCreationExpr()
@@ -226,23 +226,15 @@ public class AotGenMojo extends AbstractMojo {
         dest.add(packageName, moduleName + ".java", cu);
     }
 
-    private static byte[] rewriteWasm(byte[] wasmBytes, WasmModule module) {
+    private static byte[] rewriteWasm(byte[] wasmBytes) {
         var writer = new WasmWriter();
         Parser.parseWithoutDecoding(
                 wasmBytes,
                 section -> {
-                    if (section.sectionId() == SectionId.CODE) {
-                        var out = new ByteArrayOutputStream();
-                        int count = module.codeSection().functionBodyCount();
-                        writeVarUInt32(out, count);
-                        for (int i = 0; i < count; i++) {
-                            writeVarUInt32(out, 3); // function size in bytes
-                            writeVarUInt32(out, 0); // locals count
-                            out.write(OpCode.UNREACHABLE.opcode());
-                            out.write(OpCode.END.opcode());
-                        }
-                        writer.writeSection(SectionId.CODE, out.toByteArray());
-                    } else if (section.sectionId() != SectionId.CUSTOM) {
+                    if (section.sectionId() == SectionId.CODE
+                            || section.sectionId() == SectionId.CUSTOM) {
+                        // skip
+                    } else {
                         writer.writeSection(section);
                     }
                 });

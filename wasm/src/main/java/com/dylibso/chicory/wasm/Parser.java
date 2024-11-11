@@ -159,6 +159,10 @@ public final class Parser {
         return new Parser().parse(() -> input);
     }
 
+    public static WasmModule parse(InputStream input, WasmModule.Builder moduleBuilder) {
+        return new Parser().parse(() -> input, moduleBuilder);
+    }
+
     public static WasmModule parse(byte[] buffer) {
         return new Parser().parse(() -> new ByteArrayInputStream(buffer));
     }
@@ -181,9 +185,15 @@ public final class Parser {
     }
 
     public WasmModule parse(Supplier<InputStream> inputStreamSupplier) {
-        WasmModule.Builder moduleBuilder = WasmModule.builder();
+        return parse(inputStreamSupplier, null);
+    }
+
+    public WasmModule parse(
+            Supplier<InputStream> inputStreamSupplier, WasmModule.Builder moduleBuilder) {
+        WasmModule.Builder finalModuleBuilder =
+                (moduleBuilder == null) ? WasmModule.builder() : moduleBuilder;
         try (InputStream is = inputStreamSupplier.get()) {
-            parse(is, (s) -> onSection(moduleBuilder, s));
+            parse(is, (s) -> onSection(finalModuleBuilder, s));
         } catch (IOException e) {
             throw new ChicoryException(e);
         } catch (MalformedException e) {
@@ -192,7 +202,7 @@ public final class Parser {
                             + e.getMessage(),
                     e);
         }
-        return moduleBuilder.build();
+        return finalModuleBuilder.build();
     }
 
     public void parse(InputStream in, ParserListener listener) {
