@@ -11,9 +11,15 @@ import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
 import com.dylibso.chicory.wasm.types.ValueType;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
+import org.apache.kafka.connect.data.Struct;
 import org.junit.jupiter.api.Test;
 
 public class WasmModuleTest {
@@ -356,5 +362,130 @@ public class WasmModuleTest {
 
         // IIUC: 3 values returning from last CALL + 1 result
         assertTrue(finalStackSize.get() == 4L);
+    }
+
+    @Test
+    public void shouldUseNestedStructsFromTinyGo() {
+        // Defining Demo data:
+
+        var personName = "Xi";
+        // separating in two to "mock" a recursive data structure
+        Schema childSchema =
+                SchemaBuilder.struct()
+                        .name("com.example.Person")
+                        .field("name", Schema.STRING_SCHEMA)
+                        .field("age", Schema.INT32_SCHEMA)
+                        .build();
+        Schema parentSchema =
+                SchemaBuilder.struct()
+                        .name("com.example.Person")
+                        .field("name", Schema.STRING_SCHEMA)
+                        .field("age", Schema.INT32_SCHEMA)
+                        .field("child", childSchema)
+                        .build();
+
+        Struct child = new Struct(childSchema).put("name", personName).put("age", 2);
+
+        Struct parent =
+                new Struct(parentSchema)
+                        .put("name", "Bobby McGee")
+                        .put("age", 21)
+                        .put("child", child);
+
+        // Keep around references to the data that should be shared with the Guest module
+        // using the HashCode as a first iteration
+        Map<Integer, Struct> structsStore = new WeakHashMap<>();
+        structsStore.put(child.hashCode(), child);
+        structsStore.put(parent.hashCode(), parent);
+
+        // Those functions will be provided by a "Debezium Host SDK"
+        // it's a very low level API but provides the functionality
+        // the "design" is based on a similar patter used in OPA:
+        // https://github.com/andreaTP/opa-chicory/blob/main/core/src/main/java/com/github/andreaTP/opa/chicory/Opa.java
+        var structGetString =
+                new HostFunction(
+                        "env",
+                        "struct_get_string",
+                        List.of(ValueType.I32, ValueType.I32),
+                        List.of(ValueType.I32),
+                        (Instance instance, long... args) -> {
+                            var structPtr = (int) args[0];
+                            var fieldNamePtr = (int) args[1];
+                            System.out.println(
+                                    "structPtr: " + structPtr + " fieldNamePtr: " + fieldNamePtr);
+
+                            var fieldName = instance.memory().readCString(fieldNamePtr);
+                            instance.export("free").apply(fieldNamePtr);
+                            System.out.println("fieldName: " + fieldName);
+
+                            var fieldValue = structsStore.get(structPtr).getString(fieldName);
+                            var resultPtr =
+                                    (int)
+                                            instance.export("malloc")
+                                                    .apply(fieldValue.length() + 1)[0];
+                            instance.memory().writeCString(resultPtr, fieldValue);
+                            System.out.println(
+                                    "struct_get_string: " + fieldName + " - " + fieldValue);
+
+                            return new long[] {resultPtr};
+                        });
+        var structGetStruct =
+                new HostFunction(
+                        "env",
+                        "struct_get_struct",
+                        List.of(ValueType.I32, ValueType.I32),
+                        List.of(ValueType.I32),
+                        (Instance instance, long... args) -> {
+                            var structPtr = (int) args[0];
+                            var fieldNamePtr = (int) args[1];
+                            System.out.println(
+                                    "structPtr: " + structPtr + " fieldNamePtr: " + fieldNamePtr);
+
+                            var fieldName = instance.memory().readCString(fieldNamePtr);
+                            instance.export("free").apply(fieldNamePtr);
+                            System.out.println("fieldName: " + fieldName);
+
+                            var fieldValue = structsStore.get(structPtr).getStruct(fieldName);
+
+                            return new long[] {fieldValue.hashCode()};
+                        });
+
+        // Now we instantiate the module with the provided SDK hooks:
+        var instance =
+                Instance.builder(loadModule("debezium-poc/compiled/processor.wasm"))
+                        .withImportValues(
+                                ImportValues.builder()
+                                        .addMemory(
+                                                new ImportMemory(
+                                                        "env",
+                                                        "memory",
+                                                        new Memory(
+                                                                new MemoryLimits(
+                                                                        2,
+                                                                        MemoryLimits.MAX_PAGES))))
+                                        .addFunction(structGetString)
+                                        .addFunction(structGetStruct)
+                                        .build())
+                        .build();
+
+        // Now that we have the building blocks we can start to work on top and provide an higher
+        // level API
+        // the final user API should look like:
+        Function<Struct, String> process =
+                struct -> {
+                    var result = instance.export("process").apply(struct.hashCode())[0];
+
+                    var returnedString = instance.memory().readCString((int) result);
+                    instance.export("free").apply(result);
+
+                    return returnedString;
+                };
+
+        // the following lines are providing a demo implementation to show:
+        // how the guest can access the fields of a nested data structure without going through a
+        // full serialization/deserialization in/out
+        // the logic of the guest is hardcoded for now and basically returns: parent.child.name
+        var returnedString = process.apply(parent);
+        assertEquals(personName, returnedString);
     }
 }
