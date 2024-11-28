@@ -87,6 +87,7 @@ public class JavaTestGen {
 
         // testing imports
         cu.addImport("com.dylibso.chicory.testing.TestModule");
+        cu.addImport("com.dylibso.chicory.testing.ArgsAdapter");
 
         // runtime imports
         cu.addImport("com.dylibso.chicory.wasm.ChicoryException");
@@ -112,8 +113,6 @@ public class JavaTestGen {
         cu.addImport("com.dylibso.chicory.wasm.types.Value.i64ToVec", true, false);
         cu.addImport("com.dylibso.chicory.wasm.types.Value.f64ToVec", true, false);
         cu.addImport("com.dylibso.chicory.wasm.types.Value.f32ToVec", true, false);
-
-        cu.addImport("com.dylibso.chicory.runtime.MStack", false, false);
 
         // import for Store instance
         cu.addImport("com.dylibso.chicory.runtime.Store");
@@ -383,12 +382,11 @@ public class JavaTestGen {
                                 .collect(Collectors.toList())
                         : List.<String>of();
 
-        var argSize =
-                (cmd.action().args() != null)
-                        ? Arrays.stream(cmd.action().args()).mapToInt(a -> a.type().size()).sum()
-                        : 0;
-
-        var invocationMethod = ".apply(" + String.join(",", args) + ")";
+        var adaptedArgs =
+                (args == null || args.size() == 0)
+                        ? ""
+                        : args.stream().collect(Collectors.joining(").add(", ".add(", ")"));
+        var invocationMethod = ".apply(ArgsAdapter.builder()" + adaptedArgs + ".build()" + ")";
         if (cmd.type() == CommandType.ASSERT_TRAP || cmd.type() == CommandType.ASSERT_EXHAUSTION) {
             var assertDecl =
                     new NameExpr(
@@ -406,13 +404,7 @@ public class JavaTestGen {
             }
         } else if (cmd.type() == CommandType.ASSERT_RETURN) {
             List<Expression> exprs = new ArrayList<>();
-            exprs.add(new NameExpr("var args = new MStack()"));
-            for (String arg : args) {
-                exprs.add(new NameExpr("args.pushAll(" + arg + ")"));
-            }
-            exprs.add(
-                    new NameExpr(
-                            "var results = " + varName + ".apply(args.slice(0, " + argSize + "))"));
+            exprs.add(new NameExpr("var results = " + varName + invocationMethod));
 
             for (int i = 0; i < cmd.expected().length; i++) {
                 var expected = cmd.expected()[i];
