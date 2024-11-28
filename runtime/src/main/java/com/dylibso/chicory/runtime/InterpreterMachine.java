@@ -211,15 +211,47 @@ public class InterpreterMachine implements Machine {
                     SELECT_T(stack);
                     break;
                 case LOCAL_GET:
-                    stack.push(frame.local((int) operands.get(0)));
-                    break;
+                    // TODO: move to static functions
+                    {
+                        var idx = (int) operands.get(0);
+                        var offset = frame.localOffset(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            // TODO: verify order
+                            stack.push(frame.local(offset));
+                            stack.push(frame.local(offset + 1));
+                        } else {
+                            stack.push(frame.local(offset));
+                        }
+                        break;
+                    }
                 case LOCAL_SET:
-                    frame.setLocal((int) operands.get(0), stack.pop());
-                    break;
+                    {
+                        var idx = (int) operands.get(0);
+                        var offset = frame.localOffset(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            // TODO: verify order
+                            frame.setLocal(offset, stack.pop());
+                            frame.setLocal(offset + 1, stack.pop());
+                        } else {
+                            frame.setLocal(offset, stack.pop());
+                        }
+                        break;
+                    }
                 case LOCAL_TEE:
-                    // here we peek instead of pop, leaving it on the stack
-                    frame.setLocal((int) operands.get(0), stack.peek());
-                    break;
+                    {
+                        var idx = (int) operands.get(0);
+                        var offset = frame.localOffset(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            // TODO: verify order
+                            var tmp = stack.pop();
+                            frame.setLocal(offset, stack.pop());
+                            frame.setLocal(offset + 1, stack.peek());
+                            stack.push(tmp);
+                        } else {
+                            frame.setLocal(offset, stack.peek());
+                        }
+                        break;
+                    }
                 case GLOBAL_GET:
                     GLOBAL_GET(stack, instance, operands);
                     break;

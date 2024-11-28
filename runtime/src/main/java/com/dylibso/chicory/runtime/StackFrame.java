@@ -25,6 +25,9 @@ public class StackFrame {
     private final int funcId;
     private int pc;
     private final long[] locals;
+    private final ValueType[] localTypes;
+    private final int argsSize;
+    private final int[] localOffsets;
     private final Instance instance;
 
     private final List<CtrlFrame> ctrlStack = new ArrayList<>();
@@ -36,20 +39,38 @@ public class StackFrame {
     StackFrame(
             Instance instance,
             int funcId,
+            // TODO: we need to track also the args types
             long[] args,
             List<ValueType> localTypes,
             List<AnnotatedInstruction> code) {
         this.code = code;
         this.instance = instance;
         this.funcId = funcId;
-        this.locals = Arrays.copyOf(args, args.length + localTypes.size());
+        this.localTypes = localTypes.toArray(ValueType[]::new);
+        this.localOffsets = new int[localTypes.size()];
+        this.argsSize = args.length;
+        int localSize = 0;
+        for (int i = 0; i < localTypes.size(); i++) {
+            if (localTypes.get(i) == ValueType.V128) {
+                localSize += 1;
+            } else {
+                localSize += 2;
+            }
+        }
+        this.locals = Arrays.copyOf(args, args.length + localSize);
 
         // initialize codesegment locals.
+        int offset = 0;
         for (var i = 0; i < localTypes.size(); i++) {
             ValueType type = localTypes.get(i);
-            // TODO: How do we initialize non-numeric V128
+            this.localOffsets[i] = offset;
             if (type != ValueType.V128) {
-                locals[i + args.length] = Value.zero(type);
+                locals[offset + args.length] = Value.zero(type);
+                offset += 1;
+            } else {
+                locals[offset + args.length] = Value.zero(ValueType.I64);
+                locals[1 + offset + args.length] = Value.zero(ValueType.I64);
+                offset += 2;
             }
         }
     }
@@ -63,6 +84,17 @@ public class StackFrame {
 
     int funcId() {
         return funcId;
+    }
+
+    ValueType localType(int i) {
+        return this.localTypes[i - argsSize];
+    }
+
+    int localOffset(int idx) {
+        if (idx < argsSize) {
+            return idx;
+        }
+        return this.localOffsets[idx - argsSize];
     }
 
     void setLocal(int i, long v) {
