@@ -73,7 +73,13 @@ public class InterpreterMachine implements Machine {
         var func = instance.function(funcId);
         if (func != null) {
             var stackFrame =
-                    new StackFrame(instance, funcId, args, func.localTypes(), func.instructions());
+                    new StackFrame(
+                            instance,
+                            funcId,
+                            args,
+                            type.params(),
+                            func.localTypes(),
+                            func.instructions());
             stackFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(stackFrame);
 
@@ -83,7 +89,7 @@ public class InterpreterMachine implements Machine {
                 throw new ChicoryException("call stack exhausted", e);
             }
         } else {
-            var stackFrame = new StackFrame(instance, funcId, args, List.of());
+            var stackFrame = new StackFrame(instance, funcId, args);
             stackFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(stackFrame);
 
@@ -211,15 +217,44 @@ public class InterpreterMachine implements Machine {
                     SELECT_T(stack);
                     break;
                 case LOCAL_GET:
-                    stack.push(frame.local((int) operands.get(0)));
-                    break;
+                    {
+                        var idx = (int) operands.get(0);
+                        var i = frame.localIndexOf(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            stack.push(frame.local(i));
+                            stack.push(frame.local(i + 1));
+                        } else {
+                            stack.push(frame.local(i));
+                        }
+                        break;
+                    }
                 case LOCAL_SET:
-                    frame.setLocal((int) operands.get(0), stack.pop());
-                    break;
+                    {
+                        var idx = (int) operands.get(0);
+                        var i = frame.localIndexOf(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            frame.setLocal(i, stack.pop());
+                            frame.setLocal(i + 1, stack.pop());
+                        } else {
+                            frame.setLocal(i, stack.pop());
+                        }
+                        break;
+                    }
                 case LOCAL_TEE:
-                    // here we peek instead of pop, leaving it on the stack
-                    frame.setLocal((int) operands.get(0), stack.peek());
-                    break;
+                    {
+                        // here we peek instead of pop, leaving it on the stack
+                        var idx = (int) operands.get(0);
+                        var i = frame.localIndexOf(idx);
+                        if (frame.localType(idx) == ValueType.V128) {
+                            var tmp = stack.pop();
+                            frame.setLocal(i, tmp);
+                            frame.setLocal(i + 1, stack.peek());
+                            stack.push(tmp);
+                        } else {
+                            frame.setLocal(i, stack.peek());
+                        }
+                        break;
+                    }
                 case GLOBAL_GET:
                     GLOBAL_GET(stack, instance, operands);
                     break;
@@ -1857,7 +1892,13 @@ public class InterpreterMachine implements Machine {
             var ctrlFrame = callStack.pop();
             StackFrame.doControlTransfer(ctrlFrame.popCtrlTillCall(), stack);
             var newFrame =
-                    new StackFrame(instance, funcId, args, func.localTypes(), func.instructions());
+                    new StackFrame(
+                            instance,
+                            funcId,
+                            args,
+                            type.params(),
+                            func.localTypes(),
+                            func.instructions());
             newFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(newFrame);
             return newFrame;
@@ -1904,7 +1945,13 @@ public class InterpreterMachine implements Machine {
             var ctrlFrame = callStack.pop();
             StackFrame.doControlTransfer(ctrlFrame.popCtrlTillCall(), stack);
             var newFrame =
-                    new StackFrame(instance, funcId, args, func.localTypes(), func.instructions());
+                    new StackFrame(
+                            instance,
+                            funcId,
+                            args,
+                            type.params(),
+                            func.localTypes(),
+                            func.instructions());
             newFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(newFrame);
             return newFrame;
