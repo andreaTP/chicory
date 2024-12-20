@@ -687,6 +687,9 @@ final class Validator {
                 case BR_TABLE:
                 case BR:
                 case END:
+                case THROW:
+                case TRY:
+                case CATCH:
                     break;
                 case DATA_DROP:
                     {

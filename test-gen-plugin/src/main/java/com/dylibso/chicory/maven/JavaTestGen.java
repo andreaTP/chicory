@@ -92,6 +92,7 @@ public class JavaTestGen {
         cu.addImport("com.dylibso.chicory.wasm.ChicoryException");
         cu.addImport("com.dylibso.chicory.runtime.ExportFunction");
         cu.addImport("com.dylibso.chicory.runtime.Instance");
+        cu.addImport("com.dylibso.chicory.runtime.WasmException");
 
         // base imports
         cu.addImport("com.dylibso.chicory.wasm.InvalidException");
@@ -196,6 +197,7 @@ public class JavaTestGen {
                 case ASSERT_RETURN:
                 case ASSERT_TRAP:
                 case ASSERT_EXHAUSTION:
+                case ASSERT_EXCEPTION:
                     {
                         method =
                                 createTestMethod(
@@ -295,6 +297,7 @@ public class JavaTestGen {
                 return excludedUninstantiableWasts.contains(name + ".wast");
             case ASSERT_UNLINKABLE:
                 return excludedUnlinkableWasts.contains(name + ".wast");
+            case ASSERT_EXCEPTION:
             case ASSERT_EXHAUSTION:
             case ASSERT_TRAP:
                 return false;
@@ -313,6 +316,8 @@ public class JavaTestGen {
                 return "UninstantiableException";
             case ASSERT_UNLINKABLE:
                 return "UnlinkableException";
+            case ASSERT_EXCEPTION:
+                return "WasmException";
             case ASSERT_TRAP:
             case ASSERT_EXHAUSTION:
                 return "ChicoryException";
@@ -372,7 +377,8 @@ public class JavaTestGen {
     private List<Expression> generateAssert(String varName, Command cmd) {
         assert (cmd.type() == CommandType.ASSERT_RETURN
                 || cmd.type() == CommandType.ASSERT_TRAP
-                || cmd.type() == CommandType.ASSERT_EXHAUSTION);
+                || cmd.type() == CommandType.ASSERT_EXHAUSTION
+                || cmd.type() == CommandType.ASSERT_EXCEPTION);
         assert (cmd.expected() != null);
         assert (cmd.expected().length > 0);
         assert (cmd.action().type() == INVOKE);
@@ -395,7 +401,9 @@ public class JavaTestGen {
                         ? ".apply(ArgsAdapter.builder()" + adaptedArgs + ".build()" + ")"
                         : ".getValue()";
 
-        if (cmd.type() == CommandType.ASSERT_TRAP || cmd.type() == CommandType.ASSERT_EXHAUSTION) {
+        if (cmd.type() == CommandType.ASSERT_TRAP
+                || cmd.type() == CommandType.ASSERT_EXHAUSTION
+                || cmd.type() == CommandType.ASSERT_EXCEPTION) {
             var assertDecl =
                     new NameExpr(
                             "var exception ="
