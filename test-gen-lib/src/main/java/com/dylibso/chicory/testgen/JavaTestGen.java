@@ -43,6 +43,8 @@ public class JavaTestGen {
 
     private final List<String> excludedUnlinkableWasts;
 
+    private final boolean singleTestCase = true;
+
     public JavaTestGen(
             List<String> excludedTests,
             List<String> excludedMalformedWasts,
@@ -112,13 +114,15 @@ public class JavaTestGen {
         cu.addImport("com.dylibso.chicory.testing.Spectest");
 
         var testClass = cu.addClass(testName);
-        testClass.addSingleMemberAnnotation(
-                "TestMethodOrder", new NameExpr("MethodOrderer.OrderAnnotation.class"));
-        testClass.addSingleMemberAnnotation(
-                "TestInstance",
-                new FieldAccessExpr(
-                        new FieldAccessExpr(new NameExpr("TestInstance"), "Lifecycle"),
-                        "PER_CLASS"));
+        if (!singleTestCase) {
+            testClass.addSingleMemberAnnotation(
+                    "TestMethodOrder", new NameExpr("MethodOrderer.OrderAnnotation.class"));
+            testClass.addSingleMemberAnnotation(
+                    "TestInstance",
+                    new FieldAccessExpr(
+                            new FieldAccessExpr(new NameExpr("TestInstance"), "Lifecycle"),
+                            "PER_CLASS"));
+        }
 
         MethodDeclaration method;
         int testNumber = 0;
@@ -136,6 +140,12 @@ public class JavaTestGen {
                 "Store",
                 "store",
                 new NameExpr("new Store().addImportValues(Spectest.toImportValues())"));
+
+        MethodDeclaration singleTestCaseMethod = null;
+        if (singleTestCase) {
+            singleTestCaseMethod = testClass.addMethod("singleTest", Modifier.Keyword.PUBLIC);
+            singleTestCaseMethod.addAnnotation("Test");
+        }
 
         String currentWasmFile = null;
         for (var cmd : wast.commands()) {
@@ -157,22 +167,8 @@ public class JavaTestGen {
                                 Modifier.Keyword.PUBLIC,
                                 Modifier.Keyword.STATIC);
 
-                        var instantiateMethodName = "instantiate_" + lastInstanceVarName;
-                        var instantiateMethod =
-                                testClass.addMethod(instantiateMethodName, Modifier.Keyword.PUBLIC);
                         // It needs to be a test to be executed
-                        instantiateMethod.addAnnotation("Test");
-                        instantiateMethod.addSingleMemberAnnotation(
-                                "Order", new IntegerLiteralExpr(Integer.toString(testNumber++)));
-                        instantiateMethod.addSingleMemberAnnotation(
-                                "DisplayName",
-                                new StringLiteralExpr(
-                                        formatWastFileCoordinates(
-                                                wast.sourceFilename().getName(),
-                                                cmd.line(),
-                                                cmd.filename())));
-
-                        instantiateMethod.setBody(
+                        var body =
                                 new BlockStmt()
                                         .addStatement(
                                                 new AssignExpr(
@@ -182,7 +178,28 @@ public class JavaTestGen {
                                                                 getExcluded(
                                                                         CommandType.ASSERT_INVALID,
                                                                         name)),
-                                                        AssignExpr.Operator.ASSIGN)));
+                                                        AssignExpr.Operator.ASSIGN));
+                        if (!singleTestCase) {
+                            var instantiateMethodName = "instantiate_" + lastInstanceVarName;
+                            var instantiateMethod =
+                                    testClass.addMethod(
+                                            instantiateMethodName, Modifier.Keyword.PUBLIC);
+                            instantiateMethod.addAnnotation("Test");
+                            instantiateMethod.addSingleMemberAnnotation(
+                                    "Order",
+                                    new IntegerLiteralExpr(Integer.toString(testNumber++)));
+                            instantiateMethod.addSingleMemberAnnotation(
+                                    "DisplayName",
+                                    new StringLiteralExpr(
+                                            formatWastFileCoordinates(
+                                                    wast.sourceFilename().getName(),
+                                                    cmd.line(),
+                                                    cmd.filename())));
+                            instantiateMethod.setBody(body);
+                        } else {
+                            singleTestCaseMethod.setBody(body);
+                        }
+
                         break;
                     }
                 case ACTION:
@@ -190,33 +207,51 @@ public class JavaTestGen {
                 case ASSERT_TRAP:
                 case ASSERT_EXHAUSTION:
                     {
-                        method =
-                                createTestMethod(
-                                        wast.sourceFilename().getName(),
-                                        cmd,
-                                        testClass,
-                                        testNumber++,
-                                        excludedMethods);
+                        var testNum = testNumber++;
 
                         var baseVarName = StringUtils.escapedCamelCase(cmd.action().field());
                         var varNum = fallbackVarNumber++;
-                        var varName = "var" + (baseVarName.isEmpty() ? varNum : baseVarName);
+                        var varName =
+                                "var" + (baseVarName.isEmpty() ? varNum : varNum + baseVarName);
                         String moduleName = lastModuleVarName;
                         if (cmd.action().module() != null) {
                             moduleName = cmd.action().module().replace("$", "");
                         }
                         var fieldExport = generateFieldExport(varName, cmd, moduleName);
                         if (fieldExport.isPresent()) {
-                            method.getBody().get().addStatement(fieldExport.get());
+                            if (!singleTestCase) {
+                                method =
+                                        createTestMethod(
+                                                wast.sourceFilename().getName(),
+                                                cmd,
+                                                testClass,
+                                                testNum,
+                                                excludedMethods);
+
+                                method.getBody().get().addStatement(fieldExport.get());
+                            } else {
+                                singleTestCaseMethod
+                                        .getBody()
+                                        .get()
+                                        .addStatement(fieldExport.get());
+                            }
                         }
 
                         if (cmd.type() == CommandType.ACTION) {
                             for (var expr : generateInvoke(varName, cmd)) {
-                                method.getBody().get().addStatement(expr);
+                                if (!singleTestCase) {
+                                    method.getBody().get().addStatement(expr);
+                                } else {
+                                    singleTestCaseMethod.getBody().get().addStatement(expr);
+                                }
                             }
                         } else {
                             for (var expr : generateAssert(varName, cmd)) {
-                                method.getBody().get().addStatement(expr);
+                                if (!singleTestCase) {
+                                    method.getBody().get().addStatement(expr);
+                                } else {
+                                    singleTestCaseMethod.getBody().get().addStatement(expr);
+                                }
                             }
                         }
                         break;
@@ -226,39 +261,58 @@ public class JavaTestGen {
 
                     generateRegisterInstance(cmd.as(), lastInstanceVarName);
 
-                    var instantiateMethodName = "register_" + lastInstanceVarName;
-                    var instantiateMethod =
-                            testClass.addMethod(instantiateMethodName, Modifier.Keyword.PUBLIC);
-                    // It needs to be a test to be executed
-                    instantiateMethod.addAnnotation("Test");
-                    instantiateMethod.addSingleMemberAnnotation(
-                            "Order", new IntegerLiteralExpr(Integer.toString(testNumber++)));
+                    if (!singleTestCase) {
+                        var instantiateMethodName = "register_" + lastInstanceVarName;
+                        var instantiateMethod =
+                                testClass.addMethod(instantiateMethodName, Modifier.Keyword.PUBLIC);
+                        // It needs to be a test to be executed
+                        instantiateMethod.addAnnotation("Test");
+                        instantiateMethod.addSingleMemberAnnotation(
+                                "Order", new IntegerLiteralExpr(Integer.toString(testNumber++)));
 
-                    instantiateMethod.setBody(
-                            new BlockStmt()
-                                    .addStatement(
-                                            generateRegisterInstance(
-                                                    cmd.as(), lastInstanceVarName)));
-
+                        instantiateMethod.setBody(
+                                new BlockStmt()
+                                        .addStatement(
+                                                generateRegisterInstance(
+                                                        cmd.as(), lastInstanceVarName)));
+                    } else {
+                        singleTestCaseMethod
+                                .getBody()
+                                .get()
+                                .addStatement(
+                                        generateRegisterInstance(cmd.as(), lastInstanceVarName));
+                    }
                     break;
                 case ASSERT_MALFORMED:
                 case ASSERT_INVALID:
                 case ASSERT_UNINSTANTIABLE:
                 case ASSERT_UNLINKABLE:
                     {
-                        method =
-                                createTestMethod(
-                                        wast.sourceFilename().getName(),
-                                        cmd,
-                                        testClass,
-                                        testNumber++,
-                                        excludedMethods);
-                        generateAssertThrows(
-                                wasmClasspath,
-                                cmd,
-                                method,
-                                getExcluded(cmd.type(), name),
-                                getExceptionType(cmd.type()));
+                        var testNum = testNumber++;
+                        if (!singleTestCase) {
+                            method =
+                                    createTestMethod(
+                                            wast.sourceFilename().getName(),
+                                            cmd,
+                                            testClass,
+                                            testNum,
+                                            excludedMethods);
+                            generateAssertThrows(
+                                    wasmClasspath,
+                                    cmd,
+                                    method,
+                                    getExcluded(cmd.type(), name),
+                                    testNum,
+                                    getExceptionType(cmd.type()));
+                        } else {
+                            generateAssertThrows(
+                                    wasmClasspath,
+                                    cmd,
+                                    singleTestCaseMethod,
+                                    getExcluded(cmd.type(), name),
+                                    testNum,
+                                    getExceptionType(cmd.type()));
+                        }
                         break;
                     }
                 default:
@@ -389,9 +443,12 @@ public class JavaTestGen {
                         : ".getValue()";
 
         if (cmd.type() == CommandType.ASSERT_TRAP || cmd.type() == CommandType.ASSERT_EXHAUSTION) {
+            var exceptionName = varName + "exception";
             var assertDecl =
                     new NameExpr(
-                            "var exception ="
+                            "var "
+                                    + exceptionName
+                                    + " ="
                                     + " assertThrows("
                                     + getExceptionType(cmd.type())
                                     + ".class, () -> "
@@ -399,13 +456,14 @@ public class JavaTestGen {
                                     + invocationMethod
                                     + ")");
             if (cmd.text() != null) {
-                return List.of(assertDecl, exceptionMessageMatch(cmd.text()));
+                return List.of(assertDecl, exceptionMessageMatch(exceptionName, cmd.text()));
             } else {
                 return List.of(assertDecl);
             }
         } else if (cmd.type() == CommandType.ASSERT_RETURN) {
             List<Expression> exprs = new ArrayList<>();
-            var resVarName = (cmd.action().type() == ActionType.INVOKE) ? "results" : "result";
+            var resVarName =
+                    varName + ((cmd.action().type() == ActionType.INVOKE) ? "results" : "result");
             exprs.add(new NameExpr("var " + resVarName + " = " + varName + invocationMethod));
 
             for (int i = 0; i < cmd.expected().length; i++) {
@@ -417,26 +475,47 @@ public class JavaTestGen {
                                 : expected.toResultValue(resVarName);
 
                 if (expected.type() == WasmValueType.V128) {
-                    exprs.add(new NameExpr("var expected = " + resultVar));
+                    var expectedVarName = varName + "expected";
+                    exprs.add(new NameExpr("var " + expectedVarName + " = " + resultVar));
                     switch (expected.laneType()) {
                         case I8:
                             exprs.add(
                                     new NameExpr(
-                                            "assertArrayEquals(expected," + " vecTo8(results))"));
+                                            "assertArrayEquals("
+                                                    + expectedVarName
+                                                    + ","
+                                                    + " vecTo8("
+                                                    + resVarName
+                                                    + "))"));
                             break;
                         case I16:
                             exprs.add(
-                                    new NameExpr("assertArrayEquals(expected, vecTo16(results))"));
+                                    new NameExpr(
+                                            "assertArrayEquals( "
+                                                    + expectedVarName
+                                                    + ", vecTo16("
+                                                    + resVarName
+                                                    + "))"));
                             break;
                         case I32:
                             exprs.add(
                                     new NameExpr(
-                                            "assertArrayEquals(expected," + " vecTo32(results))"));
+                                            "assertArrayEquals("
+                                                    + expectedVarName
+                                                    + ","
+                                                    + " vecTo32("
+                                                    + resVarName
+                                                    + "))"));
                             break;
                         case F32:
                             exprs.add(
                                     new NameExpr(
-                                            "assertArrayEquals(expected," + " vecToF32(results))"));
+                                            "assertArrayEquals("
+                                                    + expectedVarName
+                                                    + ","
+                                                    + " vecToF32("
+                                                    + resVarName
+                                                    + "))"));
                             break;
                     }
 
@@ -467,7 +546,9 @@ public class JavaTestGen {
 
         var assertDecl =
                 new NameExpr(
-                        "var exception = assertDoesNotThrow(() -> "
+                        "var "
+                                + varName
+                                + "exception = assertDoesNotThrow(() -> "
                                 + varName
                                 + invocationMethod
                                 + ")");
@@ -500,11 +581,13 @@ public class JavaTestGen {
             Command cmd,
             MethodDeclaration method,
             boolean excluded,
+            int testNumber,
             String exceptionType) {
 
         String wasmFile = getWasmFile(cmd, wasmClasspath);
 
-        var assignementStmt = (cmd.text() != null) ? "var exception = " : "";
+        var exceptionVarName = "exception" + testNumber;
+        var assignementStmt = (cmd.text() != null) ? "var " + exceptionVarName + " = " : "";
 
         var assertThrows =
                 new NameExpr(
@@ -517,7 +600,9 @@ public class JavaTestGen {
 
         method.getBody().get().addStatement(assertThrows);
         if (cmd.text() != null) {
-            method.getBody().get().addStatement(exceptionMessageMatch(cmd.text()));
+            method.getBody()
+                    .get()
+                    .addStatement(exceptionMessageMatch(exceptionVarName, cmd.text()));
         }
 
         if (excluded) {
@@ -527,11 +612,15 @@ public class JavaTestGen {
         }
     }
 
-    private Expression exceptionMessageMatch(String text) {
+    private Expression exceptionMessageMatch(String exceptionName, String text) {
         return new NameExpr(
-                "assertTrue(exception.getMessage().contains(\""
+                "assertTrue("
+                        + exceptionName
+                        + ".getMessage().contains(\""
                         + text
-                        + "\"), \"'\" + exception.getMessage() + \"' doesn't contain: '"
+                        + "\"), \"'\" + "
+                        + exceptionName
+                        + ".getMessage() + \"' doesn't contain: '"
                         + text
                         + "\")");
     }
