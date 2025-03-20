@@ -116,6 +116,7 @@
             <wast>proposals/exception-handling/exports.wast</wast>
             <wast>proposals/exception-handling/imports.wast</wast>
             <wast>proposals/exception-handling/tag.wast</wast>
+            <wast>proposals/gc/ref.wast</wast>
             <wast>proposals/tail-call/return_call.wast</wast>
             <wast>proposals/tail-call/return_call_indirect.wast</wast>
             <wast>ref_func.wast</wast>
@@ -329,6 +330,7 @@
                 <wast>proposals/exception-handling/exports.wast</wast>
                 <wast>proposals/exception-handling/imports.wast</wast>
                 <wast>proposals/exception-handling/tag.wast</wast>
+                <wast>proposals/gc/ref.wast</wast>
                 <wast>proposals/tail-call/return_call.wast</wast>
                 <wast>proposals/tail-call/return_call_indirect.wast</wast>
                 <wast>ref_func.wast</wast>
