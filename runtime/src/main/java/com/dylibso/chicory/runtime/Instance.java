@@ -98,9 +98,12 @@ public class Instance {
             this.tables[i] = new TableInstance(tables[i]);
         }
         this.elements = elements.clone();
-        this.tags = (tags == null) ? new TagInstance[0] : new TagInstance[tags.length];
-        for (int i = 0; i < this.tags.length; i++) {
-            this.tags[i] = new TagInstance(tags[i], this);
+        this.tags =
+                (tags == null)
+                        ? new TagInstance[imports.tagCount()]
+                        : new TagInstance[imports.tagCount() + tags.length];
+        for (int i = imports.tagCount(); i < this.tags.length; i++) {
+            this.tags[i] = new TagInstance(tags[i - imports.tagCount()], this);
         }
         this.exports = exports;
         this.listener = listener;
@@ -166,6 +169,23 @@ public class Instance {
                 }
             }
             throw new InvalidException("unknown memory");
+        }
+
+        // imported tags
+        for (int i = 0; i < imports.tagCount(); i++) {
+            for (int j = imports.tagCount(); j < tags.length; j++) {
+                var importedTagType =
+                        imports.tag(i)
+                                .tag()
+                                .instance()
+                                .type(imports.tag(i).tag().tagType().typeIdx());
+                var currentTagType = type(tags[j].tagType().typeIdx());
+
+                if (importedTagType.paramsMatch(currentTagType)
+                        && importedTagType.returnsMatch(currentTagType)) {
+                    tags[i] = tags[j];
+                }
+            }
         }
 
         Export startFunction = this.exports.get(START_FUNCTION_NAME);
@@ -313,10 +333,7 @@ public class Instance {
     }
 
     public TagInstance tag(int idx) {
-        if (idx < imports.tagCount()) {
-            return imports.tag(idx).tag();
-        }
-        return tags[idx - imports.tagCount()];
+        return tags[idx];
     }
 
     public int tagCount() {

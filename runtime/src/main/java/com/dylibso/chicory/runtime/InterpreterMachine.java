@@ -2092,17 +2092,23 @@ public class InterpreterMachine implements Machine {
                         var exceptionTag = exception.instance().tag(exception.tagIdx());
 
                         // if it's an import we verify the compatibility
-                        if (currentCatch.tag() < instance.imports().tagCount()) {
-                            var currentCatchType =
-                                    instance.type(currentCatchTag.tagType().typeIdx());
-                            var exceptionType =
-                                    exception.instance().type(exceptionTag.tagType().typeIdx());
-
-                            if (currentCatchType.paramsMatch(exceptionType)
-                                    && exceptionType.returnsMatch(exceptionType)) {
-                                compatibleImport = true;
-                            }
-                        } else if (exceptionTag != currentCatchTag) {
+                        //                        if (currentCatch.tag() <
+                        // instance.imports().tagCount()) {
+                        //                            var currentCatchType =
+                        //
+                        // instance.type(currentCatchTag.tagType().typeIdx());
+                        //                            var exceptionType =
+                        //
+                        // exception.instance().type(exceptionTag.tagType().typeIdx());
+                        //
+                        //                            if
+                        // (currentCatchType.paramsMatch(exceptionType)
+                        //                                    &&
+                        // exceptionType.returnsMatch(exceptionType)) {
+                        //                                compatibleImport = true;
+                        //                            }
+                        //                        } else
+                        if (exceptionTag != currentCatchTag) {
                             // if it's not an import the tag should be the same
                             continue;
                         }
