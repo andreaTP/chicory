@@ -221,6 +221,7 @@ final class AotUtil {
                 false);
     }
 
+    // this signature should fallback for > 255 params
     public static void emitInvokeFunction(
             MethodVisitor asm, String internalClassName, int funcId, FunctionType functionType) {
         asm.visitMethodInsn(

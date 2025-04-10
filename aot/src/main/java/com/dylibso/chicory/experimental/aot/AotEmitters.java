@@ -138,6 +138,7 @@ final class AotEmitters {
 
         emitInvokeStatic(asm, AotMethodRefs.CHECK_INTERRUPTION);
 
+        // max 253
         asm.load(ctx.memorySlot(), OBJECT_TYPE);
         asm.load(ctx.instanceSlot(), OBJECT_TYPE);
         emitInvokeFunction(asm, ctx.internalClassName(), funcId, functionType);

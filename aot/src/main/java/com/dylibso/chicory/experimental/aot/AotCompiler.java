@@ -669,6 +669,7 @@ public final class AotCompiler {
         }
     }
 
+    // receiving function that should fallback
     private void compileFunction(
             String internalClassName,
             int funcId,
