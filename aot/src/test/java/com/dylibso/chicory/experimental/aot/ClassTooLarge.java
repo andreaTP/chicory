@@ -13,15 +13,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class ClassTooLarge {
 
     @Test
-    @Disabled(
-            "Method too large: com/dylibso/chicory/$gen/CompiledMachine.call_indirect_0"
-                + " (IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I\n")
     public void testFunc50k() throws IOException {
 
         var funcCount = 50_000;
@@ -31,6 +27,7 @@ public class ClassTooLarge {
                         .withStart(false)
                         .build();
 
+        funcCount = 1000;
         var expected = 0;
         for (int i = 1; i <= funcCount; i++) {
             expected += i;

@@ -14,8 +14,12 @@ import static com.dylibso.chicory.experimental.aot.AotMethodRefs.THROW_CALL_STAC
 import static com.dylibso.chicory.experimental.aot.AotMethodRefs.THROW_INDIRECT_CALL_TYPE_MISMATCH;
 import static com.dylibso.chicory.experimental.aot.AotMethodRefs.THROW_UNKNOWN_FUNCTION;
 import static com.dylibso.chicory.experimental.aot.AotUtil.asmType;
+import static com.dylibso.chicory.experimental.aot.AotUtil.callDispatchMethodName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.callIndirectMethodName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.callIndirectMethodType;
+import static com.dylibso.chicory.experimental.aot.AotUtil.callMethodName;
+import static com.dylibso.chicory.experimental.aot.AotUtil.classNameForCallIndirect;
+import static com.dylibso.chicory.experimental.aot.AotUtil.classNameForDispatch;
 import static com.dylibso.chicory.experimental.aot.AotUtil.defaultValue;
 import static com.dylibso.chicory.experimental.aot.AotUtil.emitInvokeFunction;
 import static com.dylibso.chicory.experimental.aot.AotUtil.emitInvokeStatic;
@@ -26,8 +30,9 @@ import static com.dylibso.chicory.experimental.aot.AotUtil.hasTooManyParameters;
 import static com.dylibso.chicory.experimental.aot.AotUtil.internalClassName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.jvmReturnType;
 import static com.dylibso.chicory.experimental.aot.AotUtil.localType;
-import static com.dylibso.chicory.experimental.aot.AotUtil.methodNameFor;
+import static com.dylibso.chicory.experimental.aot.AotUtil.methodNameForFunc;
 import static com.dylibso.chicory.experimental.aot.AotUtil.methodTypeFor;
+import static com.dylibso.chicory.experimental.aot.AotUtil.rawMethodTypeFor;
 import static com.dylibso.chicory.experimental.aot.AotUtil.slotCount;
 import static com.dylibso.chicory.experimental.aot.AotUtil.valueMethodName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.valueMethodType;
@@ -69,6 +74,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassTooLargeException;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -97,7 +103,8 @@ public final class AotCompiler {
     private final AotAnalyzer analyzer;
     private final int functionImports;
     private final List<FunctionType> functionTypes;
-    private final Map<String, byte[]> extraClasses;
+    private final Map<String, byte[]> extraClasses = new LinkedHashMap<>();
+    private int maxFunctionsPerClass;
 
     private AotCompiler(WasmModule module, String className) {
         this.className = requireNonNull(className, "className");
@@ -105,7 +112,7 @@ public final class AotCompiler {
         this.analyzer = new AotAnalyzer(module);
         this.functionImports = module.importSection().count(ExternalType.FUNCTION);
         this.functionTypes = analyzer.functionTypes();
-        this.extraClasses = compileExtraClasses();
+        compileExtraClasses();
     }
 
     public static CompilerResult compileModule(WasmModule module) {
@@ -159,18 +166,104 @@ public final class AotCompiler {
         }
     }
 
-    private void loadExtraClass(Map<String, byte[]> classes, byte[] bytes) {
+    private String loadExtraClass(byte[] bytes) {
         Class<?> clazz = loadClass(bytes);
-        classes.put(clazz.getName(), bytes);
+        extraClasses.put(clazz.getName(), bytes);
+        return clazz.getName();
     }
 
-    private Map<String, byte[]> compileExtraClasses() {
-        Map<String, byte[]> classes = new LinkedHashMap<>();
-        loadExtraClass(classes, createAotMethodsClass(className));
-        if (!functionTypes.isEmpty()) {
-            loadExtraClass(classes, compileMachineCallClass());
+    private void compileExtraClasses() {
+        loadExtraClass(createAotMethodsClass(className));
+
+        int totalFunctions = functionImports + module.functionSection().functionCount();
+        // 1024*12 was empirically determined to work for the 50K small wasm functions.
+        // So lets start there and halve it until we find a size that works.
+        // This should give us the biggest class size possible.
+        maxFunctionsPerClass = 1024 * 12;
+        ArrayList<String> generated = new ArrayList<>();
+        while (true) {
+            try {
+                for (int start = 0; start < totalFunctions; start += maxFunctionsPerClass) {
+                    int end = min(start + maxFunctionsPerClass, totalFunctions);
+                    generated.add(
+                            loadExtraClass(
+                                    compileExtraClass(
+                                            classNameForFuncGroup(start),
+                                            emitFunctionGroup(
+                                                    start, end, internalClassName(className)))));
+                }
+                break;
+            } catch (ClassTooLargeException e) {
+                for (var x : generated) {
+                    extraClasses.remove(x);
+                }
+                maxFunctionsPerClass = maxFunctionsPerClass >> 1;
+            }
         }
-        return classes;
+
+        if (!functionTypes.isEmpty()) {
+            loadExtraClass(compileMachineCallClass());
+        }
+    }
+
+    public String classNameForFuncGroup(int funcId) {
+        return "FuncGroup_" + (funcId / maxFunctionsPerClass);
+    }
+
+    private Consumer<ClassVisitor> emitFunctionGroup(int start, int end, String internalClassName) {
+        return (classWriter) -> {
+            for (int i = start; i < end; i++) {
+                FunctionBody body = null;
+                try {
+                    int funcId = i;
+                    var type = functionTypes.get(funcId);
+
+                    // is it an import function?
+                    if (i < functionImports) {
+                        emitFunction(
+                                classWriter,
+                                methodNameForFunc(funcId),
+                                methodTypeFor(type),
+                                true,
+                                asm -> compileHostFunction(funcId, type, asm));
+
+                    } else {
+                        body = module.codeSection().getFunctionBody(i - functionImports);
+                        var bodyCopy = body;
+                        emitFunction(
+                                classWriter,
+                                methodNameForFunc(funcId),
+                                methodTypeFor(type),
+                                true,
+                                asm ->
+                                        compileFunction(
+                                                internalClassName, funcId, type, bodyCopy, asm));
+
+                        // call_xxx() bridges for boxed to native
+                        emitFunction(
+                                classWriter,
+                                callMethodName(funcId),
+                                CALL_METHOD_TYPE,
+                                true,
+                                asm -> compileCallFunction(funcId, type, asm));
+                    }
+                } catch (MethodTooLargeException e) {
+                    String details = "WASM function index: " + i;
+                    if (module.nameSection() != null) {
+                        details +=
+                                String.format(", name: %s", module.nameSection().nameOfFunction(i));
+                    }
+                    if (body != null) {
+                        details +=
+                                String.format(
+                                        ", locals: %d, instructions: %d",
+                                        body.localTypes().size(), body.instructions().size());
+                    }
+                    e.addSuppressed(new ChicoryException(details));
+                    throw e;
+                }
+            }
+        };
     }
 
     private byte[] compileClass() {
@@ -215,32 +308,6 @@ public final class AotCompiler {
                 methodType(long[].class, int.class, long[].class),
                 false,
                 asm -> compileMachineCall(internalClassName, asm));
-
-        // func_xxx() bridges for native to host functions
-        for (int i = 0; i < functionImports; i++) {
-            int funcId = i;
-            var type = functionTypes.get(funcId);
-            emitFunction(
-                    classWriter,
-                    methodNameFor(funcId),
-                    methodTypeFor(type),
-                    true,
-                    asm -> compileHostFunction(funcId, type, asm));
-        }
-
-        // func_xxx() native function implementations
-        for (int i = 0; i < module.functionSection().functionCount(); i++) {
-            var funcId = functionImports + i;
-            var type = functionTypes.get(funcId);
-            var body = module.codeSection().getFunctionBody(i);
-
-            emitFunction(
-                    classWriter,
-                    methodNameFor(funcId),
-                    methodTypeFor(type),
-                    true,
-                    asm -> compileFunction(internalClassName, funcId, type, body, asm));
-        }
 
         // call_indirect_xxx() bridges for native CALL_INDIRECT
         var allTypes = module.typeSection().types();
@@ -399,66 +466,98 @@ public final class AotCompiler {
         if (functionTypes.size() < MAX_MACHINE_CALL_METHODS) {
             callMethod = asm -> compileMachineCallInvoke(asm, 0, functionTypes.size());
         } else {
-            callMethod = this::compileMachineCallDispatch;
-            for (int i = 0; i < functionTypes.size(); i += MAX_MACHINE_CALL_METHODS) {
-                int start = i;
-                int end = min(start + MAX_MACHINE_CALL_METHODS, functionTypes.size());
-                emitFunction(
-                        classWriter,
-                        callDispatchMethodName(start),
-                        MACHINE_CALL_METHOD_TYPE,
-                        true,
-                        asm -> compileMachineCallInvoke(asm, start, end));
+            // Best value that worked with the 50K small wasm functions
+            var maxMachineCallMethods = MAX_MACHINE_CALL_METHODS << 2;
+            ArrayList<String> generated = new ArrayList<>();
+            while (true) {
+                try {
+                    for (int i = 0; i < functionTypes.size(); i += maxMachineCallMethods) {
+                        int start = i;
+                        int end = min(start + maxMachineCallMethods, functionTypes.size());
+                        generated.add(
+                                loadExtraClass(
+                                        compileExtraClass(
+                                                classNameForDispatch(start),
+                                                (cw) ->
+                                                        emitFunction(
+                                                                cw,
+                                                                callDispatchMethodName(start),
+                                                                MACHINE_CALL_METHOD_TYPE,
+                                                                true,
+                                                                asm ->
+                                                                        compileMachineCallInvoke(
+                                                                                asm, start,
+                                                                                end)))));
+                    }
+                    callMethod = compileMachineCallDispatch(maxMachineCallMethods);
+                    break;
+                } catch (MethodTooLargeException e) {
+                    for (var x : generated) {
+                        extraClasses.remove(x);
+                    }
+                    maxMachineCallMethods = maxMachineCallMethods >> 1;
+                } catch (ClassTooLargeException e) {
+                    for (var x : generated) {
+                        extraClasses.remove(x);
+                    }
+                    maxMachineCallMethods = maxMachineCallMethods >> 1;
+                }
             }
         }
         emitFunction(classWriter, "call", MACHINE_CALL_METHOD_TYPE, true, callMethod);
 
-        // call_xxx() bridges for boxed to native
-        for (int i = 0; i < module.functionSection().functionCount(); i++) {
-            var funcId = functionImports + i;
-            var type = functionTypes.get(funcId);
-            emitFunction(
-                    classWriter,
-                    callMethodName(funcId),
-                    CALL_METHOD_TYPE,
-                    true,
-                    asm -> compileCallFunction(funcId, type, asm));
-        }
-
         return binaryWriter.toByteArray();
     }
 
-    private void compileMachineCallDispatch(InstructionAdapter asm) {
-        // load arguments
-        asm.load(0, OBJECT_TYPE);
-        asm.load(1, OBJECT_TYPE);
-        asm.load(2, INT_TYPE);
-        asm.load(3, OBJECT_TYPE);
+    private byte[] compileExtraClass(String name, Consumer<ClassVisitor> consumer) {
+        ClassWriter binaryWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+        ClassVisitor classWriter = aotMethodsRemapper(binaryWriter, className);
+        String internalClassName = internalClassName(className + name);
+        classWriter.visit(
+                Opcodes.V11,
+                Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
+                internalClassName,
+                null,
+                getInternalName(Object.class),
+                null);
+        consumer.accept(classWriter);
+        return binaryWriter.toByteArray();
+    }
 
-        assert Integer.bitCount(MAX_MACHINE_CALL_METHODS) == 1; // power of two
-        int shift = Integer.numberOfTrailingZeros(MAX_MACHINE_CALL_METHODS);
+    private Consumer<InstructionAdapter> compileMachineCallDispatch(int maxMachineCallMethods) {
+        return (asm) -> {
 
-        // switch (funcId >> shift)
-        Label[] labels = new Label[((functionTypes.size() - 1) >> shift) + 1];
-        for (int i = 0; i < labels.length; i++) {
-            labels[i] = new Label();
-        }
+            // load arguments
+            asm.load(0, OBJECT_TYPE);
+            asm.load(1, OBJECT_TYPE);
+            asm.load(2, INT_TYPE);
+            asm.load(3, OBJECT_TYPE);
 
-        asm.load(2, INT_TYPE);
-        asm.iconst(shift);
-        asm.shr(INT_TYPE);
-        asm.tableswitch(0, labels.length - 1, labels[0], labels);
+            assert Integer.bitCount(maxMachineCallMethods) == 1; // power of two
+            int shift = Integer.numberOfTrailingZeros(maxMachineCallMethods);
 
-        // return call_dispatch_xxx(instance, memory, funcId, args);
-        for (int i = 0; i < labels.length; i++) {
-            asm.mark(labels[i]);
-            asm.invokestatic(
-                    internalClassName(className + "$MachineCall"),
-                    callDispatchMethodName(i << shift),
-                    MACHINE_CALL_METHOD_TYPE.toMethodDescriptorString(),
-                    false);
-            asm.areturn(OBJECT_TYPE);
-        }
+            // switch (funcId >> shift)
+            Label[] labels = new Label[((functionTypes.size() - 1) >> shift) + 1];
+            for (int i = 0; i < labels.length; i++) {
+                labels[i] = new Label();
+            }
+
+            asm.load(2, INT_TYPE);
+            asm.iconst(shift);
+            asm.shr(INT_TYPE);
+            asm.tableswitch(0, labels.length - 1, labels[0], labels);
+
+            // return call_dispatch_xxx(instance, memory, funcId, args);
+            for (int i = 0; i < labels.length; i++) {
+                asm.mark(labels[i]);
+                asm.invokestatic(
+                        internalClassName(className + classNameForDispatch(i << shift)),
+                        callDispatchMethodName(i << shift),
+                        MACHINE_CALL_METHOD_TYPE.toMethodDescriptorString(),
+                        false);
+                asm.areturn(OBJECT_TYPE);
+            }
+        };
     }
 
     private void compileMachineCallInvoke(InstructionAdapter asm, int start, int end) {
@@ -483,7 +582,7 @@ public final class AotCompiler {
         for (int id = max(start, functionImports); id < end; id++) {
             asm.mark(labels[id - start]);
             asm.invokestatic(
-                    internalClassName(className + "$MachineCall"),
+                    internalClassName(className + classNameForFuncGroup(start)),
                     callMethodName(id),
                     CALL_METHOD_TYPE.toMethodDescriptorString(),
                     false);
@@ -525,7 +624,8 @@ public final class AotCompiler {
         asm.load(1, OBJECT_TYPE);
         asm.load(0, OBJECT_TYPE);
 
-        emitInvokeFunction(asm, internalClassName(className), funcId, type);
+        emitInvokeFunction(
+                asm, internalClassName(className) + classNameForFuncGroup(funcId), funcId, type);
 
         // box the result into long[]
         Class<?> returnType = jvmReturnType(type);
@@ -546,15 +646,36 @@ public final class AotCompiler {
 
     private void compileCallIndirect(
             String internalClassName, int typeId, FunctionType type, InstructionAdapter asm) {
+        compileCallIndirect(internalClassName, typeId, type, asm, 0, Integer.MAX_VALUE);
+    }
+
+    private void compileCallIndirect(
+            String internalClassName,
+            int typeId,
+            FunctionType type,
+            InstructionAdapter asm,
+            int startFunc,
+            int endFunc) {
         int slots = type.params().stream().mapToInt(AotUtil::slotCount).sum();
         if (hasTooManyParameters(type)) {
             slots = 1; // for long[]
         }
 
+        List<Integer> validIds = new ArrayList<>();
+        for (int i = 0; i < functionTypes.size(); i++) {
+            if (type.equals(functionTypes.get(i)) && startFunc <= i && i < endFunc) {
+                validIds.add(i);
+            }
+        }
+        Label invalid = new Label();
+
+        // extra params...
         int funcTableIdx = slots;
         int tableIdx = slots + 1;
         int memory = slots + 2;
         int instance = slots + 3;
+
+        // local vars
         int table = slots + 4;
         int funcId = slots + 5;
         int refInstance = slots + 6;
@@ -603,31 +724,103 @@ public final class AotCompiler {
         asm.load(memory, OBJECT_TYPE);
         asm.load(instance, OBJECT_TYPE);
 
-        List<Integer> validIds = new ArrayList<>();
-        for (int i = 0; i < functionTypes.size(); i++) {
-            if (type.equals(functionTypes.get(i))) {
-                validIds.add(i);
+        // Can we fit the impl in a single method?
+        if (validIds.size() <= MAX_MACHINE_CALL_METHODS) {
+
+            int[] keys = validIds.stream().mapToInt(x -> x).toArray();
+            Label[] labels = validIds.stream().map(x -> new Label()).toArray(Label[]::new);
+
+            asm.load(funcId, INT_TYPE);
+            asm.lookupswitch(invalid, keys, labels);
+
+            for (int i = 0; i < validIds.size(); i++) {
+                // case 0:
+                //    return func_0(a, b, memory, callerInstance);
+                asm.mark(labels[i]);
+                emitInvokeFunction(
+                        asm, internalClassName + classNameForFuncGroup(keys[i]), keys[i], type);
+                asm.areturn(getType(jvmReturnType(type)));
+            }
+
+            asm.mark(invalid);
+            emitInvokeStatic(asm, THROW_INDIRECT_CALL_TYPE_MISMATCH);
+            asm.athrow();
+
+        } else {
+            var applyParams =
+                    rawMethodTypeFor(type)
+                            .appendParameterTypes(Memory.class, Instance.class, int.class);
+
+            // Best value that worked with the 50K small wasm functions
+            var maxMachineCallMethods = MAX_MACHINE_CALL_METHODS << 2;
+            ArrayList<String> generated = new ArrayList<>();
+            while (true) {
+                try {
+                    // Let's generate a separate class the call_indirect_${start_idx} methods
+                    for (int i = 0; i < functionTypes.size(); i += maxMachineCallMethods) {
+                        int start = i;
+                        int end = min(start + maxMachineCallMethods, functionTypes.size());
+                        generated.add(
+                                loadExtraClass(
+                                        compileExtraClass(
+                                                classNameForCallIndirect(typeId, start),
+                                                (cw) -> {
+                                                    emitFunction(
+                                                            cw,
+                                                            "apply",
+                                                            applyParams,
+                                                            true,
+                                                            a ->
+                                                                    compileCallIndirectApply(
+                                                                            internalClassName,
+                                                                            type,
+                                                                            a,
+                                                                            start,
+                                                                            end));
+                                                })));
+                    }
+
+                    break;
+
+                } catch (MethodTooLargeException e) {
+                    for (var x : generated) {
+                        extraClasses.remove(x);
+                    }
+                    maxMachineCallMethods = maxMachineCallMethods >> 1;
+                } catch (ClassTooLargeException e) {
+                    for (var x : generated) {
+                        extraClasses.remove(x);
+                    }
+                    maxMachineCallMethods = maxMachineCallMethods >> 1;
+                }
+            }
+
+            assert Integer.bitCount(maxMachineCallMethods) == 1; // power of two
+            int shift = Integer.numberOfTrailingZeros(maxMachineCallMethods);
+
+            // switch (funcId >> shift)
+            Label[] labels = new Label[((functionTypes.size() - 1) >> shift) + 1];
+            for (int i = 0; i < labels.length; i++) {
+                labels[i] = new Label();
+            }
+
+            asm.load(funcId, INT_TYPE);
+            asm.iconst(shift);
+            asm.shr(INT_TYPE);
+            asm.tableswitch(0, labels.length - 1, labels[0], labels);
+
+            // invoke the method that we are about to generate
+            for (int i = 0; i < labels.length; i++) {
+                asm.mark(labels[i]);
+                asm.load(funcId, INT_TYPE);
+                asm.invokestatic(
+                        internalClassName + classNameForCallIndirect(typeId, i << shift),
+                        "apply",
+                        applyParams.toMethodDescriptorString(),
+                        false);
+                asm.areturn(getType(jvmReturnType(type)));
             }
         }
-
-        Label invalid = new Label();
-        int[] keys = validIds.stream().mapToInt(x -> x).toArray();
-        Label[] labels = validIds.stream().map(x -> new Label()).toArray(Label[]::new);
-
-        asm.load(funcId, INT_TYPE);
-        asm.lookupswitch(invalid, keys, labels);
-
-        for (int i = 0; i < validIds.size(); i++) {
-            // case 0:
-            //    return func_0(a, b, memory, callerInstance);
-            asm.mark(labels[i]);
-            emitInvokeFunction(asm, internalClassName, keys[i], type);
-            asm.areturn(getType(jvmReturnType(type)));
-        }
-
-        asm.mark(invalid);
-        emitInvokeStatic(asm, THROW_INDIRECT_CALL_TYPE_MISMATCH);
-        asm.athrow();
 
         // other: call function in another module
         asm.mark(other);
@@ -644,6 +837,63 @@ public final class AotCompiler {
         emitInvokeStatic(asm, CALL_INDIRECT);
 
         emitUnboxResult(type, asm);
+    }
+
+    private void compileCallIndirectApply(
+            String internalClassName,
+            FunctionType type,
+            InstructionAdapter asm,
+            int startFunc,
+            int endFunc) {
+
+        int slots = type.params().stream().mapToInt(AotUtil::slotCount).sum();
+        if (hasTooManyParameters(type)) {
+            slots = 1; // for long[]
+        }
+
+        // extra params...
+        int memory = slots;
+        int instance = slots + 1;
+        int funcId = slots + 2;
+
+        List<Integer> validIds = new ArrayList<>();
+        for (int i = 0; i < functionTypes.size(); i++) {
+            if (type.equals(functionTypes.get(i)) && startFunc <= i && i < endFunc) {
+                validIds.add(i);
+            }
+        }
+        Label invalid = new Label();
+
+        int[] keys = validIds.stream().mapToInt(x -> x).toArray();
+        Label[] labels = validIds.stream().map(x -> new Label()).toArray(Label[]::new);
+
+        // push call the call args on the stack...
+        for (int i = 0; i < type.params().size(); i++) {
+            asm.load(i, asmType(type.params().get(i)));
+        }
+        asm.load(memory, OBJECT_TYPE);
+        asm.load(instance, OBJECT_TYPE);
+
+        // switch (funcId)
+        asm.load(funcId, INT_TYPE);
+        asm.lookupswitch(invalid, keys, labels);
+
+        for (int i = 0; i < validIds.size(); i++) {
+            // case 0:
+            //    return func_0(a, b, memory, callerInstance);
+            asm.mark(labels[i]);
+            emitInvokeFunction(
+                    asm, internalClassName + classNameForFuncGroup(keys[i]), keys[i], type);
+            asm.areturn(getType(jvmReturnType(type)));
+            asm.areturn(OBJECT_TYPE);
+        }
+
+        // throw new InvalidException("unknown function " + funcId);
+        asm.mark(invalid);
+
+        asm.load(funcId, INT_TYPE);
+        emitInvokeStatic(asm, THROW_UNKNOWN_FUNCTION);
+        asm.athrow();
     }
 
     private static void compileHostFunction(int funcId, FunctionType type, InstructionAdapter asm) {
@@ -701,6 +951,7 @@ public final class AotCompiler {
         var ctx =
                 new AotContext(
                         internalClassName,
+                        maxFunctionsPerClass,
                         analyzer.globalTypes(),
                         functionTypes,
                         module.typeSection().types(),
@@ -798,13 +1049,5 @@ public final class AotCompiler {
                     emitter.emit(ctx, ins, asm);
             }
         }
-    }
-
-    private static String callMethodName(int funcId) {
-        return "call_" + funcId;
-    }
-
-    private static String callDispatchMethodName(int start) {
-        return "call_dispatch_" + start;
     }
 }
