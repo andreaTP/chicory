@@ -192,32 +192,43 @@ public final class AotCompiler {
             var funcId = functionImports + i;
             var type = functionTypes.get(funcId);
             var body = module.codeSection().getFunctionBody(i);
+            try {
+                loadExtraClass(
+                        classes,
+                        compileExtraClass(
+                                classNameForFunc(funcId),
+                                (classWriter) -> {
+                                    emitFunction(
+                                            classWriter,
+                                            "call",
+                                            CALL_METHOD_TYPE,
+                                            true,
+                                            asm -> compileCallFunction(funcId, type, asm));
 
-            loadExtraClass(
-                    classes,
-                    compileExtraClass(
-                            classNameForFunc(funcId),
-                            (classWriter) -> {
-                                emitFunction(
-                                        classWriter,
-                                        "call",
-                                        CALL_METHOD_TYPE,
-                                        true,
-                                        asm -> compileCallFunction(funcId, type, asm));
-
-                                emitFunction(
-                                        classWriter,
-                                        "apply",
-                                        methodTypeFor(type),
-                                        true,
-                                        asm ->
-                                                compileFunction(
-                                                        internalClassName,
-                                                        funcId,
-                                                        type,
-                                                        body,
-                                                        asm));
-                            }));
+                                    emitFunction(
+                                            classWriter,
+                                            "apply",
+                                            methodTypeFor(type),
+                                            true,
+                                            asm ->
+                                                    compileFunction(
+                                                            internalClassName,
+                                                            funcId,
+                                                            type,
+                                                            body,
+                                                            asm));
+                                }));
+            } catch (MethodTooLargeException e) {
+                String details =
+                        String.format(
+                                "WASM function index: %d, name: %s, locals: %d, instructions: %d",
+                                i,
+                                module.nameSection().nameOfFunction(i),
+                                module.codeSection().getFunctionBody(i).localTypes().size(),
+                                module.codeSection().getFunctionBody(i).instructions().size());
+                e.addSuppressed(new RuntimeException(details));
+                throw e;
+            }
         }
 
         return classes;
