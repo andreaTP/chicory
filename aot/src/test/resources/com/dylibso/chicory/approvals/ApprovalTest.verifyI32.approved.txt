@@ -2,6 +2,7 @@ public final class com/dylibso/chicory/$gen/CompiledMachine implements com/dylib
 
   NESTMEMBER com/dylibso/chicory/$gen/CompiledMachine$AotMethods
   NESTMEMBER com/dylibso/chicory/$gen/CompiledMachine$MachineCall
+  NESTMEMBER com/dylibso/chicory/$gen/CompiledMachineFunc_0
 
   private final Lcom/dylibso/chicory/runtime/Instance; instance
 
@@ -27,37 +28,6 @@ public final class com/dylibso/chicory/$gen/CompiledMachine implements com/dylib
    L1
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine$AotMethods.throwCallStackExhausted (Ljava/lang/StackOverflowError;)Ljava/lang/RuntimeException;
     ATHROW
-
-  public static func_0(Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
-    LDC -2147483648
-    POP
-    ICONST_0
-    POP
-    LDC 2147483647
-    POP
-    LDC -9223372036854775808L
-    POP2
-    LCONST_0
-    POP2
-    LDC 9223372036854775807L
-    POP2
-    LDC -2147483647
-    POP
-    LDC 2147483646
-    POP
-    LDC -9223372036854775807L
-    POP2
-    LDC 9223372036854775806L
-    POP2
-    ICONST_M1
-    POP
-    ICONST_1
-    POP
-    LDC -1L
-    POP2
-    LCONST_1
-    POP2
-    RETURN
 
   public static call_indirect_0(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine$AotMethods.checkInterruption ()V
@@ -86,7 +56,7 @@ public final class com/dylibso/chicory/$gen/CompiledMachine implements com/dylib
       0: L2
       default: L3
    L2
-    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine.func_0 (Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineFunc_0.apply (Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
     RETURN
    L3
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine$AotMethods.throwIndirectCallTypeMismatch ()Ljava/lang/RuntimeException;
@@ -119,17 +89,51 @@ final class com/dylibso/chicory/$gen/CompiledMachine$MachineCall {
       0: L0
       default: L1
    L0
-    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine$MachineCall.call_0 (Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
+    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineFunc_0.call (Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
     ARETURN
    L1
     ILOAD 2
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine$AotMethods.throwUnknownFunction (I)Ljava/lang/RuntimeException;
     ATHROW
+}
 
-  public static call_0(Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
+final class com/dylibso/chicory/$gen/CompiledMachineFunc_0 {
+
+  public static call(Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
     ALOAD 1
     ALOAD 0
-    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachine.func_0 (Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineFunc_0.apply (Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
     ACONST_NULL
     ARETURN
+
+  public static apply(Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    LDC -2147483648
+    POP
+    ICONST_0
+    POP
+    LDC 2147483647
+    POP
+    LDC -9223372036854775808L
+    POP2
+    LCONST_0
+    POP2
+    LDC 9223372036854775807L
+    POP2
+    LDC -2147483647
+    POP
+    LDC 2147483646
+    POP
+    LDC -9223372036854775807L
+    POP2
+    LDC 9223372036854775806L
+    POP2
+    ICONST_M1
+    POP
+    ICONST_1
+    POP
+    LDC -1L
+    POP2
+    LCONST_1
+    POP2
+    RETURN
 }

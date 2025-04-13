@@ -16,6 +16,7 @@ import static com.dylibso.chicory.experimental.aot.AotMethodRefs.THROW_UNKNOWN_F
 import static com.dylibso.chicory.experimental.aot.AotUtil.asmType;
 import static com.dylibso.chicory.experimental.aot.AotUtil.callIndirectMethodName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.callIndirectMethodType;
+import static com.dylibso.chicory.experimental.aot.AotUtil.classNameForFunc;
 import static com.dylibso.chicory.experimental.aot.AotUtil.defaultValue;
 import static com.dylibso.chicory.experimental.aot.AotUtil.emitInvokeFunction;
 import static com.dylibso.chicory.experimental.aot.AotUtil.emitInvokeStatic;
@@ -25,7 +26,6 @@ import static com.dylibso.chicory.experimental.aot.AotUtil.emitLongToJvm;
 import static com.dylibso.chicory.experimental.aot.AotUtil.internalClassName;
 import static com.dylibso.chicory.experimental.aot.AotUtil.jvmReturnType;
 import static com.dylibso.chicory.experimental.aot.AotUtil.localType;
-import static com.dylibso.chicory.experimental.aot.AotUtil.methodNameFor;
 import static com.dylibso.chicory.experimental.aot.AotUtil.methodTypeFor;
 import static com.dylibso.chicory.experimental.aot.AotUtil.slotCount;
 import static com.dylibso.chicory.experimental.aot.AotUtil.valueMethodName;
@@ -165,8 +165,61 @@ public final class AotCompiler {
         Map<String, byte[]> classes = new LinkedHashMap<>();
         loadExtraClass(classes, createAotMethodsClass(className));
         if (!functionTypes.isEmpty()) {
-            loadExtraClass(classes, compileMachineCallClass());
+            loadExtraClass(classes, compileMachineCallClass(classes));
         }
+
+        for (int i = 0; i < functionImports; i++) {
+            int funcId = i;
+            var type = functionTypes.get(funcId);
+            loadExtraClass(
+                    classes,
+                    compileExtraClass(
+                            classNameForFunc(funcId),
+                            (classWriter) -> {
+                                emitFunction(
+                                        classWriter,
+                                        "apply",
+                                        methodTypeFor(type),
+                                        true,
+                                        asm -> compileHostFunction(funcId, type, asm));
+                            }));
+        }
+
+        var internalClassName = internalClassName(className);
+
+        // func_xxx() native function implementations
+        for (int i = 0; i < module.functionSection().functionCount(); i++) {
+            var funcId = functionImports + i;
+            var type = functionTypes.get(funcId);
+            var body = module.codeSection().getFunctionBody(i);
+
+            loadExtraClass(
+                    classes,
+                    compileExtraClass(
+                            classNameForFunc(funcId),
+                            (classWriter) -> {
+                                emitFunction(
+                                        classWriter,
+                                        "call",
+                                        CALL_METHOD_TYPE,
+                                        true,
+                                        asm -> compileCallFunction(funcId, type, asm));
+
+                                emitFunction(
+                                        classWriter,
+                                        "apply",
+                                        methodTypeFor(type),
+                                        true,
+                                        asm ->
+                                                compileFunction(
+                                                        internalClassName,
+                                                        funcId,
+                                                        type,
+                                                        body,
+                                                        asm));
+                            }));
+        }
+
         return classes;
     }
 
@@ -212,32 +265,6 @@ public final class AotCompiler {
                 methodType(long[].class, int.class, long[].class),
                 false,
                 asm -> compileMachineCall(internalClassName, asm));
-
-        // func_xxx() bridges for native to host functions
-        for (int i = 0; i < functionImports; i++) {
-            int funcId = i;
-            var type = functionTypes.get(funcId);
-            emitFunction(
-                    classWriter,
-                    methodNameFor(funcId),
-                    methodTypeFor(type),
-                    true,
-                    asm -> compileHostFunction(funcId, type, asm));
-        }
-
-        // func_xxx() native function implementations
-        for (int i = 0; i < module.functionSection().functionCount(); i++) {
-            var funcId = functionImports + i;
-            var type = functionTypes.get(funcId);
-            var body = module.codeSection().getFunctionBody(i);
-
-            emitFunction(
-                    classWriter,
-                    methodNameFor(funcId),
-                    methodTypeFor(type),
-                    true,
-                    asm -> compileFunction(internalClassName, funcId, type, body, asm));
-        }
 
         // call_indirect_xxx() bridges for native CALL_INDIRECT
         var allTypes = module.typeSection().types();
@@ -366,7 +393,7 @@ public final class AotCompiler {
         asm.athrow();
     }
 
-    private byte[] compileMachineCallClass() {
+    private byte[] compileMachineCallClass(Map<String, byte[]> classes) {
         ClassWriter binaryWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         ClassVisitor classWriter = aotMethodsRemapper(binaryWriter, className);
 
@@ -400,28 +427,37 @@ public final class AotCompiler {
             for (int i = 0; i < functionTypes.size(); i += MAX_MACHINE_CALL_METHODS) {
                 int start = i;
                 int end = min(start + MAX_MACHINE_CALL_METHODS, functionTypes.size());
-                emitFunction(
-                        classWriter,
-                        callDispatchMethodName(start),
-                        MACHINE_CALL_METHOD_TYPE,
-                        true,
-                        asm -> compileMachineCallInvoke(asm, start, end));
+                loadExtraClass(
+                        classes,
+                        compileExtraClass(
+                                dispatchClassName(start),
+                                (cw) -> {
+                                    emitFunction(
+                                            cw,
+                                            "apply",
+                                            MACHINE_CALL_METHOD_TYPE,
+                                            true,
+                                            asm -> compileMachineCallInvoke(asm, start, end));
+                                }));
             }
         }
         emitFunction(classWriter, "call", MACHINE_CALL_METHOD_TYPE, true, callMethod);
 
-        // call_xxx() bridges for boxed to native
-        for (int i = 0; i < module.functionSection().functionCount(); i++) {
-            var funcId = functionImports + i;
-            var type = functionTypes.get(funcId);
-            emitFunction(
-                    classWriter,
-                    callMethodName(funcId),
-                    CALL_METHOD_TYPE,
-                    true,
-                    asm -> compileCallFunction(funcId, type, asm));
-        }
+        return binaryWriter.toByteArray();
+    }
 
+    private byte[] compileExtraClass(String name, Consumer<ClassVisitor> consumer) {
+        ClassWriter binaryWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+        ClassVisitor classWriter = aotMethodsRemapper(binaryWriter, className);
+        String internalClassName = internalClassName(className + name);
+        classWriter.visit(
+                Opcodes.V11,
+                Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
+                internalClassName,
+                null,
+                getInternalName(Object.class),
+                null);
+        consumer.accept(classWriter);
         return binaryWriter.toByteArray();
     }
 
@@ -450,8 +486,8 @@ public final class AotCompiler {
         for (int i = 0; i < labels.length; i++) {
             asm.mark(labels[i]);
             asm.invokestatic(
-                    internalClassName(className + "$MachineCall"),
-                    callDispatchMethodName(i << shift),
+                    internalClassName(className + dispatchClassName(i << shift)),
+                    "apply",
                     MACHINE_CALL_METHOD_TYPE.toMethodDescriptorString(),
                     false);
             asm.areturn(OBJECT_TYPE);
@@ -480,8 +516,8 @@ public final class AotCompiler {
         for (int id = max(start, functionImports); id < end; id++) {
             asm.mark(labels[id - start]);
             asm.invokestatic(
-                    internalClassName(className + "$MachineCall"),
-                    callMethodName(id),
+                    internalClassName(className + classNameForFunc(id)),
+                    "call",
                     CALL_METHOD_TYPE.toMethodDescriptorString(),
                     false);
             asm.areturn(OBJECT_TYPE);
@@ -763,11 +799,7 @@ public final class AotCompiler {
         }
     }
 
-    private static String callMethodName(int funcId) {
-        return "call_" + funcId;
-    }
-
-    private static String callDispatchMethodName(int start) {
-        return "call_dispatch_" + start;
+    private static String dispatchClassName(int start) {
+        return "Dispatch_" + start;
     }
 }
