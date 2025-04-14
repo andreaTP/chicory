@@ -46,6 +46,8 @@
       <plugin>
         <groupId>com.dylibso.chicory</groupId>
         <artifactId>aot-maven-plugin-experimental</artifactId>
+        <!-- We have to use a previously released version, otherwise it causes cycles in the build deps -->
+        <version>1.2.1</version>
         <executions>
           <execution>
             <id>wast2json</id>

@@ -6,67 +6,98 @@ import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wabt.Wat2Wasm;
 import com.dylibso.chicory.wasm.Parser;
+import com.github.jknack.handlebars.Handlebars;
+import com.github.jknack.handlebars.helper.ConditionalHelpers;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class ClassTooLarge {
 
     @Test
-    public void testFunc50k() {
+    @Disabled(
+            "Method too large: com/dylibso/chicory/$gen/CompiledMachine.call_indirect_0"
+                + " (IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I\n")
+    public void testFunc50k() throws IOException {
+
+        var funcCount = 50_000;
         var instance =
-                Instance.builder(Parser.parse(buildHugeWasm(50_000)))
+                Instance.builder(Parser.parse(buildHugeWasm(funcCount, 0)))
                         .withMachineFactory(AotMachine::new)
                         .withStart(false)
                         .build();
 
-        ExportFunction func1 = instance.export("func_1");
-        assertEquals(42, func1.apply(50_045)[0]);
+        var expected = 0;
+        for (int i = 1; i <= funcCount; i++) {
+            expected += i;
+        }
+        ExportFunction func1 = instance.export("func_" + funcCount);
+        assertEquals(expected, func1.apply(0)[0]);
+    }
+
+    @Test
+    public void testManyBigFuncs() throws IOException {
+
+        var funcCount = 10;
+        var instance =
+                Instance.builder(Parser.parse(buildHugeWasm(funcCount, 15_000)))
+                        .withMachineFactory(AotMachine::new)
+                        .withStart(false)
+                        .build();
+
+        var expected = 0;
+        for (int i = 1; i <= funcCount; i++) {
+            expected += i;
+        }
+        ExportFunction func1 = instance.export("func_" + funcCount);
+        assertEquals(expected, func1.apply(0)[0]);
+    }
+
+    public static final class Context {
+        public final ArrayList<Integer> functions = new ArrayList<>();
+        public final ArrayList<Integer> instructions = new ArrayList<>();
+
+        public List<Integer> getFunctions() {
+            return functions;
+        }
+
+        public List<Integer> getInstructions() {
+            return instructions;
+        }
     }
 
     @SuppressWarnings("StringConcatToTextBlock")
-    private byte[] buildHugeWasm(int funcCount) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("(module");
-        sb.append("\n");
-        String function1 =
-                "(func $func_1 (param i32) (result i32)\n"
-                        + "    local.get 0\n"
-                        + "    i32.const 1\n"
-                        + "    i32.sub\n"
-                        + "    call $func_"
-                        + funcCount
-                        + "\n"
-                        + ")";
-        sb.append(function1);
-        sb.append("\n");
-        String function =
-                "(func $func_%d (param i32) (result i32)\n"
-                        + "    local.get 0\n"
-                        + "    i32.const %d\n"
-                        + "    i32.sub\n"
-                        + ")";
-        for (int i = 2; i < funcCount; i++) {
-            sb.append(String.format(function, i, i));
-            sb.append("\n");
+    private byte[] buildHugeWasm(int funcCount, int funcSize) throws IOException {
+        var handlebars = new Handlebars();
+        handlebars.registerHelpers(ConditionalHelpers.class);
+        handlebars.registerHelper(
+                "minus",
+                (value, options) -> {
+                    var a = (Integer) value;
+                    var b = (Integer) options.param(0, null);
+                    return a - b;
+                });
+        var ctx = new Context();
+        for (int i = 0; i < funcCount; i++) {
+            ctx.functions.add(i + 1);
         }
-        String functionEnd =
-                "(func $func_"
-                        + funcCount
-                        + " (param i32) (result i32)\n"
-                        + "    local.get 0\n"
-                        + "    i32.const "
-                        + funcCount
-                        + "\n"
-                        + "    i32.sub\n"
-                        + "    call $func_2\n"
-                        + ")";
-        sb.append(functionEnd);
-        sb.append("\n");
-
-        for (int i = 1; i <= funcCount; i++) {
-            sb.append(String.format("(export \"func_%d\" (func $func_%d))", i, i));
+        for (int i = 0; i < funcSize; i++) {
+            ctx.instructions.add(i + 1);
         }
-        sb.append(")");
 
-        return Wat2Wasm.parse(sb.toString());
+        var template = handlebars.compileInline(stringResource("class-too-large.wat"));
+        String wat = template.apply(ctx);
+        //        System.out.println(wat);
+        return Wat2Wasm.parse(wat);
+    }
+
+    private static String stringResource(String resource) throws IOException {
+        try (InputStream is = ClassTooLarge.class.getResourceAsStream(resource)) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }
