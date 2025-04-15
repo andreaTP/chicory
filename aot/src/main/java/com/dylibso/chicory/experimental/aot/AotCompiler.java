@@ -87,7 +87,7 @@ import org.objectweb.asm.util.CheckClassAdapter;
 public final class AotCompiler {
 
     public static final String DEFAULT_CLASS_NAME = "com.dylibso.chicory.$gen.CompiledMachine";
-    public static final Type LONG_ARRAY_TYPE = Type.getType(long[].class);
+    private static final Type LONG_ARRAY_TYPE = Type.getType(long[].class);
 
     private static final MethodType CALL_METHOD_TYPE =
             methodType(long[].class, Instance.class, Memory.class, long[].class);
@@ -96,6 +96,10 @@ public final class AotCompiler {
             methodType(long[].class, Instance.class, Memory.class, int.class, long[].class);
 
     private static final int MAX_MACHINE_CALL_METHODS = 1024; // must be power of two
+    // 1024*12 was empirically determined to work for the 50K small wasm functions.
+    // So lets start there and halve it until we find a size that works.
+    // This should give us the biggest class size possible.
+    private static final int DEFAULT_MAX_FUNCTIONS_PER_CLASS = 1024 * 12;
 
     private final AotClassLoader classLoader = new AotClassLoader();
     private final String className;
@@ -106,28 +110,57 @@ public final class AotCompiler {
     private final Map<String, byte[]> extraClasses = new LinkedHashMap<>();
     private int maxFunctionsPerClass;
 
-    private AotCompiler(WasmModule module, String className) {
+    private AotCompiler(WasmModule module, String className, int maxFunctionsPerClass) {
         this.className = requireNonNull(className, "className");
         this.module = requireNonNull(module, "module");
         this.analyzer = new AotAnalyzer(module);
         this.functionImports = module.importSection().count(ExternalType.FUNCTION);
         this.functionTypes = analyzer.functionTypes();
+        this.maxFunctionsPerClass = maxFunctionsPerClass;
         compileExtraClasses();
     }
 
-    public static CompilerResult compileModule(WasmModule module) {
-        return compileModule(module, DEFAULT_CLASS_NAME);
+    public static Builder builder(WasmModule module) {
+        return new Builder(module);
     }
 
-    public static CompilerResult compileModule(WasmModule module, String className) {
-        var compiler = new AotCompiler(module, className);
+    public static final class Builder {
+        private final WasmModule module;
+        private String className;
+        private int maxFunctionsPerClass;
 
-        var bytes = compiler.compileClass();
-        var factory = compiler.createMachineFactory(bytes);
+        private Builder(WasmModule module) {
+            this.module = module;
+        }
+
+        public Builder withClassName(String className) {
+            this.className = className;
+            return this;
+        }
+
+        public Builder withMaxFunctionsPerClass(int maxFunctionsPerClass) {
+            this.maxFunctionsPerClass = maxFunctionsPerClass;
+            return this;
+        }
+
+        public AotCompiler build() {
+            if (className == null) {
+                className = DEFAULT_CLASS_NAME;
+            }
+            if (maxFunctionsPerClass <= 0) {
+                maxFunctionsPerClass = DEFAULT_MAX_FUNCTIONS_PER_CLASS;
+            }
+            return new AotCompiler(module, className, maxFunctionsPerClass);
+        }
+    }
+
+    public CompilerResult compile() {
+        var bytes = compileClass();
+        var factory = createMachineFactory(bytes);
 
         Map<String, byte[]> classBytes = new LinkedHashMap<>();
         classBytes.put(className, bytes);
-        classBytes.putAll(compiler.extraClasses);
+        classBytes.putAll(extraClasses);
         return new CompilerResult(factory, classBytes);
     }
 
@@ -176,10 +209,7 @@ public final class AotCompiler {
         loadExtraClass(createAotMethodsClass(className));
 
         int totalFunctions = functionImports + module.functionSection().functionCount();
-        // 1024*12 was empirically determined to work for the 50K small wasm functions.
-        // So lets start there and halve it until we find a size that works.
-        // This should give us the biggest class size possible.
-        maxFunctionsPerClass = 1024 * 12;
+
         ArrayList<String> generated = new ArrayList<>();
         while (true) {
             try {
@@ -206,7 +236,7 @@ public final class AotCompiler {
         }
     }
 
-    public String classNameForFuncGroup(int funcId) {
+    private String classNameForFuncGroup(int funcId) {
         return "FuncGroup_" + (funcId / maxFunctionsPerClass);
     }
 
