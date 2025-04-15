@@ -6,20 +6,16 @@ import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wabt.Wat2Wasm;
 import com.dylibso.chicory.wasm.Parser;
-import com.github.jknack.handlebars.Handlebars;
-import com.github.jknack.handlebars.helper.ConditionalHelpers;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public class ClassTooLarge {
 
     @Test
     public void testFunc50k() throws IOException {
-
         var funcCount = 50_000;
         var instance =
                 Instance.builder(Parser.parse(buildHugeWasm(funcCount, 0)))
@@ -38,7 +34,6 @@ public class ClassTooLarge {
 
     @Test
     public void testManyBigFuncs() throws IOException {
-
         var funcCount = 10;
         var instance =
                 Instance.builder(Parser.parse(buildHugeWasm(funcCount, 15_000)))
@@ -57,27 +52,9 @@ public class ClassTooLarge {
     public static final class Context {
         public final ArrayList<Integer> functions = new ArrayList<>();
         public final ArrayList<Integer> instructions = new ArrayList<>();
-
-        public List<Integer> getFunctions() {
-            return functions;
-        }
-
-        public List<Integer> getInstructions() {
-            return instructions;
-        }
     }
 
-    @SuppressWarnings("StringConcatToTextBlock")
     private byte[] buildHugeWasm(int funcCount, int funcSize) throws IOException {
-        var handlebars = new Handlebars();
-        handlebars.registerHelpers(ConditionalHelpers.class);
-        handlebars.registerHelper(
-                "minus",
-                (value, options) -> {
-                    var a = (Integer) value;
-                    var b = (Integer) options.param(0, null);
-                    return a - b;
-                });
         var ctx = new Context();
         for (int i = 0; i < funcCount; i++) {
             ctx.functions.add(i + 1);
@@ -86,15 +63,41 @@ public class ClassTooLarge {
             ctx.instructions.add(i + 1);
         }
 
-        var template = handlebars.compileInline(stringResource("class-too-large.wat"));
-        String wat = template.apply(ctx);
-        //        System.out.println(wat);
-        return Wat2Wasm.parse(wat);
-    }
+        String TAB = "  ";
+        String TAB2 = TAB + TAB;
+        StringWriter out = new StringWriter();
+        var pw = new PrintWriter(out);
+        pw.println("(module");
+        for (int i = 0; i < ctx.functions.size(); i++) {
+            var func = ctx.functions.get(i);
 
-    private static String stringResource(String resource) throws IOException {
-        try (InputStream is = ClassTooLarge.class.getResourceAsStream(resource)) {
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            pw.printf(
+                    TAB + "(func $func_%d (export \"func_%d\") (param i32) (result i32)",
+                    func,
+                    func);
+            pw.println();
+            pw.println(TAB2 + "local.get 0");
+            pw.printf(TAB2 + "i32.const %d", func);
+            pw.println();
+            pw.println(TAB2 + "i32.add");
+            pw.println();
+            for (int j = 0; j < ctx.instructions.size(); j++) {
+                pw.println(TAB2 + "i32.const 1");
+                pw.println(TAB2 + "i32.add");
+                pw.println(TAB2 + "i32.const 1");
+                pw.println(TAB2 + "i32.sub");
+            }
+            if (func != 1) {
+                pw.printf(TAB2 + "call $func_%d", func - 1);
+                pw.println();
+            }
+            pw.println(TAB + ")");
         }
+        pw.println(")");
+
+        pw.flush();
+        String wat = out.toString();
+
+        return Wat2Wasm.parse(wat);
     }
 }
