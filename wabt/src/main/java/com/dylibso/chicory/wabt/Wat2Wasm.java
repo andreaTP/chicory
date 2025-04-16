@@ -56,7 +56,10 @@ public final class Wat2Wasm {
 
             try (FileSystem fs =
                     Jimfs.newFileSystem(
-                            Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
+                            Configuration.unix().toBuilder()
+                                    .setMaxCacheSize(Configuration.Builder.DEFAULT_MAX_SIZE)
+                                    .setAttributeViews("unix")
+                                    .build())) {
 
                 Path target = fs.getPath("tmp");
                 java.nio.file.Files.createDirectory(target);
