@@ -80,7 +80,7 @@ public final class Wat2Wasm {
                         .withMemoryFactory(
                                 limits -> {
                                     return new ByteArrayMemory(
-                                            new MemoryLimits(10_000, MemoryLimits.MAX_PAGES));
+                                            new MemoryLimits(1_000, MemoryLimits.MAX_PAGES));
                                 })
                         .withImportValues(imports)
                         .build();
