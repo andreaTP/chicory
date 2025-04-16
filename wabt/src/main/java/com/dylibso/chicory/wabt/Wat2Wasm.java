@@ -26,6 +26,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class Wat2Wasm {
     private static final Logger logger = new SystemLogger();
@@ -71,20 +72,27 @@ public final class Wat2Wasm {
                                             "--output=" + target.resolve("result.wasm")))
                             .build();
 
+            AtomicReference<ByteArrayMemory> memory = new AtomicReference<>();
             try (var wasi =
                     WasiPreview1.builder().withLogger(logger).withOptions(wasiOpts).build()) {
                 ImportValues imports =
                         ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+
                 Instance.builder(MODULE)
                         .withMachineFactory(Wat2WasmModule::create)
                         .withMemoryFactory(
                                 limits -> {
-                                    return new ByteArrayMemory(
-                                            new MemoryLimits(1_000, MemoryLimits.MAX_PAGES));
+                                    var mem =
+                                            new ByteArrayMemory(
+                                                    new MemoryLimits(limits.initialPages(), 1_000));
+                                    memory.set(mem);
+                                    return mem;
                                 })
                         .withImportValues(imports)
                         .build();
             }
+
+            System.out.println("final pages -> " + memory.get().pages());
 
             return java.nio.file.Files.readAllBytes(target.resolve("result.wasm"));
         } catch (IOException e) {
