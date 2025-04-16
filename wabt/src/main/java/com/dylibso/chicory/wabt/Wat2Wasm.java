@@ -47,45 +47,41 @@ public final class Wat2Wasm {
         var fileName = "temp.wat";
 
         try (FileSystem fs =
-                Jimfs.newFileSystem(
-                        Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
-            try (ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
-                    ByteArrayOutputStream stderrStream = new ByteArrayOutputStream()) {
+                        Jimfs.newFileSystem(
+                                Configuration.unix().toBuilder()
+                                        .setAttributeViews("unix")
+                                        .build());
+                ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
+                ByteArrayOutputStream stderrStream = new ByteArrayOutputStream()) {
 
-                try (InputStream is =
-                        new ByteArrayInputStream(wat.getBytes(StandardCharsets.UTF_8))) {
-                    Path target = fs.getPath("tmp");
-                    java.nio.file.Files.createDirectory(target);
-                    Path path = target.resolve(fileName);
-                    copy(is, path, StandardCopyOption.REPLACE_EXISTING);
-
-                    WasiOptions wasiOpts =
-                            WasiOptions.builder()
-                                    .withStdout(stdoutStream)
-                                    .withStderr(stderrStream)
-                                    .withDirectory(target.toString(), target)
-                                    .withArguments(
-                                            List.of("wat2wasm", path.toString(), "--output=-"))
-                                    .build();
-
-                    try (var wasi =
-                            WasiPreview1.builder()
-                                    .withLogger(logger)
-                                    .withOptions(wasiOpts)
-                                    .build()) {
-                        ImportValues imports =
-                                ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
-                        Instance.builder(MODULE)
-                                .withMachineFactory(Wat2WasmModule::create)
-                                .withImportValues(imports)
-                                .build();
-                    }
-
-                    return stdoutStream.toByteArray();
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+            Path target = fs.getPath("tmp");
+            Path path = target.resolve(fileName);
+            try (InputStream is = new ByteArrayInputStream(wat.getBytes(StandardCharsets.UTF_8))) {
+                java.nio.file.Files.createDirectory(target);
+                copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
+
+            WasiOptions wasiOpts =
+                    WasiOptions.builder()
+                            .withStdout(stdoutStream)
+                            .withStderr(stderrStream)
+                            .withDirectory(target.toString(), target)
+                            .withArguments(List.of("wat2wasm", path.toString(), "--output=-"))
+                            .build();
+
+            try (var wasi =
+                    WasiPreview1.builder().withLogger(logger).withOptions(wasiOpts).build()) {
+                ImportValues imports =
+                        ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+                Instance.builder(MODULE)
+                        .withMachineFactory(Wat2WasmModule::create)
+                        .withImportValues(imports)
+                        .build();
+            }
+
+            return stdoutStream.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
