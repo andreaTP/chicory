@@ -68,7 +68,11 @@ public final class Wat2Wasm {
                             .withStdout(stdoutStream)
                             .withStderr(stderrStream)
                             .withDirectory(target.toString(), target)
-                            .withArguments(List.of("wat2wasm", path.toString(), "--output=-"))
+                            .withArguments(
+                                    List.of(
+                                            "wat2wasm",
+                                            path.toString(),
+                                            "--output=" + target.resolve("result.wasm")))
                             .build();
 
             try (var wasi =
@@ -81,7 +85,9 @@ public final class Wat2Wasm {
                         .build();
             }
 
-            return stdoutStream.toByteArray();
+            return java.nio.file.Files.readAllBytes(target.resolve("result.wasm"));
+
+            // return stdoutStream.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
