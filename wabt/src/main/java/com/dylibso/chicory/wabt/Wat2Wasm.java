@@ -84,7 +84,7 @@ public final class Wat2Wasm {
                                 limits -> {
                                     var mem =
                                             new ByteArrayMemory(
-                                                    new MemoryLimits(limits.initialPages(), 1_000));
+                                                    new MemoryLimits(limits.initialPages(), 5_000));
                                     memory.set(mem);
                                     return mem;
                                 })

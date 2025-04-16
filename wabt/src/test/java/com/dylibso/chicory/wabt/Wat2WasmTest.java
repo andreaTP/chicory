@@ -70,6 +70,7 @@ public class Wat2WasmTest {
     @Test
     @Order(3)
     public void canCompile50kFunctions() throws IOException {
+        System.gc();
         var funcCount = 50_000;
         buildBigWasm(funcCount, 0);
     }
