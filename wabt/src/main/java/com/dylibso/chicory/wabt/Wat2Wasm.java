@@ -6,6 +6,7 @@ import com.dylibso.chicory.log.Logger;
 import com.dylibso.chicory.log.SystemLogger;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.runtime.WasmRuntimeException;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.WasmModule;
@@ -56,10 +57,7 @@ public final class Wat2Wasm {
 
             try (FileSystem fs =
                     Jimfs.newFileSystem(
-                            Configuration.unix().toBuilder()
-                                    .setMaxCacheSize(Configuration.Builder.DEFAULT_MAX_SIZE)
-                                    .setAttributeViews("unix")
-                                    .build())) {
+                            Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
 
                 Path target = fs.getPath("tmp");
                 java.nio.file.Files.createDirectory(target);
@@ -82,6 +80,8 @@ public final class Wat2Wasm {
                             .withMachineFactory(Wat2WasmModule::create)
                             .withImportValues(imports)
                             .build();
+                } catch (WasmRuntimeException ex) {
+                    ex.printStackTrace();
                 }
 
                 return stdoutStream.toByteArray();

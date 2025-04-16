@@ -161,7 +161,7 @@ public final class ByteArrayMemory implements Memory {
                             + limit
                             + " and size: "
                             + size;
-            return new WasmRuntimeException(errorMsg);
+            return new WasmRuntimeException(errorMsg, e);
         } else {
             return e;
         }

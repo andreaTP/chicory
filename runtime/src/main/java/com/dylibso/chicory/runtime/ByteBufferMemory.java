@@ -152,7 +152,7 @@ public final class ByteBufferMemory implements Memory {
                             + limit
                             + " and size: "
                             + size;
-            return new WasmRuntimeException(errorMsg);
+            return new WasmRuntimeException(errorMsg, e);
         } else {
             return e;
         }
