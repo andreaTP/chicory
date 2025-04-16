@@ -4,12 +4,14 @@ import static java.nio.file.Files.copy;
 
 import com.dylibso.chicory.log.Logger;
 import com.dylibso.chicory.log.SystemLogger;
+import com.dylibso.chicory.runtime.ByteArrayMemory;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.WasmRuntimeException;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.WasmModule;
+import com.dylibso.chicory.wasm.types.MemoryLimits;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import java.io.ByteArrayInputStream;
@@ -60,6 +62,7 @@ public final class Wat2Wasm {
 
             WasiOptions wasiOpts =
                     WasiOptions.builder()
+                            .inheritSystem()
                             .withDirectory(target.toString(), target)
                             .withArguments(
                                     List.of(
@@ -74,6 +77,11 @@ public final class Wat2Wasm {
                         ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
                 Instance.builder(MODULE)
                         .withMachineFactory(Wat2WasmModule::create)
+                        .withMemoryFactory(
+                                limits -> {
+                                    return new ByteArrayMemory(
+                                            new MemoryLimits(10_000, MemoryLimits.MAX_PAGES));
+                                })
                         .withImportValues(imports)
                         .build();
             }
