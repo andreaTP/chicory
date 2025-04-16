@@ -170,150 +170,150 @@ public final class ByteBufferMemory implements Memory {
 
     @Override
     public void write(int addr, byte[] data, int offset, int size) {
-        try {
-            buffer.position(addr);
-            buffer.put(data, offset, size);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, size, sizeInBytes());
-        }
+        //        try {
+        buffer.position(addr);
+        buffer.put(data, offset, size);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, size, sizeInBytes());
+        //        }
     }
 
     @Override
     public byte read(int addr) {
-        try {
-            return buffer.get(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 1, sizeInBytes());
-        }
+        //        try {
+        return buffer.get(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 1, sizeInBytes());
+        //        }
     }
 
     @Override
     public byte[] readBytes(int addr, int len) {
-        try {
-            var bytes = new byte[len];
-            buffer.position(addr);
-            buffer.get(bytes);
-            return bytes;
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, len, sizeInBytes());
-        }
+        //        try {
+        var bytes = new byte[len];
+        buffer.position(addr);
+        buffer.get(bytes);
+        return bytes;
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, len, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeI32(int addr, int data) {
-        try {
-            buffer.putInt(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 4, sizeInBytes());
-        }
+        //        try {
+        buffer.putInt(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 4, sizeInBytes());
+        //        }
     }
 
     @Override
     public int readInt(int addr) {
-        try {
-            return buffer.getInt(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 4, sizeInBytes());
-        }
+        //        try {
+        return buffer.getInt(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 4, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeLong(int addr, long data) {
-        try {
-            buffer.putLong(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 8, sizeInBytes());
-        }
+        //        try {
+        buffer.putLong(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 8, sizeInBytes());
+        //        }
     }
 
     @Override
     public long readLong(int addr) {
-        try {
-            return buffer.getLong(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 8, sizeInBytes());
-        }
+        //        try {
+        return buffer.getLong(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 8, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeShort(int addr, short data) {
-        try {
-            buffer.putShort(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 2, sizeInBytes());
-        }
+        //        try {
+        buffer.putShort(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 2, sizeInBytes());
+        //        }
     }
 
     @Override
     public short readShort(int addr) {
-        try {
-            return buffer.getShort(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 2, sizeInBytes());
-        }
+        //        try {
+        return buffer.getShort(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 2, sizeInBytes());
+        //        }
     }
 
     @Override
     public long readU16(int addr) {
-        try {
-            return buffer.getShort(addr) & 0xffff;
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 2, sizeInBytes());
-        }
+        //        try {
+        return buffer.getShort(addr) & 0xffff;
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 2, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeByte(int addr, byte data) {
-        try {
-            buffer.put(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 1, sizeInBytes());
-        }
+        //        try {
+        buffer.put(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 1, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeF32(int addr, float data) {
-        try {
-            buffer.putFloat(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 4, sizeInBytes());
-        }
+        //        try {
+        buffer.putFloat(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 4, sizeInBytes());
+        //        }
     }
 
     @Override
     public long readF32(int addr) {
-        try {
-            return buffer.getInt(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 4, sizeInBytes());
-        }
+        //        try {
+        return buffer.getInt(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 4, sizeInBytes());
+        //        }
     }
 
     @Override
     public float readFloat(int addr) {
-        try {
-            return buffer.getFloat(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 4, sizeInBytes());
-        }
+        //        try {
+        return buffer.getFloat(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 4, sizeInBytes());
+        //        }
     }
 
     @Override
     public void writeF64(int addr, double data) {
-        try {
-            buffer.putDouble(addr, data);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 8, sizeInBytes());
-        }
+        //        try {
+        buffer.putDouble(addr, data);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 8, sizeInBytes());
+        //        }
     }
 
     @Override
     public double readDouble(int addr) {
-        try {
-            return buffer.getDouble(addr);
-        } catch (RuntimeException e) {
-            throw outOfBoundsException(e, addr, 8, sizeInBytes());
-        }
+        //        try {
+        return buffer.getDouble(addr);
+        //        } catch (RuntimeException e) {
+        //            throw outOfBoundsException(e, addr, 8, sizeInBytes());
+        //        }
     }
 
     @Override
