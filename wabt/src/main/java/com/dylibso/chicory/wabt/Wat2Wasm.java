@@ -47,13 +47,8 @@ public final class Wat2Wasm {
         var fileName = "temp.wat";
 
         try (FileSystem fs =
-                        Jimfs.newFileSystem(
-                                Configuration.unix().toBuilder()
-                                        .setAttributeViews("unix")
-                                        .build());
-                ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
-                ByteArrayOutputStream stderrStream = new ByteArrayOutputStream()) {
-
+                Jimfs.newFileSystem(
+                        Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
             Path target = fs.getPath("tmp");
             Path path = target.resolve(fileName);
             try (InputStream is = new ByteArrayInputStream(wat.getBytes(StandardCharsets.UTF_8))) {
@@ -65,8 +60,6 @@ public final class Wat2Wasm {
 
             WasiOptions wasiOpts =
                     WasiOptions.builder()
-                            .withStdout(stdoutStream)
-                            .withStderr(stderrStream)
                             .withDirectory(target.toString(), target)
                             .withArguments(
                                     List.of(
@@ -86,8 +79,6 @@ public final class Wat2Wasm {
             }
 
             return java.nio.file.Files.readAllBytes(target.resolve("result.wasm"));
-
-            // return stdoutStream.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
