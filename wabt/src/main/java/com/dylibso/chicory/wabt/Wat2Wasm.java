@@ -72,16 +72,33 @@ public final class Wat2Wasm {
                                 .withArguments(List.of("wat2wasm", path.toString(), "--output=-"))
                                 .build();
 
-                try (var wasi =
-                        WasiPreview1.builder().withLogger(logger).withOptions(wasiOpts).build()) {
-                    ImportValues imports =
-                            ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
-                    Instance.builder(MODULE)
-                            .withMachineFactory(Wat2WasmModule::create)
-                            .withImportValues(imports)
-                            .build();
-                } catch (WasmRuntimeException ex) {
-                    ex.printStackTrace();
+                var retry = 3;
+
+                WasmRuntimeException ex = null;
+                boolean finished = false;
+                while (retry > 0) {
+                    try (var wasi =
+                            WasiPreview1.builder()
+                                    .withLogger(logger)
+                                    .withOptions(wasiOpts)
+                                    .build()) {
+                        ImportValues imports =
+                                ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+                        Instance.builder(MODULE)
+                                .withMachineFactory(Wat2WasmModule::create)
+                                .withImportValues(imports)
+                                .build();
+                        finished = true;
+                        break;
+                    } catch (WasmRuntimeException e) {
+                        ex = e;
+                        System.out.println("retrying");
+                        retry--;
+                    }
+                }
+
+                if (!finished) {
+                    throw ex;
                 }
 
                 return stdoutStream.toByteArray();
