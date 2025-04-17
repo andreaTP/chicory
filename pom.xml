@@ -456,7 +456,9 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <version>${maven-surefire-plugin.version}</version>
           <configuration>
-            <argLine>-XX:-TieredCompilation</argLine>
+            <argLine>-XX:+UnlockDiagnosticVMOptions -XX:+PrintCompilation -XX:+PrintInlining -XX:+PrintTieredEvents -XX:CompileCommandFile=MyCompilerFile.txt</argLine>
+<!--            -XX:-TieredCompilation thisa flag "fixes"-->
+<!--            -XX:UnlockDiagnosticVMOptions -XX:+PrintCompilation -XX:+PrintInlining -->
           </configuration>
         </plugin>
         <plugin>

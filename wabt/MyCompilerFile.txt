@@ -1,0 +1,3 @@
+dontinline com/dylibso/chicory/wabt/Wat2WasmMachine$AotMethods.*
+dontinline com/dylibso/chicory/runtime/ByteBufferMemory.*
+dontinline com/dylibso/chicory/wabt/Wat2WasmMachine.*
