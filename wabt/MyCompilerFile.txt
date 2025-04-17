@@ -1,1 +1,2 @@
-dontinline com/dylibso/chicory/wabt/Wat2WasmMachine$AotMethods.*
+dontinline com/dylibso/chicory/runtime/ByteBufferMemory.copy2
+dontinline com/dylibso/chicory/wabt/Wat2WasmMachine$AotMethods.memoryCopy2
