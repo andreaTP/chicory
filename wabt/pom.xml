@@ -31,13 +31,12 @@
       <artifactId>wasm</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.jimfs</groupId>
-      <artifactId>jimfs</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.dylibso.chicory</groupId>
       <artifactId>wasm-corpus</artifactId>
-      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.jimfs</groupId>
+      <artifactId>jimfs</artifactId>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
