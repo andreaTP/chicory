@@ -79,7 +79,7 @@ public final class WasiOptions {
     }
 
     public static final class Builder {
-        private Random random = new SecureRandom();
+        private Random random;
         private Clock clock = Clock.systemUTC();
         private OutputStream stdout = OutputStream.nullOutputStream();
         private OutputStream stderr = OutputStream.nullOutputStream();
@@ -139,7 +139,14 @@ public final class WasiOptions {
 
         public WasiOptions build() {
             return new WasiOptions(
-                    random, clock, stdout, stderr, stdin, arguments, environment, directories);
+                    (random == null) ? new SecureRandom() : random,
+                    clock,
+                    stdout,
+                    stderr,
+                    stdin,
+                    arguments,
+                    environment,
+                    directories);
         }
     }
 }
