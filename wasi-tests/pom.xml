@@ -16,22 +16,20 @@
   <dependencies>
     <dependency>
       <groupId>com.dylibso.chicory</groupId>
+      <artifactId>runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>wasm</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
       <artifactId>log</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.dylibso.chicory</groupId>
-      <artifactId>runtime</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.dylibso.chicory</groupId>
       <artifactId>wasi</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.dylibso.chicory</groupId>
-      <artifactId>wasm</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -58,6 +56,24 @@
 
   <build>
     <plugins>
+
+      <plugin>
+        <groupId>com.dylibso.chicory</groupId>
+        <artifactId>aot-maven-plugin-experimental</artifactId>
+        <executions>
+          <execution>
+            <id>ubuntu</id>
+            <goals>
+              <goal>wasm-aot-gen</goal>
+            </goals>
+            <configuration>
+              <name>com.dylibso.chicory.wasi.Ubuntu</name>
+              <wasmFile>../ubuntu.wasm</wasmFile>
+              <interpreterFallback>WARN</interpreterFallback>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>com.dylibso.chicory</groupId>
         <artifactId>wasi-test-gen-plugin</artifactId>

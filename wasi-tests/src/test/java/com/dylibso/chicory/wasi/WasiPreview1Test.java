@@ -6,6 +6,7 @@ import static java.nio.file.Files.createDirectory;
 import static java.nio.file.Files.createSymbolicLink;
 import static java.nio.file.Files.writeString;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -432,6 +433,31 @@ public class WasiPreview1Test {
         assertEquals(WasiErrno.ESUCCESS.value(), memory.readShort(outPtr + 8));
         assertEquals(WasiEventType.CLOCK, memory.read(outPtr + 10));
         assertTrue(System.nanoTime() >= deadline);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = MINUTES)
+    public void shouldRunC2WModule() {
+        /* Preparation:
+         * c2w ubuntu:22.04 ubuntu.wasm
+         */
+        var fakeStdout = new MockPrintStream();
+        var filename = "ubuntu.wasm";
+        var args = List.of(filename, "uname", "-a");
+        var wasiOpts = WasiOptions.builder().withArguments(args).withStdout(fakeStdout).build();
+        var wasi = WasiPreview1.builder().withOptions(wasiOpts).build();
+        var imports = ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+        var exit =
+                assertThrows(
+                        WasiExitException.class,
+                        () ->
+                                Instance.builder(UbuntuModule.load())
+                                        .withImportValues(imports)
+                                        .withMachineFactory(UbuntuModule::create)
+                                        .build());
+        assertEquals(0, exit.exitCode());
+        System.out.println(fakeStdout.output());
+        assertTrue(fakeStdout.output().startsWith("Linux localhost"));
     }
 
     private static FileSystem newJimfs() {
