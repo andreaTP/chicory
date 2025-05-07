@@ -19,6 +19,8 @@ import com.dylibso.chicory.wasm.types.TableLimits;
 import com.dylibso.chicory.wasm.types.TagType;
 import com.dylibso.chicory.wasm.types.ValType;
 import com.dylibso.chicory.wasm.types.Value;
+
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -548,5 +550,55 @@ public class WasmModuleTest {
         assertEquals(2, result.size());
         assertEquals(0, result.get(0));
         assertEquals(0, result.get(1));
+    }
+
+    @Test
+    public void testGrass() {
+        var module = Parser.parse(Path.of("/home/aperuffo/workspace/grass/target/wasm32-unknown-unknown/release/grass.wasm"));
+
+        var imports = new HostFunction[] {
+                new HostFunction(
+                        "__wbindgen_placeholder__",
+                        "__wbindgen_describe",
+                        FunctionType.of(List.of(ValType.I32), List.of()),
+                        (instance, args) -> {
+                            System.out.println("describe");
+                            return null;
+                        }
+                ),
+                new HostFunction(
+                        "__wbindgen_placeholder__",
+                        "__wbindgen_throw",
+                        FunctionType.of(List.of(ValType.I32, ValType.I32), List.of()),
+                        (instance, args) -> {
+                            System.out.println("throw");
+                            return null;
+                        }
+                ),
+                new HostFunction(
+                        "__wbindgen_externref_xform__",
+                        "__wbindgen_externref_table_grow",
+                        FunctionType.of(List.of(ValType.I32), List.of(ValType.I32)),
+                        (instance, args) -> {
+                            System.out.println("table grow");
+                            return null;
+                        }
+                ),
+                new HostFunction(
+                        "__wbindgen_externref_xform__",
+                        "__wbindgen_externref_table_set_null",
+                        FunctionType.of(List.of(ValType.I32), List.of()),
+                        (instance, args) -> {
+                            System.out.println("table set null");
+                            return null;
+                        }
+                ),
+        };
+
+        var instance = Instance.builder(module)
+                .withImportValues(ImportValues.builder().addFunction(imports).build())
+                .build();
+
+        System.out.println("hello!");
     }
 }
