@@ -1066,8 +1066,17 @@ public final class WasiPreview1 implements Closeable {
             return wasiResult(WasiErrno.EACCES);
         }
 
+        if (rawNewPath.endsWith("/")) {
+            return wasiResult(WasiErrno.ENOENT);
+        }
         Path newPath = resolvePath(newDirectory, rawNewPath);
         if (newPath == null) {
+            return wasiResult(WasiErrno.EACCES);
+        }
+        if (Files.exists(newPath)) {
+            return wasiResult(WasiErrno.EEXIST);
+        }
+        if (Files.isDirectory(oldPath)) {
             return wasiResult(WasiErrno.EACCES);
         }
 
@@ -1237,7 +1246,7 @@ public final class WasiPreview1 implements Closeable {
             return wasiResult(WasiErrno.EIO);
         }
 
-        byte[] name = link.toString().getBytes(UTF_8);
+        byte[] name = link.getFileName().toString().getBytes(UTF_8);
         int used = min(name.length, bufLen);
         memory.write(buf, name, 0, used);
         memory.writeI32(bufUsedPtr, used);
@@ -1370,9 +1379,7 @@ public final class WasiPreview1 implements Closeable {
         }
 
         try {
-            // isn't is the opposite?
-            // Files.createSymbolicLink(newPath, oldPath);
-            Files.createSymbolicLink(oldPath, newPath);
+            Files.createSymbolicLink(newPath, oldPath);
         } catch (UnsupportedOperationException | AtomicMoveNotSupportedException e) {
             return wasiResult(WasiErrno.ENOTSUP);
         } catch (NoSuchFileException e) {
