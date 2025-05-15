@@ -549,4 +549,37 @@ public class WasmModuleTest {
         assertEquals(0, result.get(0));
         assertEquals(0, result.get(1));
     }
+
+    @Test
+    public void issue892() {
+        var invoked = new AtomicBoolean();
+        var store = new Store();
+
+        var drawRect =
+                new HostFunction(
+                        "hedge",
+                        "draw_rect",
+                        FunctionType.of(
+                                List.of(ValType.F32, ValType.F32, ValType.F32, ValType.F32),
+                                List.of()),
+                        (Instance instance, long... args) -> {
+                            invoked.set(true);
+
+                            assertEquals(10, Value.longToFloat(args[0]));
+                            assertEquals(11, Value.longToFloat(args[1]));
+                            assertEquals(32, Value.longToFloat(args[2]));
+                            assertEquals(33, Value.longToFloat(args[3]));
+                            return null;
+                        });
+
+        store.addFunction(drawRect);
+
+        var module = loadModule("compiled/issue892.c.wasm");
+        Instance instance = store.instantiate("hedge", module);
+
+        var update = instance.export("run");
+        update.apply(1, Value.floatToLong(10), Value.floatToLong(11));
+
+        assertTrue(invoked.get());
+    }
 }
