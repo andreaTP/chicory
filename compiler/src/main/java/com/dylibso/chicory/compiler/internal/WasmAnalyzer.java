@@ -78,8 +78,6 @@ final class WasmAnalyzer {
         // implicit block for the function
         stack.enterScope(FUNCTION_SCOPE, FunctionType.of(List.of(), functionType.returns()));
 
-        Map<Integer, long[]> tryTableOperands = new HashMap<>();
-
         int exitBlockDepth = -1;
         for (int idx = 0; idx < body.instructions().size(); idx++) {
             AnnotatedInstruction ins = body.instructions().get(idx);
@@ -115,17 +113,14 @@ final class WasmAnalyzer {
                 case END:
                     // Check if this is the end of a TRY_TABLE block
                     if (ins.scope().opcode() == OpCode.TRY_TABLE) {
-                        Instruction tryTableIns = ins.scope();
-                        var operands = tryTableOperands.remove(tryTableIns.address());
-                        // Werid: sometimes we see END occur multiple times for the same try table.
-                        if (operands != null) {
+                        if (ins.scope().operands() != null) {
 
                             // add a NOOP just in case the it's an empty try block.
                             result.add(new CompilerInstruction(CompilerOpCode.NOP));
 
                             var tryEndLabel = nextLabel++;
                             result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryEndLabel));
-                            operands[1] = tryEndLabel;
+                            ins.scope().setOperand(1, tryEndLabel);
 
                             // Jump over the exception handler during normal execution
                             var afterHandlerLabel = nextLabel++;
@@ -138,11 +133,13 @@ final class WasmAnalyzer {
                             result.add(
                                     new CompilerInstruction(
                                             CompilerOpCode.LABEL, catchHandlerLabel));
-                            operands[2] = catchHandlerLabel;
+                            ins.scope().setOperand(2, catchHandlerLabel);
 
                             // Emit the exception handler logic directly instead of as TRY_TABLE
                             // instruction
-                            result.add(new CompilerInstruction(CompilerOpCode.TRY_TABLE, operands));
+                            result.add(
+                                    new CompilerInstruction(
+                                            CompilerOpCode.TRY_TABLE, ins.scope().operands()));
 
                             // Mark the end of exception handler
                             result.add(
@@ -269,29 +266,11 @@ final class WasmAnalyzer {
                     {
                         stack.enterScope(ins.scope(), blockType(ins));
 
-                        // create the operands of the TRY_TABLE....
-                        ArrayList<Long> ops = new ArrayList<>();
-
                         // Emit a LABEL instruction to mark the try start
                         int tryStartLabel = nextLabel++;
                         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryStartLabel));
-                        ops.add((long) tryStartLabel);
-                        ops.add(-1L); // reserve for the tryEnd
-                        ops.add(-1L); // reserve for the catchtart
+                        ins.setOperand(0, tryStartLabel);
 
-                        // add the branch labels
-                        ops.add((long) ins.labelTable().size());
-                        for (var l : ins.labelTable()) {
-                            ops.add((long) l);
-                        }
-
-                        // add the catch info
-                        for (Long l : ins.operands()) {
-                            ops.add(l);
-                        }
-
-                        long[] opsArray = ops.stream().mapToLong(i -> i).toArray();
-                        tryTableOperands.put(ins.address(), opsArray);
                         break;
                     }
                 case THROW:

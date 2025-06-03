@@ -1226,10 +1226,10 @@ public final class Compiler {
         // Emit visitTryCatchBlock before it's labels
         for (CompilerInstruction ins : instructions) {
             if (ins.opcode() == CompilerOpCode.TRY_TABLE) {
-                var tryStart = labels.get(ins.operand(0)); // Try start label
-                var tryEnd = labels.get(ins.operand(1)); // Try end label
-                var catchHandler = labels.get(ins.operand(2)); // Catch handler label
-                asm.visitTryCatchBlock(
+                var tryStart = labels.get(ins.labelTargets()[0]); // Try start label
+                var tryEnd = labels.get(ins.labelTargets()[1]); // Try end label
+                var catchHandler = labels.get(ins.labelTargets()[2]); // Catch handler label
+                asm.visitTry    CatchBlock(
                         tryStart, tryEnd, catchHandler, getInternalName(WasmException.class));
             }
         }
@@ -1276,14 +1276,6 @@ public final class Compiler {
                     break;
                 case TRY_TABLE:
                     {
-                        var handlerCount = ins.operands().skip(3).findFirst().getAsLong();
-                        var handlerOffset = 4;
-                        List<Catch> catches =
-                                CatchOpCode.decode(
-                                        ins.operands()
-                                                .skip(handlerOffset + handlerCount)
-                                                .toArray());
-
                         // This instruction only executes when an exception is caught
                         // (not during normal execution flow)
                         var exceptionSlot = ctx.tempSlot();
