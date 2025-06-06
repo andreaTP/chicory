@@ -78,6 +78,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassTooLargeException;
 import org.objectweb.asm.ClassVisitor;
@@ -753,6 +754,16 @@ public final class Compiler {
         return binaryWriter.toByteArray();
     }
 
+    private void emitSwitch(
+            InstructionAdapter asm, int min, int max, Label dfault, Label... labels) {
+        if (labels.length < 100) {
+            asm.tableswitch(min, max, dfault, labels);
+        } else {
+            int[] keys = IntStream.rangeClosed(min, max).toArray();
+            asm.lookupswitch(dfault, keys, labels);
+        }
+    }
+
     private Consumer<InstructionAdapter> compileMachineCallDispatch(int maxMachineCallMethods) {
         return (asm) -> {
 
@@ -774,7 +785,7 @@ public final class Compiler {
             asm.load(2, INT_TYPE);
             asm.iconst(shift);
             asm.shr(INT_TYPE);
-            asm.tableswitch(0, labels.length - 1, labels[0], labels);
+            emitSwitch(asm, 0, labels.length - 1, labels[0], labels);
 
             // return call_dispatch_xxx(instance, memory, funcId, args);
             for (int i = 0; i < labels.length; i++) {
@@ -805,7 +816,7 @@ public final class Compiler {
         }
 
         asm.load(2, INT_TYPE);
-        asm.tableswitch(start, end - 1, defaultLabel, labels);
+        emitSwitch(asm, start, end - 1, defaultLabel, labels);
 
         // return call_xxx(instance, memory, args);
         for (int id = max(start, functionImports); id < end; id++) {
@@ -1012,7 +1023,7 @@ public final class Compiler {
             asm.load(funcId, INT_TYPE);
             asm.iconst(shift);
             asm.shr(INT_TYPE);
-            asm.tableswitch(0, labels.length - 1, labels[0], labels);
+            emitSwitch(asm, 0, labels.length - 1, labels[0], labels);
 
             // invoke the method that we are about to generate
             for (int i = 0; i < labels.length; i++) {
@@ -1267,7 +1278,7 @@ public final class Compiler {
                         table[i] = labels.get(ins.operand(i));
                     }
                     Label defaultLabel = labels.get(ins.operand(table.length));
-                    asm.tableswitch(0, table.length - 1, defaultLabel, table);
+                    emitSwitch(asm, 0, table.length - 1, defaultLabel, table);
                     break;
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
