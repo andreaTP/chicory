@@ -205,7 +205,10 @@ enum CompilerOpCode {
     TABLE_FILL(OpCode.TABLE_FILL),
     THROW(OpCode.THROW),
     THROW_REF(OpCode.THROW_REF),
-    EMITTER,
+    TRY_TABLE(OpCode.TRY_TABLE),
+    CATCH_START(),
+    CATCH_INS(), // TODO: rename?
+    CATCH_END(),
     ;
 
     private final Optional<OpCode> opcode;

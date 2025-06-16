@@ -59,6 +59,7 @@ import com.dylibso.chicory.compiler.InterpreterFallback;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Machine;
 import com.dylibso.chicory.runtime.Memory;
+import com.dylibso.chicory.runtime.WasmException;
 import com.dylibso.chicory.runtime.internal.CompilerInterpreterMachine;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.WasmModule;
@@ -70,6 +71,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1176,15 +1178,14 @@ public final class Compiler {
 
         var ctx =
                 new Context(
-                        module,
                         internalClassName,
                         maxFunctionsPerClass,
                         analyzer.globalTypes(),
                         functionTypes,
+                        module.typeSection().types(),
                         funcId,
                         type,
-                        body,
-                        asm);
+                        body);
 
         List<CompilerInstruction> instructions = analyzer.analyze(funcId);
 
@@ -1212,7 +1213,7 @@ public final class Compiler {
         }
 
         // allocate labels for all label targets
-        var labels = ctx.labels();
+        Map<Long, Label> labels = new HashMap<>();
         for (var ins : instructions) {
             for (long target : ins.labelTargets()) {
                 labels.put(target, new Label());
@@ -1268,8 +1269,12 @@ public final class Compiler {
                     Label defaultLabel = labels.get(ins.operand(table.length));
                     asm.tableswitch(0, table.length - 1, defaultLabel, table);
                     break;
-                case EMITTER:
-                    ins.emitter().accept(ctx);
+                case TRY_TABLE:
+                    Label start = labels.get(ins.operand(0));
+                    Label end = labels.get(ins.operand(1));
+                    Label handler = labels.get(ins.operand(2));
+                    asm.visitTryCatchBlock(
+                            start, end, handler, getInternalName(WasmException.class));
                     break;
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
