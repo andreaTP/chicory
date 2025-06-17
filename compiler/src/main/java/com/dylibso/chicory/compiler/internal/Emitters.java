@@ -670,7 +670,7 @@ final class Emitters {
 
     public static void THROW(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
         int tagNumber = (int) ins.operand(0);
-        var type = ctx.type(tagNumber);
+        var type = ctx.tagFunctionType(tagNumber);
 
         // emmit:
         // call createWasmException(long[] args, int tagNumber, Instance instance)
@@ -749,7 +749,7 @@ final class Emitters {
 
                 // Get the tag type to know what
                 // parameter types to unbox
-                var tagFuncType = ctx.type(tag);
+                var tagFuncType = ctx.tagFunctionType(tag);
                 // var tagFuncType = ctx.getTagFunctionType(catchCondition.tag());
                 if (!tagFuncType.params().isEmpty()) {
                     // unbox the exception args

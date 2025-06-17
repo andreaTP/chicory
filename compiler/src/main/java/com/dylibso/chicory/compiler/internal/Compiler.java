@@ -1178,11 +1178,11 @@ public final class Compiler {
 
         var ctx =
                 new Context(
+                        module,
                         internalClassName,
                         maxFunctionsPerClass,
                         analyzer.globalTypes(),
                         functionTypes,
-                        module.typeSection().types(),
                         funcId,
                         type,
                         body);

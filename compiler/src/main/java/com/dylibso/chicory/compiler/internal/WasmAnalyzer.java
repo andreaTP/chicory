@@ -313,7 +313,8 @@ final class WasmAnalyzer {
                                         // Emmit an instruction for each catch condition
                                         res.add(
                                                 new CompilerInstruction(
-                                                        CompilerOpCode.CATCH_INS, catchCondition.opcode().opcode()));
+                                                        CompilerOpCode.CATCH_INS,
+                                                        catchCondition.opcode().opcode()));
 
                                         // TODO: verify order of the "mark"
                                         res.add(
