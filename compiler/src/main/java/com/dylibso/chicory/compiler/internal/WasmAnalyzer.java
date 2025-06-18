@@ -400,14 +400,12 @@ final class WasmAnalyzer {
 
             switch (catchCondition.opcode()) {
                 case CATCH:
-                    result.add(
-                            new CompilerInstruction(CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CATCH, catchCondition.tag()));
                     result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
                     result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
                     break;
                 case CATCH_REF:
-                    result.add(
-                            new CompilerInstruction(CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CATCH, catchCondition.tag()));
                     result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
                     result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
                     result.add(new CompilerInstruction(CATCH_REF));

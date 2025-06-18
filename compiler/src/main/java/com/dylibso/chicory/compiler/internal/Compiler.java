@@ -1271,22 +1271,12 @@ public final class Compiler {
                     asm.tableswitch(0, table.length - 1, defaultLabel, table);
                     break;
                 case TRY_CATCH_BLOCK:
-                    Label start = labels.get(ins.operand(0));
-                    Label endLabel = labels.get(ins.operand(1));
-                    Label handlerLabel = labels.get(ins.operand(2));
                     asm.visitTryCatchBlock(
-                            start, endLabel, handlerLabel, getInternalName(WasmException.class));
+                            labels.get(ins.operand(0)),
+                            labels.get(ins.operand(1)),
+                            labels.get(ins.operand(2)),
+                            getInternalName(WasmException.class));
                     break;
-                    //                case CATCH:
-                    //                    var tag = (int) ins.operand(0);
-                    //                    var afterCatchLabel = labels.get(ins.operand(1));
-                    //                    // Compare tag
-                    //                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
-                    //                    asm.iconst(tag);
-                    //                    asm.load(ctx.instanceSlot(), OBJECT_TYPE);
-                    //                    emitInvokeStatic(asm, EXCEPTION_MATCHES);
-                    //                    asm.ifeq(afterCatchLabel);
-                    //                    break;
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
                     if (emitter == null) {

@@ -30,6 +30,7 @@ final class Context {
     private final int memorySlot;
     private final int instanceSlot;
     private final int tempSlot;
+    private final List<TagImport> tagImports;
 
     public Context(
             WasmModule module,
@@ -85,6 +86,12 @@ final class Context {
 
         this.slots = List.copyOf(slots);
         this.tempSlot = slot;
+
+        this.tagImports =
+                module.importSection().stream()
+                        .filter((x) -> x.importType() == ExternalType.TAG)
+                        .map((x) -> (TagImport) x)
+                        .collect(Collectors.toList());
     }
 
     public String internalClassName() {
@@ -139,14 +146,7 @@ final class Context {
         return "FuncGroup_" + (funcId / maxFunctionsPerClass);
     }
 
-    public FunctionType getTagFunctionType(int tagId) {
-        var tagSection = module.tagSection();
-        var tagImports =
-                module.importSection().stream()
-                        .filter((x) -> x.importType() == ExternalType.TAG)
-                        .map((x) -> (TagImport) x)
-                        .collect(Collectors.toList());
-
+    public FunctionType tagFunctionType(int tagId) {
         if (tagId < 0) {
             throw new IllegalArgumentException("Tag ID must be non-negative");
         }
@@ -155,10 +155,10 @@ final class Context {
             var tag = tagImports.get(tagId);
             idx = tag.tagType().typeIdx();
         } else {
-            if (tagSection.isEmpty()) {
+            if (module.tagSection().isEmpty()) {
                 throw new IllegalStateException("No tag section available");
             }
-            idx = tagSection.get().getTag(tagId - tagImports.size()).typeIdx();
+            idx = module.tagSection().get().getTag(tagId - tagImports.size()).typeIdx();
         }
         return type(idx);
     }
