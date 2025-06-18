@@ -278,15 +278,27 @@ final class WasmAnalyzer {
                         var startLabel = nextLabel++;
                         var endLabel = nextLabel++;
                         var handlerLabel = nextLabel++;
-                        var afterLabel = nextLabel++;
+                        var afterHandlerLabel = nextLabel++;
+
+                        result.add(
+                                new CompilerInstruction(
+                                        CompilerOpCode.TRY_TABLE,
+                                        startLabel,
+                                        endLabel,
+                                        handlerLabel));
 
                         result.add(new CompilerInstruction(CompilerOpCode.LABEL, startLabel));
+
+                        var afterCatchLabels = new long[ins.catches().size()];
+                        for (int i = 0; i < ins.catches().size(); i++) {
+                            afterCatchLabels[i] = nextLabel++;
+                        }
 
                         // TODO: prepare the result for the catch instructions
                         tryCatchBlocks.put(
                                 ins.address(),
                                 () -> {
-                                    // TODO: move to it's own function
+                                    // TODO: move to a standalone function
                                     List<CompilerInstruction> res = new ArrayList<>();
 
                                     // Mark the end of the try block
@@ -298,7 +310,7 @@ final class WasmAnalyzer {
                                     // thrown
                                     res.add(
                                             new CompilerInstruction(
-                                                    CompilerOpCode.GOTO, afterLabel));
+                                                    CompilerOpCode.GOTO, afterHandlerLabel));
 
                                     // Mark the start of the exception handler
                                     res.add(
@@ -310,17 +322,14 @@ final class WasmAnalyzer {
                                     for (int i = 0; i < ins.catches().size(); i++) {
                                         var catchCondition = ins.catches().get(i);
 
-                                        // Emmit an instruction for each catch condition
+                                        // Emit an instruction for each catch condition
                                         res.add(
                                                 new CompilerInstruction(
                                                         CompilerOpCode.CATCH_INS,
-                                                        catchCondition.opcode().opcode()));
-
-                                        // TODO: verify order of the "mark"
-                                        res.add(
-                                                new CompilerInstruction(
-                                                        CompilerOpCode.LABEL,
-                                                        catchCondition.resolvedLabel()));
+                                                        catchCondition.opcode().opcode(),
+                                                        catchCondition.tag(),
+                                                        catchCondition.resolvedLabel(),
+                                                        afterCatchLabels[i]));
                                     }
 
                                     res.add(new CompilerInstruction(CompilerOpCode.CATCH_END));
@@ -328,17 +337,10 @@ final class WasmAnalyzer {
                                     // Mark the end of exception handler
                                     res.add(
                                             new CompilerInstruction(
-                                                    CompilerOpCode.LABEL, afterLabel));
+                                                    CompilerOpCode.LABEL, afterHandlerLabel));
 
                                     return res;
                                 });
-                        result.add(
-                                new CompilerInstruction(
-                                        CompilerOpCode.TRY_TABLE,
-                                        startLabel,
-                                        endLabel,
-                                        handlerLabel,
-                                        afterLabel));
                         break;
                     }
 

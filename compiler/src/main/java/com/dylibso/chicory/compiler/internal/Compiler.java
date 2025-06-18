@@ -29,6 +29,7 @@ import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_HOST_FUNCTIO
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_INDIRECT;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_INDIRECT_ON_INTERPRETER;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CHECK_INTERRUPTION;
+import static com.dylibso.chicory.compiler.internal.ShadedRefs.EXCEPTION_MATCHES;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.INSTANCE_MEMORY;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.INSTANCE_TABLE;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.TABLE_INSTANCE;
@@ -38,6 +39,7 @@ import static com.dylibso.chicory.compiler.internal.ShadedRefs.THROW_INDIRECT_CA
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.THROW_UNKNOWN_FUNCTION;
 import static com.dylibso.chicory.compiler.internal.Shader.createShadedClass;
 import static com.dylibso.chicory.compiler.internal.Shader.shadedClassRemapper;
+import static com.dylibso.chicory.wasm.types.CatchOpCode.CATCH_REF;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.invoke.MethodHandleProxies.asInterfaceInstance;
@@ -63,6 +65,7 @@ import com.dylibso.chicory.runtime.WasmException;
 import com.dylibso.chicory.runtime.internal.CompilerInterpreterMachine;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.WasmModule;
+import com.dylibso.chicory.wasm.types.CatchOpCode;
 import com.dylibso.chicory.wasm.types.ExternalType;
 import com.dylibso.chicory.wasm.types.FunctionBody;
 import com.dylibso.chicory.wasm.types.FunctionType;
@@ -71,7 +74,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,6 +91,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 import org.objectweb.asm.util.CheckClassAdapter;
+import org.objectweb.asm.util.CheckMethodAdapter;
 
 public final class Compiler {
 
@@ -561,7 +564,8 @@ public final class Compiler {
                         null);
 
         // uncomment if you ever want to troubleshoot invalid bytecode generation
-        // methodWriter = new CheckMethodAdapter(methodWriter);
+        // TODO: re-comment
+        methodWriter = new CheckMethodAdapter(methodWriter);
 
         methodWriter.visitCode();
         consumer.accept(new InstructionAdapter(methodWriter));
@@ -1213,7 +1217,7 @@ public final class Compiler {
         }
 
         // allocate labels for all label targets
-        Map<Long, Label> labels = new HashMap<>();
+        Map<Long, Label> labels = ctx.labels();
         for (var ins : instructions) {
             for (long target : ins.labelTargets()) {
                 labels.put(target, new Label());
@@ -1270,12 +1274,100 @@ public final class Compiler {
                     asm.tableswitch(0, table.length - 1, defaultLabel, table);
                     break;
                 case TRY_TABLE:
-                    Label start = labels.get(ins.operand(0));
-                    Label end = labels.get(ins.operand(1));
-                    Label handler = labels.get(ins.operand(2));
-                    asm.visitTryCatchBlock(
-                            start, end, handler, getInternalName(WasmException.class));
-                    break;
+                    {
+                        Label start = labels.get(ins.operand(0));
+                        Label end = labels.get(ins.operand(1));
+                        Label handler = labels.get(ins.operand(2));
+                        asm.visitTryCatchBlock(
+                                start, end, handler, getInternalName(WasmException.class));
+                        break;
+                    }
+                case CATCH_INS:
+                    {
+                        var opcode = CatchOpCode.byOpCode((int) ins.operand(0));
+                        var tag = (int) ins.operand(1);
+                        Label resolvedLabel = labels.get(ins.operand(2));
+                        Label afterCatchLabel = labels.get(ins.operand(3));
+                        switch (opcode) {
+                            case CATCH:
+                            case CATCH_REF:
+                                // Compare tag
+                                asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                                asm.iconst(tag);
+                                asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+                                emitInvokeStatic(asm, EXCEPTION_MATCHES);
+                                asm.ifeq(afterCatchLabel);
+
+                                // Get the tag type to know what
+                                // parameter types to unbox
+                                var tagFuncType = ctx.tagFunctionType(tag);
+                                if (!tagFuncType.params().isEmpty()) {
+                                    // unbox the exception args
+                                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                                    asm.invokevirtual(
+                                            getInternalName(WasmException.class),
+                                            "args",
+                                            getMethodDescriptor(getType(long[].class)),
+                                            false);
+
+                                    // Store the array in a local
+                                    // variable
+                                    var argsSlot = ctx.tempSlot() + 1;
+                                    asm.store(argsSlot, OBJECT_TYPE);
+
+                                    // Unbox each argument from the
+                                    // long[] array and push onto stack
+                                    for (int j = 0; j < tagFuncType.params().size(); j++) {
+                                        var param = tagFuncType.params().get(j);
+                                        asm.load(argsSlot, OBJECT_TYPE);
+                                        asm.iconst(j);
+                                        asm.aload(LONG_TYPE);
+                                        emitLongToJvm(asm, param);
+                                    }
+                                }
+
+                                if (opcode == CatchOpCode.CATCH_REF) {
+                                    // Register exception and push its
+                                    // index
+                                    asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+                                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                                    asm.invokevirtual(
+                                            getInternalName(Instance.class),
+                                            "registerException",
+                                            getMethodDescriptor(
+                                                    INT_TYPE, getType(WasmException.class)),
+                                            false);
+                                }
+                                asm.goTo(resolvedLabel);
+                                break;
+
+                            case CATCH_ALL:
+                                // Always matches, no tag comparison
+                                // needed
+                                asm.goTo(resolvedLabel);
+                                break;
+
+                            case CATCH_ALL_REF:
+                                // Always matches, register exception
+                                // and push its index
+                                asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+                                asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                                asm.invokevirtual(
+                                        getInternalName(Instance.class),
+                                        "registerException",
+                                        getMethodDescriptor(INT_TYPE, getType(WasmException.class)),
+                                        false);
+                                asm.goTo(resolvedLabel);
+                                break;
+                            default:
+                                throw new IllegalArgumentException(
+                                        "Catch not recognized " + opcode);
+                        }
+
+                        // Mark the label for next check
+                        asm.mark(afterCatchLabel);
+                        break;
+                    }
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
                     if (emitter == null) {

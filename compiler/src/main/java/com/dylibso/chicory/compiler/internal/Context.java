@@ -10,8 +10,11 @@ import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.TagImport;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.objectweb.asm.Label;
 
 /**
  * Class for tracking context relevant to compiling a single function
@@ -30,6 +33,7 @@ final class Context {
     private final int memorySlot;
     private final int instanceSlot;
     private final int tempSlot;
+    private final Map<Long, Label> labels = new HashMap<>();
 
     public Context(
             WasmModule module,
@@ -105,6 +109,10 @@ final class Context {
 
     public FunctionType[] types() {
         return module.typeSection().types();
+    }
+
+    public Map<Long, Label> labels() {
+        return labels;
     }
 
     public FunctionType tagFunctionType(int tagId) {

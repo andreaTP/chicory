@@ -5,6 +5,7 @@ final class com/dylibso/chicory/$gen/CompiledMachineFuncGroup_0 {
     TRYCATCHBLOCK L3 L4 L2 com/dylibso/chicory/runtime/WasmException
     TRYCATCHBLOCK L5 L6 L2 com/dylibso/chicory/runtime/WasmException
     TRYCATCHBLOCK L7 L8 L2 com/dylibso/chicory/runtime/WasmException
+    TRYCATCHBLOCK L9 L10 L2 com/dylibso/chicory/runtime/WasmException
     TRYCATCHBLOCK L0 L1 L7 com/dylibso/chicory/runtime/WasmException
     TRYCATCHBLOCK L3 L4 L7 com/dylibso/chicory/runtime/WasmException
     TRYCATCHBLOCK L5 L6 L7 com/dylibso/chicory/runtime/WasmException
@@ -46,7 +47,7 @@ final class com/dylibso/chicory/$gen/CompiledMachineFuncGroup_0 {
     ATHROW
    L6
     ATHROW
-   L9
+   L11
     NOP
     NOP
     ATHROW
@@ -56,35 +57,35 @@ final class com/dylibso/chicory/$gen/CompiledMachineFuncGroup_0 {
     ICONST_0
     ALOAD 2
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineShaded.exceptionMatches (Lcom/dylibso/chicory/runtime/WasmException;ILcom/dylibso/chicory/runtime/Instance;)Z
-    IFEQ L10
-   L10
+    IFEQ L12
+    GOTO L9
+   L12
     ALOAD 3
     ATHROW
    L8
     NOP
     NOP
     ATHROW
-   L11
-    ATHROW
-   L12
-    NOP
-    NOP
-    ATHROW
+   L9
+    ICONST_3
+   L10
+    GOTO L13
    L2
     ASTORE 3
     ALOAD 3
-    ICONST_0
+    ICONST_1
     ALOAD 2
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineShaded.exceptionMatches (Lcom/dylibso/chicory/runtime/WasmException;ILcom/dylibso/chicory/runtime/Instance;)Z
-    IFEQ L13
-   L13
+    IFEQ L14
+    GOTO L15
+   L14
     ALOAD 3
     ATHROW
-   L14
-    ATHROW
+   L13
+    IRETURN
    L15
-    NOP
-    ATHROW
+    ICONST_4
+    IRETURN
 
   public static call_0(Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
     ALOAD 2
@@ -161,14 +162,15 @@ final class com/dylibso/chicory/$gen/CompiledMachineFuncGroup_0 {
     ALOAD 2
     INVOKESTATIC com/dylibso/chicory/$gen/CompiledMachineShaded.exceptionMatches (Lcom/dylibso/chicory/runtime/WasmException;ILcom/dylibso/chicory/runtime/Instance;)Z
     IFEQ L6
+    GOTO L7
    L6
     ALOAD 3
     ATHROW
    L5
     IRETURN
    L7
-    NOP
-    ATHROW
+    ICONST_1
+    IRETURN
 
   public static call_2(Lcom/dylibso/chicory/runtime/Instance;Lcom/dylibso/chicory/runtime/Memory;[J)[J
     ALOAD 2

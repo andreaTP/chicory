@@ -23,7 +23,6 @@ final class EmitterMap {
                     .intrinsic(CompilerOpCode.THROW, Emitters::THROW)
                     .intrinsic(CompilerOpCode.THROW_REF, Emitters::THROW_REF)
                     .intrinsic(CompilerOpCode.CATCH_START, Emitters::CATCH_START)
-                    .intrinsic(CompilerOpCode.CATCH_INS, Emitters::CATCH_INS)
                     .intrinsic(CompilerOpCode.CATCH_END, Emitters::CATCH_END)
 
                     // ====== References ======

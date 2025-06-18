@@ -54,6 +54,8 @@ final class CompilerInstruction {
             case TRY_TABLE:
             case SWITCH:
                 return operands;
+            case CATCH_INS:
+                return new long[] {operands[2], operands[3]};
             default:
                 return EMPTY;
         }
