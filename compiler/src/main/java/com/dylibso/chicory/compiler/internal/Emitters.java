@@ -729,8 +729,8 @@ final class Emitters {
     public static void CATCH_CLAUSE(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
         var opcode = CatchOpCode.byOpCode((int) ins.operand(0));
         var tag = (int) ins.operand(1);
-        var afterCatchLabel = ctx.labels().get(ins.operand(2));
-        var resolvedLabel = ctx.labels().get(ins.operand(3));
+        var resolvedLabel = ctx.labels().get(ins.operand(2));
+        var afterCatchLabel = ctx.labels().get(ins.operand(3));
 
         switch (opcode) {
             case CATCH:

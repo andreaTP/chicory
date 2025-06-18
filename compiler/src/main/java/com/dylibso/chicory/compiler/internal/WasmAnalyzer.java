@@ -1,5 +1,6 @@
 package com.dylibso.chicory.compiler.internal;
 
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_CLAUSE;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
@@ -371,19 +372,19 @@ final class WasmAnalyzer {
             long afterCatchLabel = tryCatchBlock.afterCatch[i];
 
             // Emmit an instruction for each catch condition
-            //            result.add(
-            //                    new CompilerInstruction(
-            //                            CATCH_CLAUSE,
-            //                            catchCondition.opcode().opcode(),
-            //                            catchCondition.tag(),
-            //                            catchCondition.resolvedLabel(),
-            //                            afterCatchLabel));
-
             result.add(
                     new CompilerInstruction(
-                            Emitters.CATCH_CONDITION(catchCondition, afterCatchLabel),
+                            CATCH_CLAUSE,
+                            catchCondition.opcode().opcode(),
+                            catchCondition.tag(),
                             catchCondition.resolvedLabel(),
                             afterCatchLabel));
+
+            //            result.add(
+            //                    new CompilerInstruction(
+            //                            Emitters.CATCH_CONDITION(catchCondition, afterCatchLabel),
+            //                            catchCondition.resolvedLabel(),
+            //                            afterCatchLabel));
         }
 
         // Default case: re-throw the exception
