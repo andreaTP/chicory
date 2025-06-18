@@ -86,7 +86,7 @@ public class CompilerInterpreterMachine extends InterpreterMachine {
                 // we need at least an empty frame
                 var stackFrame = new StackFrame(instance, funcId, args);
                 THROW_REF(
-                        instance, instance.registerException(e), stack, stackFrame, getCallStack());
+                        instance, instance.registerException(e), stack, stackFrame, callStack);
             }
         }
     }

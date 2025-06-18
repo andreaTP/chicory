@@ -89,7 +89,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 import org.objectweb.asm.util.CheckClassAdapter;
-import org.objectweb.asm.util.CheckMethodAdapter;
 
 public final class Compiler {
 
@@ -562,7 +561,7 @@ public final class Compiler {
                         null);
 
         // uncomment if you ever want to troubleshoot invalid bytecode generation
-        methodWriter = new CheckMethodAdapter(methodWriter);
+        // methodWriter = new CheckMethodAdapter(methodWriter);
 
         methodWriter.visitCode();
         consumer.accept(new InstructionAdapter(methodWriter));

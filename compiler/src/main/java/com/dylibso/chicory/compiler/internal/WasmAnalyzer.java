@@ -1,12 +1,5 @@
 package com.dylibso.chicory.compiler.internal;
 
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_END;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_REF;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_START;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_UNBOX_PARAMS;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.IFEQ;
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
 import static java.util.Collections.reverse;
@@ -136,7 +129,10 @@ final class WasmAnalyzer {
                 tryCatchBlocks.put(ins.address(), block);
                 result.add(
                         new CompilerInstruction(
-                                TRY_CATCH_BLOCK, block.start, block.end, block.handler));
+                                CompilerOpCode.TRY_CATCH_BLOCK,
+                                block.start,
+                                block.end,
+                                block.handler));
             }
         }
 
@@ -392,7 +388,7 @@ final class WasmAnalyzer {
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.handler));
 
         // store the exception in a temporary slot
-        result.add(new CompilerInstruction(CATCH_START));
+        result.add(new CompilerInstruction(CompilerOpCode.CATCH_START));
 
         for (int i = 0; i < tryCatchBlock.ins.catches().size(); i++) {
             var catchCondition = tryCatchBlock.ins.catches().get(i);
@@ -400,15 +396,19 @@ final class WasmAnalyzer {
 
             switch (catchCondition.opcode()) {
                 case CATCH:
-                    result.add(new CompilerInstruction(CATCH, catchCondition.tag()));
-                    result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
-                    result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CompilerOpCode.CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CompilerOpCode.IFEQ, afterCatchLabel));
+                    result.add(
+                            new CompilerInstruction(
+                                    CompilerOpCode.CATCH_UNBOX_PARAMS, catchCondition.tag()));
                     break;
                 case CATCH_REF:
-                    result.add(new CompilerInstruction(CATCH, catchCondition.tag()));
-                    result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
-                    result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
-                    result.add(new CompilerInstruction(CATCH_REF));
+                    result.add(new CompilerInstruction(CompilerOpCode.CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CompilerOpCode.IFEQ, afterCatchLabel));
+                    result.add(
+                            new CompilerInstruction(
+                                    CompilerOpCode.CATCH_UNBOX_PARAMS, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CompilerOpCode.CATCH_REF));
                     break;
                 case CATCH_ALL:
                     // Always matches, no tag comparison needed
@@ -416,7 +416,7 @@ final class WasmAnalyzer {
                 case CATCH_ALL_REF:
                     // Always matches, register exception
                     // and push its index
-                    result.add(new CompilerInstruction(CATCH_REF));
+                    result.add(new CompilerInstruction(CompilerOpCode.CATCH_REF));
                     break;
             }
             result.add(
@@ -425,7 +425,7 @@ final class WasmAnalyzer {
         }
 
         // Default case: re-throw the exception
-        result.add(new CompilerInstruction(CATCH_END));
+        result.add(new CompilerInstruction(CompilerOpCode.CATCH_END));
 
         // Mark the end of exception handler
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.after));

@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.stream.LongStream;
 
 final class CompilerInstruction {
-
     public static final long[] EMPTY = new long[0];
 
     private final CompilerOpCode opcode;
