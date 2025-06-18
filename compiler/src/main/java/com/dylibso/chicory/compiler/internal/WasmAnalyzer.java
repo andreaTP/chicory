@@ -379,12 +379,7 @@ final class WasmAnalyzer {
                             catchCondition.tag(),
                             catchCondition.resolvedLabel(),
                             afterCatchLabel));
-
-            //            result.add(
-            //                    new CompilerInstruction(
-            //                            Emitters.CATCH_CONDITION(catchCondition, afterCatchLabel),
-            //                            catchCondition.resolvedLabel(),
-            //                            afterCatchLabel));
+            result.add(new CompilerInstruction(CompilerOpCode.LABEL, afterCatchLabel));
         }
 
         // Default case: re-throw the exception
