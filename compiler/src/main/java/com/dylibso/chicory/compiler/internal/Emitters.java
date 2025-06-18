@@ -622,9 +622,13 @@ final class Emitters {
     }
 
     private static void emitUnboxResult(InstructionAdapter asm, Context ctx, List<ValType> types) {
-        asm.store(ctx.tempSlot(), OBJECT_TYPE);
+        emitUnboxResult(asm, types, ctx.tempSlot());
+    }
+
+    private static void emitUnboxResult(InstructionAdapter asm, List<ValType> types, int tempSlot) {
+        asm.store(tempSlot, OBJECT_TYPE);
         for (int i = 0; i < types.size(); i++) {
-            asm.load(ctx.tempSlot(), OBJECT_TYPE);
+            asm.load(tempSlot, OBJECT_TYPE);
             asm.iconst(i);
             asm.aload(LONG_TYPE);
             emitLongToJvm(asm, types.get(i));
@@ -763,19 +767,19 @@ final class Emitters {
 
             // Store the array in a local
             // variable
-            var argsSlot = ctx.tempSlot() + 1;
-            asm.store(argsSlot, OBJECT_TYPE);
+            //            var argsSlot = ctx.tempSlot() + 1;
+            //            asm.store(argsSlot, OBJECT_TYPE);
 
             // Unbox each argument from the
             // long[] array and push onto stack
-            // emitUnboxResult(asm, ctx, tagFuncType.params());
-            for (int j = 0; j < tagFuncType.params().size(); j++) {
-                var param = tagFuncType.params().get(j);
-                asm.load(argsSlot, OBJECT_TYPE);
-                asm.iconst(j);
-                asm.aload(LONG_TYPE);
-                emitLongToJvm(asm, param);
-            }
+            emitUnboxResult(asm, tagFuncType.params(), ctx.tempSlot() + 1);
+            //            for (int j = 0; j < tagFuncType.params().size(); j++) {
+            //                var param = tagFuncType.params().get(j);
+            //                asm.load(argsSlot, OBJECT_TYPE);
+            //                asm.iconst(j);
+            //                asm.aload(LONG_TYPE);
+            //                emitLongToJvm(asm, param);
+            //            }
 
             // TODO verify:
             //            asm.store(ctx.tempSlot(), OBJECT_TYPE);
