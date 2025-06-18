@@ -765,30 +765,10 @@ final class Emitters {
                     getMethodDescriptor(getType(long[].class)),
                     false);
 
-            // Store the array in a local
-            // variable
-            //            var argsSlot = ctx.tempSlot() + 1;
-            //            asm.store(argsSlot, OBJECT_TYPE);
-
+            // Store the array in a local variable
             // Unbox each argument from the
             // long[] array and push onto stack
             emitUnboxResult(asm, tagFuncType.params(), ctx.tempSlot() + 1);
-            //            for (int j = 0; j < tagFuncType.params().size(); j++) {
-            //                var param = tagFuncType.params().get(j);
-            //                asm.load(argsSlot, OBJECT_TYPE);
-            //                asm.iconst(j);
-            //                asm.aload(LONG_TYPE);
-            //                emitLongToJvm(asm, param);
-            //            }
-
-            // TODO verify:
-            //            asm.store(ctx.tempSlot(), OBJECT_TYPE);
-            //            for (int i = 0; i < types.size(); i++) {
-            //                asm.load(ctx.tempSlot(), OBJECT_TYPE);
-            //                asm.iconst(i);
-            //                asm.aload(LONG_TYPE);
-            //                emitLongToJvm(asm, types.get(i));
-            //            }
         }
     }
 
