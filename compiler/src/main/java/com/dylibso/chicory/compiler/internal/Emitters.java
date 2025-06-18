@@ -29,7 +29,6 @@ import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.OpCodeIdentifier;
 import com.dylibso.chicory.runtime.WasmException;
 import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
-import com.dylibso.chicory.wasm.types.CatchOpCode;
 import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.lang.reflect.Method;
@@ -720,39 +719,9 @@ final class Emitters {
         }
     }
 
-    public static void TRY_CATCH_BLOCK(
+    public static void CATCH_UNBOX_PARAMS(
             Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
-        var labels = ctx.labels();
-        Label start = labels.get(ins.operand(0));
-        Label endLabel = labels.get(ins.operand(1));
-        Label handlerLabel = labels.get(ins.operand(2));
-        asm.visitTryCatchBlock(start, endLabel, handlerLabel, getInternalName(WasmException.class));
-    }
-
-    public static void CATCH_CLAUSE(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
-        var opcode = CatchOpCode.byOpCode((int) ins.operand(0));
-        var tag = (int) ins.operand(1);
-
-        switch (opcode) {
-            case CATCH:
-                CATCH(ctx, tag, asm);
-                break;
-            case CATCH_REF:
-                CATCH(ctx, tag, asm);
-                CATCH_REF(ctx, asm);
-                break;
-            case CATCH_ALL:
-                // Always matches, no tag comparison needed
-                break;
-            case CATCH_ALL_REF:
-                // Always matches, register exception
-                // and push its index
-                CATCH_REF(ctx, asm);
-                break;
-        }
-    }
-
-    public static void CATCH(Context ctx, int tag, InstructionAdapter asm) {
+        var tag = (int) ins.operand(0);
         // Get the tag type to know what
         // parameter types to unbox
         var tagFuncType = ctx.getTagFunctionType(tag);
@@ -772,7 +741,7 @@ final class Emitters {
         }
     }
 
-    public static void CATCH_REF(Context ctx, InstructionAdapter asm) {
+    public static void CATCH_REF(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
         // Register exception and push its
         // index
         asm.load(ctx.instanceSlot(), OBJECT_TYPE);

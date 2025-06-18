@@ -68,8 +68,8 @@ final class CompilerInstruction {
             case SWITCH:
             case TRY_CATCH_BLOCK:
                 return operands;
-            case CATCH_CLAUSE:
-                return new long[] {operands[2]};
+            case CATCH:
+                return new long[] {operands[1]};
             default:
                 return EMPTY;
         }

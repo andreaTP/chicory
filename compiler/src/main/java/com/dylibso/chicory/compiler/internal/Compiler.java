@@ -64,7 +64,6 @@ import com.dylibso.chicory.runtime.WasmException;
 import com.dylibso.chicory.runtime.internal.CompilerInterpreterMachine;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.WasmModule;
-import com.dylibso.chicory.wasm.types.CatchOpCode;
 import com.dylibso.chicory.wasm.types.ExternalType;
 import com.dylibso.chicory.wasm.types.FunctionBody;
 import com.dylibso.chicory.wasm.types.FunctionType;
@@ -1282,21 +1281,16 @@ public final class Compiler {
                     asm.visitTryCatchBlock(
                             start, endLabel, handlerLabel, getInternalName(WasmException.class));
                     break;
-                case CATCH_CLAUSE:
-                    var opcode = CatchOpCode.byOpCode((int) ins.operand(0));
-                    switch (opcode) {
-                        case CATCH:
-                        case CATCH_REF:
-                            var tag = (int) ins.operand(1);
-                            var afterCatchLabel = labels.get(ins.operand(2));
-                            // Compare tag
-                            asm.load(ctx.tempSlot(), OBJECT_TYPE);
-                            asm.iconst(tag);
-                            asm.load(ctx.instanceSlot(), OBJECT_TYPE);
-                            emitInvokeStatic(asm, EXCEPTION_MATCHES);
-                            asm.ifeq(afterCatchLabel);
-                    }
-                    // intentional fall through
+                case CATCH:
+                    var tag = (int) ins.operand(0);
+                    var afterCatchLabel = labels.get(ins.operand(1));
+                    // Compare tag
+                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                    asm.iconst(tag);
+                    asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+                    emitInvokeStatic(asm, EXCEPTION_MATCHES);
+                    asm.ifeq(afterCatchLabel);
+                    break;
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
                     if (emitter == null) {

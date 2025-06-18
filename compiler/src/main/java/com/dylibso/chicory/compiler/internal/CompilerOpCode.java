@@ -206,7 +206,9 @@ enum CompilerOpCode {
     THROW(OpCode.THROW),
     THROW_REF(OpCode.THROW_REF),
     TRY_CATCH_BLOCK(OpCode.TRY_TABLE),
-    CATCH_CLAUSE(),
+    CATCH(),
+    CATCH_UNBOX_PARAMS(),
+    CATCH_REF(),
     EMITTER,
     ;
 

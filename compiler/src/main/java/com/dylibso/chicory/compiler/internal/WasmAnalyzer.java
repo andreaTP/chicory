@@ -1,6 +1,8 @@
 package com.dylibso.chicory.compiler.internal;
 
-import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_CLAUSE;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_REF;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_UNBOX_PARAMS;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
@@ -371,13 +373,27 @@ final class WasmAnalyzer {
             var catchCondition = tryCatchBlock.ins.catches().get(i);
             long afterCatchLabel = tryCatchBlock.afterCatch[i];
 
-            // Emmit an instruction for each catch condition
-            result.add(
-                    new CompilerInstruction(
-                            CATCH_CLAUSE,
-                            catchCondition.opcode().opcode(),
-                            catchCondition.tag(),
-                            afterCatchLabel));
+            switch (catchCondition.opcode()) {
+                case CATCH:
+                    result.add(
+                            new CompilerInstruction(CATCH, catchCondition.tag(), afterCatchLabel));
+                    result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
+                    break;
+                case CATCH_REF:
+                    result.add(
+                            new CompilerInstruction(CATCH, catchCondition.tag(), afterCatchLabel));
+                    result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
+                    result.add(new CompilerInstruction(CATCH_REF));
+                    break;
+                case CATCH_ALL:
+                    // Always matches, no tag comparison needed
+                    break;
+                case CATCH_ALL_REF:
+                    // Always matches, register exception
+                    // and push its index
+                    result.add(new CompilerInstruction(CATCH_REF));
+                    break;
+            }
             result.add(
                     new CompilerInstruction(CompilerOpCode.GOTO, catchCondition.resolvedLabel()));
             result.add(new CompilerInstruction(CompilerOpCode.LABEL, afterCatchLabel));
