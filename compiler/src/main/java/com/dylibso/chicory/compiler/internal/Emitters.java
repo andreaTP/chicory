@@ -28,7 +28,6 @@ import static org.objectweb.asm.commons.InstructionAdapter.OBJECT_TYPE;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.OpCodeIdentifier;
 import com.dylibso.chicory.runtime.WasmException;
-import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
 import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.lang.reflect.Method;
@@ -36,7 +35,6 @@ import java.lang.reflect.Modifier;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -671,7 +669,6 @@ final class Emitters {
     }
 
     public static void THROW(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
-
         int tagNumber = (int) ins.operand(0);
         var type = ctx.getTagFunctionType(tagNumber);
 
@@ -693,30 +690,13 @@ final class Emitters {
         asm.athrow();
     }
 
-    public interface Emitter extends Consumer<Context> {}
+    public static void CATCH_START(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
+        asm.store(ctx.tempSlot(), OBJECT_TYPE);
+    }
 
-    public static class TryCatchBlock {
-        final AnnotatedInstruction ins;
-        final long start;
-        final long end;
-        final long handler;
-        final long after;
-        final long[] afterCatch;
-
-        public TryCatchBlock(
-                AnnotatedInstruction ins,
-                long start,
-                long end,
-                long handler,
-                long after,
-                long[] afterCatch) {
-            this.ins = ins;
-            this.start = start;
-            this.end = end;
-            this.handler = handler;
-            this.after = after;
-            this.afterCatch = afterCatch;
-        }
+    public static void CATCH_END(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
+        asm.load(ctx.tempSlot(), OBJECT_TYPE);
+        asm.athrow();
     }
 
     public static void CATCH_UNBOX_PARAMS(

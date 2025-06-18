@@ -1,7 +1,9 @@
 package com.dylibso.chicory.compiler.internal;
 
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_END;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_REF;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_START;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_UNBOX_PARAMS;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
@@ -9,9 +11,7 @@ import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
 import static java.util.Collections.reverse;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toUnmodifiableList;
-import static org.objectweb.asm.commons.InstructionAdapter.OBJECT_TYPE;
 
-import com.dylibso.chicory.compiler.internal.Emitters.TryCatchBlock;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
@@ -61,6 +61,30 @@ final class WasmAnalyzer {
 
     public List<FunctionType> functionTypes() {
         return functionTypes;
+    }
+
+    public static class TryCatchBlock {
+        final AnnotatedInstruction ins;
+        final long start;
+        final long end;
+        final long handler;
+        final long after;
+        final long[] afterCatch;
+
+        public TryCatchBlock(
+                AnnotatedInstruction ins,
+                long start,
+                long end,
+                long handler,
+                long after,
+                long[] afterCatch) {
+            this.ins = ins;
+            this.start = start;
+            this.end = end;
+            this.handler = handler;
+            this.after = after;
+            this.afterCatch = afterCatch;
+        }
     }
 
     @SuppressWarnings("checkstyle:modifiedcontrolvariable")
@@ -367,7 +391,7 @@ final class WasmAnalyzer {
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.handler));
 
         // store the exception in a temporary slot
-        result.add(new CompilerInstruction((ctx) -> ctx.asm().store(ctx.tempSlot(), OBJECT_TYPE)));
+        result.add(new CompilerInstruction(CATCH_START));
 
         for (int i = 0; i < tryCatchBlock.ins.catches().size(); i++) {
             var catchCondition = tryCatchBlock.ins.catches().get(i);
@@ -400,12 +424,7 @@ final class WasmAnalyzer {
         }
 
         // Default case: re-throw the exception
-        result.add(
-                new CompilerInstruction(
-                        (ctx) -> {
-                            ctx.asm().load(ctx.tempSlot(), OBJECT_TYPE);
-                            ctx.asm().athrow();
-                        }));
+        result.add(new CompilerInstruction(CATCH_END));
 
         // Mark the end of exception handler
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.after));

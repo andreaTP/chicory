@@ -206,10 +206,11 @@ enum CompilerOpCode {
     THROW(OpCode.THROW),
     THROW_REF(OpCode.THROW_REF),
     TRY_CATCH_BLOCK(OpCode.TRY_TABLE),
-    CATCH(),
-    CATCH_UNBOX_PARAMS(),
-    CATCH_REF(),
-    EMITTER,
+    CATCH_START,
+    CATCH_END,
+    CATCH_UNBOX_PARAMS,
+    CATCH,
+    CATCH_REF,
     ;
 
     private final Optional<OpCode> opcode;

@@ -24,6 +24,8 @@ final class EmitterMap {
                     .intrinsic(CompilerOpCode.THROW_REF, Emitters::THROW_REF)
                     .intrinsic(CompilerOpCode.CATCH_UNBOX_PARAMS, Emitters::CATCH_UNBOX_PARAMS)
                     .intrinsic(CompilerOpCode.CATCH_REF, Emitters::CATCH_REF)
+                    .intrinsic(CompilerOpCode.CATCH_START, Emitters::CATCH_START)
+                    .intrinsic(CompilerOpCode.CATCH_END, Emitters::CATCH_END)
 
                     // ====== References ======
                     .intrinsic(CompilerOpCode.REF_FUNC, Emitters::REF_FUNC)
