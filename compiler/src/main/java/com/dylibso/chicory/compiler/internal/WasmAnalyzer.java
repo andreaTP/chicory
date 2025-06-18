@@ -1,7 +1,7 @@
 package com.dylibso.chicory.compiler.internal;
 
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
-import static com.dylibso.chicory.compiler.internal.Emitters.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
 import static java.util.Collections.reverse;
 import static java.util.stream.Collectors.toCollection;
@@ -94,16 +94,21 @@ final class WasmAnalyzer {
 
             if (ins.opcode() == OpCode.TRY_TABLE
                     && body.instructions().get(idx + 1).opcode() != OpCode.END) {
-                var block =
-                        new TryCatchBlock(ins, nextLabel++, nextLabel++, nextLabel++, nextLabel++);
+                var start = nextLabel++;
+                var end = nextLabel++;
+                var handle = nextLabel++;
+                var after = nextLabel++;
+
+                var afterCatchLabels = new long[ins.catches().size()];
+                for (int i = 0; i < ins.catches().size(); i++) {
+                    afterCatchLabels[i] = nextLabel++;
+                }
+
+                var block = new TryCatchBlock(ins, start, end, handle, after, afterCatchLabels);
                 tryCatchBlocks.put(ins.address(), block);
                 result.add(
                         new CompilerInstruction(
-                                TRY_CATCH_BLOCK(block),
-                                block.start,
-                                block.end,
-                                block.handler,
-                                block.after));
+                                TRY_CATCH_BLOCK, block.start, block.end, block.handler));
             }
         }
 
@@ -268,7 +273,6 @@ final class WasmAnalyzer {
                         var tryCatchBlock = tryCatchBlocks.get(ins.address());
                         result.add(
                                 new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.start));
-
                         break;
                     }
 
@@ -279,8 +283,7 @@ final class WasmAnalyzer {
 
                         // Weird: sometimes we see END occur multiple times for
                         if (tryCatchBlock != null) {
-
-                            nextLabel = analyzeTryCatchEnd(result, nextLabel, tryCatchBlock);
+                            analyzeTryCatchEnd(result, tryCatchBlock);
                         }
                     }
                     stack.exitScope(ins.scope());
@@ -348,15 +351,14 @@ final class WasmAnalyzer {
         return result;
     }
 
-    private static int analyzeTryCatchEnd(
-            List<CompilerInstruction> result, int nextLabel, TryCatchBlock tryCatchBlock) {
+    private static void analyzeTryCatchEnd(
+            List<CompilerInstruction> result, TryCatchBlock tryCatchBlock) {
 
         // Mark the end of the try block
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.end));
 
         // Jump over the exception handler if since no exception was thrown
-        var afterHandlerLabel = nextLabel++;
-        result.add(new CompilerInstruction(CompilerOpCode.GOTO, afterHandlerLabel));
+        result.add(new CompilerInstruction(CompilerOpCode.GOTO, tryCatchBlock.after));
 
         // Mark the start of the exception handler
         result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.handler));
@@ -364,17 +366,19 @@ final class WasmAnalyzer {
         // store the exception in a temporary slot
         result.add(new CompilerInstruction((ctx) -> ctx.asm().store(ctx.tempSlot(), OBJECT_TYPE)));
 
-        // create labels for after each catch block
-        var afterCatchLabels = new long[tryCatchBlock.ins.catches().size()];
-        for (int i = 0; i < tryCatchBlock.ins.catches().size(); i++) {
-            afterCatchLabels[i] = nextLabel++;
-        }
-
         for (int i = 0; i < tryCatchBlock.ins.catches().size(); i++) {
             var catchCondition = tryCatchBlock.ins.catches().get(i);
-            long afterCatchLabel = afterCatchLabels[i];
+            long afterCatchLabel = tryCatchBlock.afterCatch[i];
 
             // Emmit an instruction for each catch condition
+            //            result.add(
+            //                    new CompilerInstruction(
+            //                            CATCH_CLAUSE,
+            //                            catchCondition.opcode().opcode(),
+            //                            catchCondition.tag(),
+            //                            catchCondition.resolvedLabel(),
+            //                            afterCatchLabel));
+
             result.add(
                     new CompilerInstruction(
                             Emitters.CATCH_CONDITION(catchCondition, afterCatchLabel),
@@ -391,8 +395,7 @@ final class WasmAnalyzer {
                         }));
 
         // Mark the end of exception handler
-        result.add(new CompilerInstruction(CompilerOpCode.LABEL, afterHandlerLabel));
-        return nextLabel;
+        result.add(new CompilerInstruction(CompilerOpCode.LABEL, tryCatchBlock.after));
     }
 
     private void analyzeSimple(

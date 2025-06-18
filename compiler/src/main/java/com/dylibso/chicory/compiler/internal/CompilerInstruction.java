@@ -66,7 +66,10 @@ final class CompilerInstruction {
             case IFNE:
             case EMITTER:
             case SWITCH:
+            case TRY_CATCH_BLOCK:
                 return operands;
+            case CATCH_CLAUSE:
+                return new long[] {operands[2], operands[3]};
             default:
                 return EMPTY;
         }
