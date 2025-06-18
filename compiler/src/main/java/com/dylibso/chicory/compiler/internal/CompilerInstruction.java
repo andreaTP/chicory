@@ -69,7 +69,7 @@ final class CompilerInstruction {
             case TRY_CATCH_BLOCK:
                 return operands;
             case CATCH_CLAUSE:
-                return new long[] {operands[2], operands[3]};
+                return new long[] {operands[2]};
             default:
                 return EMPTY;
         }

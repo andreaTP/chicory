@@ -15,7 +15,6 @@ import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.slotCount;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.valueMethodName;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.valueMethodType;
-import static com.dylibso.chicory.compiler.internal.ShadedRefs.EXCEPTION_MATCHES;
 import static com.dylibso.chicory.wasm.types.Value.REF_NULL_VALUE;
 import static java.lang.Double.longBitsToDouble;
 import static java.lang.Float.intBitsToFloat;
@@ -729,15 +728,13 @@ final class Emitters {
     public static void CATCH_CLAUSE(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
         var opcode = CatchOpCode.byOpCode((int) ins.operand(0));
         var tag = (int) ins.operand(1);
-        var resolvedLabel = ctx.labels().get(ins.operand(2));
-        var afterCatchLabel = ctx.labels().get(ins.operand(3));
 
         switch (opcode) {
             case CATCH:
-                CATCH(ctx, tag, afterCatchLabel, asm);
+                CATCH(ctx, tag, asm);
                 break;
             case CATCH_REF:
-                CATCH(ctx, tag, afterCatchLabel, asm);
+                CATCH(ctx, tag, asm);
                 CATCH_REF(ctx, asm);
                 break;
             case CATCH_ALL:
@@ -749,17 +746,9 @@ final class Emitters {
                 CATCH_REF(ctx, asm);
                 break;
         }
-        asm.goTo(resolvedLabel);
     }
 
-    public static void CATCH(Context ctx, int tag, Label afterCatchLabel, InstructionAdapter asm) {
-        // Compare tag
-        asm.load(ctx.tempSlot(), OBJECT_TYPE);
-        asm.iconst(tag);
-        asm.load(ctx.instanceSlot(), OBJECT_TYPE);
-        emitInvokeStatic(asm, EXCEPTION_MATCHES);
-        asm.ifeq(afterCatchLabel);
-
+    public static void CATCH(Context ctx, int tag, InstructionAdapter asm) {
         // Get the tag type to know what
         // parameter types to unbox
         var tagFuncType = ctx.getTagFunctionType(tag);
@@ -779,6 +768,7 @@ final class Emitters {
 
             // Unbox each argument from the
             // long[] array and push onto stack
+            // emitUnboxResult(asm, ctx, tagFuncType.params());
             for (int j = 0; j < tagFuncType.params().size(); j++) {
                 var param = tagFuncType.params().get(j);
                 asm.load(argsSlot, OBJECT_TYPE);
@@ -786,6 +776,15 @@ final class Emitters {
                 asm.aload(LONG_TYPE);
                 emitLongToJvm(asm, param);
             }
+
+            // TODO verify:
+            //            asm.store(ctx.tempSlot(), OBJECT_TYPE);
+            //            for (int i = 0; i < types.size(); i++) {
+            //                asm.load(ctx.tempSlot(), OBJECT_TYPE);
+            //                asm.iconst(i);
+            //                asm.aload(LONG_TYPE);
+            //                emitLongToJvm(asm, types.get(i));
+            //            }
         }
     }
 

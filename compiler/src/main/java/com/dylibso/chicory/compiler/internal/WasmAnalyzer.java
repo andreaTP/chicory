@@ -377,8 +377,9 @@ final class WasmAnalyzer {
                             CATCH_CLAUSE,
                             catchCondition.opcode().opcode(),
                             catchCondition.tag(),
-                            catchCondition.resolvedLabel(),
                             afterCatchLabel));
+            result.add(
+                    new CompilerInstruction(CompilerOpCode.GOTO, catchCondition.resolvedLabel()));
             result.add(new CompilerInstruction(CompilerOpCode.LABEL, afterCatchLabel));
         }
 
