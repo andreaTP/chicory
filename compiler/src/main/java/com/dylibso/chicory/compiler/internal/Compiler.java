@@ -29,7 +29,6 @@ import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_HOST_FUNCTIO
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_INDIRECT;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CALL_INDIRECT_ON_INTERPRETER;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.CHECK_INTERRUPTION;
-import static com.dylibso.chicory.compiler.internal.ShadedRefs.EXCEPTION_MATCHES;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.INSTANCE_MEMORY;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.INSTANCE_TABLE;
 import static com.dylibso.chicory.compiler.internal.ShadedRefs.TABLE_INSTANCE;
@@ -1278,16 +1277,16 @@ public final class Compiler {
                     asm.visitTryCatchBlock(
                             start, endLabel, handlerLabel, getInternalName(WasmException.class));
                     break;
-                case CATCH:
-                    var tag = (int) ins.operand(0);
-                    var afterCatchLabel = labels.get(ins.operand(1));
-                    // Compare tag
-                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
-                    asm.iconst(tag);
-                    asm.load(ctx.instanceSlot(), OBJECT_TYPE);
-                    emitInvokeStatic(asm, EXCEPTION_MATCHES);
-                    asm.ifeq(afterCatchLabel);
-                    break;
+                    //                case CATCH:
+                    //                    var tag = (int) ins.operand(0);
+                    //                    var afterCatchLabel = labels.get(ins.operand(1));
+                    //                    // Compare tag
+                    //                    asm.load(ctx.tempSlot(), OBJECT_TYPE);
+                    //                    asm.iconst(tag);
+                    //                    asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+                    //                    emitInvokeStatic(asm, EXCEPTION_MATCHES);
+                    //                    asm.ifeq(afterCatchLabel);
+                    //                    break;
                 default:
                     var emitter = EMITTERS.get(ins.opcode());
                     if (emitter == null) {

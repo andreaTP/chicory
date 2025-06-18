@@ -22,6 +22,7 @@ final class EmitterMap {
                     // ====== Exception Handling ======
                     .intrinsic(CompilerOpCode.THROW, Emitters::THROW)
                     .intrinsic(CompilerOpCode.THROW_REF, Emitters::THROW_REF)
+                    .intrinsic(CompilerOpCode.CATCH, Emitters::CATCH)
                     .intrinsic(CompilerOpCode.CATCH_UNBOX_PARAMS, Emitters::CATCH_UNBOX_PARAMS)
                     .intrinsic(CompilerOpCode.CATCH_REF, Emitters::CATCH_REF)
                     .intrinsic(CompilerOpCode.CATCH_START, Emitters::CATCH_START)

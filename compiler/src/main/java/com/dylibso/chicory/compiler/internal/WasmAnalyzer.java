@@ -5,6 +5,7 @@ import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_END;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_REF;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_START;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.CATCH_UNBOX_PARAMS;
+import static com.dylibso.chicory.compiler.internal.CompilerOpCode.IFEQ;
 import static com.dylibso.chicory.compiler.internal.CompilerOpCode.TRY_CATCH_BLOCK;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.TypeStack.FUNCTION_SCOPE;
@@ -400,12 +401,14 @@ final class WasmAnalyzer {
             switch (catchCondition.opcode()) {
                 case CATCH:
                     result.add(
-                            new CompilerInstruction(CATCH, catchCondition.tag(), afterCatchLabel));
+                            new CompilerInstruction(CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
                     result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
                     break;
                 case CATCH_REF:
                     result.add(
-                            new CompilerInstruction(CATCH, catchCondition.tag(), afterCatchLabel));
+                            new CompilerInstruction(CATCH, catchCondition.tag()));
+                    result.add(new CompilerInstruction(IFEQ, afterCatchLabel));
                     result.add(new CompilerInstruction(CATCH_UNBOX_PARAMS, catchCondition.tag()));
                     result.add(new CompilerInstruction(CATCH_REF));
                     break;

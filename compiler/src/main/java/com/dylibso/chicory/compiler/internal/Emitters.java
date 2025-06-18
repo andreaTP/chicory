@@ -15,6 +15,7 @@ import static com.dylibso.chicory.compiler.internal.CompilerUtil.localType;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.slotCount;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.valueMethodName;
 import static com.dylibso.chicory.compiler.internal.CompilerUtil.valueMethodType;
+import static com.dylibso.chicory.compiler.internal.ShadedRefs.EXCEPTION_MATCHES;
 import static com.dylibso.chicory.wasm.types.Value.REF_NULL_VALUE;
 import static java.lang.Double.longBitsToDouble;
 import static java.lang.Float.intBitsToFloat;
@@ -719,6 +720,15 @@ final class Emitters {
             // long[] array and push onto stack
             emitUnboxResult(asm, tagFuncType.params(), ctx.tempSlot() + 1);
         }
+    }
+
+    public static void CATCH(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
+        var tag = (int) ins.operand(0);
+        // Compare tag
+        asm.load(ctx.tempSlot(), OBJECT_TYPE);
+        asm.iconst(tag);
+        asm.load(ctx.instanceSlot(), OBJECT_TYPE);
+        emitInvokeStatic(asm, EXCEPTION_MATCHES);
     }
 
     public static void CATCH_REF(Context ctx, CompilerInstruction ins, InstructionAdapter asm) {
