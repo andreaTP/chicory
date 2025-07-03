@@ -46,7 +46,6 @@ jobs:
           - StyraInc/opa-java-wasm
           - roastedroot/sqlite4j
           - roastedroot/quickjs4j
-          - roastedroot/proxy-wasm-java-host
     steps:
       - name: Checkout ${{ matrix.project }} sources
         uses: actions/checkout@v4
