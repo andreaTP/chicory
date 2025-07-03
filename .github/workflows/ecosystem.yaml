@@ -54,7 +54,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: maven
       - name: Restore .m2 repo
         uses: actions/download-artifact@v4
         with:
@@ -79,7 +78,7 @@ jobs:
         working-directory: opa
         run: |
           WASM_BUILD_ONLY=true make wasm-rego-test
-          cp opa/.go/cache/testcases.tar.gz ecosystem-project
+          cp .go/cache/testcases.tar.gz ../
       - name: Install Open Policy Agent
         if: matrix.project == 'StyraInc/opa-java-wasm'
         uses: open-policy-agent/setup-opa@v2
