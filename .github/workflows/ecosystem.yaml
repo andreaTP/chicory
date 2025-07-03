@@ -44,6 +44,9 @@ jobs:
       matrix:
         project:
           - StyraInc/opa-java-wasm
+          - roastedroot/sqlite4j
+          - roastedroot/quickjs4j
+          - roastedroot/proxy-wasm-java-host
     steps:
       - name: Checkout ${{ matrix.project }} sources
         uses: actions/checkout@v4
@@ -63,7 +66,7 @@ jobs:
         run: |
           sed -i "s|<chicory.version>.*</chicory.version>|<chicory.version>999-SNAPSHOT</chicory.version>|" pom.xml
 
-      # Ecosystem projects specific setup
+      # Ecosystem project specific setup
 
       # opa-java-wasm
       - name: Checkout OPA
@@ -84,6 +87,17 @@ jobs:
         uses: open-policy-agent/setup-opa@v2
         with:
           version: 0.70.0
+
+      # QuickJs4J
+      - name: Set up Rust
+        if: matrix.project == 'oastedroot/quickjs4j'
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build the Javy plugin
+        if: matrix.project == 'oastedroot/quickjs4j'
+        working-directory: javy-plugin
+        run: |
+          rustup target add wasm32-wasip1
+          make build
 
       # Common install and test
 
