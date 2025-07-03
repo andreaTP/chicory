@@ -16,13 +16,11 @@ permissions:
 jobs:
   ecosystem:
     name: Ecosystem CI
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        version: [21]
         project:
           - StyraInc/opa-java-wasm
     steps:
@@ -37,7 +35,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '${{ matrix.version }}'
+          java-version: '21'
           cache: maven
       - name: Build Chicory
         run: ./mvnw -B -Dquickly
@@ -47,4 +45,4 @@ jobs:
           sed -i "s|<chicory.version>.*</chicory.version>|<chicory.version>999-SNAPSHOT</chicory.version>|" pom.xml
       - name: Test Java and Check Style
         working-directory: ecosystem-project
-        run: mvn -B clean install
+        run: mvn -B clean install -Dspotless.check.skip=true
