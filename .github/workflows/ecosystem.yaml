@@ -89,10 +89,10 @@ jobs:
 
       # QuickJs4J
       - name: Set up Rust
-        if: matrix.project == 'oastedroot/quickjs4j'
+        if: matrix.project == 'roastedroot/quickjs4j'
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Build the Javy plugin
-        if: matrix.project == 'oastedroot/quickjs4j'
+        if: matrix.project == 'roastedroot/quickjs4j'
         working-directory: javy-plugin
         run: |
           rustup target add wasm32-wasip1
@@ -100,5 +100,5 @@ jobs:
 
       # Common install and test
 
-      - name: Test Java and Check Style
+      - name: Test Java
         run: mvn -B clean install -Dspotless.check.skip=true
