@@ -72,10 +72,10 @@ jobs:
         with:
           repository: open-policy-agent/opa
           ref: main
-          path: opa
+          path: opa-testcases
       - name: Prep OPA cases
         if: matrix.project == 'StyraInc/opa-java-wasm'
-        working-directory: opa
+        working-directory: opa-testcases
         run: |
           WASM_BUILD_ONLY=true make wasm-rego-test
           cp .go/cache/testcases.tar.gz ../
@@ -88,5 +88,4 @@ jobs:
       # Common install and test
 
       - name: Test Java and Check Style
-        working-directory: ecosystem-project
         run: mvn -B clean install -Dspotless.check.skip=true
