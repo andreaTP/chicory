@@ -14,23 +14,12 @@ permissions:
   checks: write
 
 jobs:
-  ecosystem:
-    name: Ecosystem CI
+  build-chicory:
+    name: Prepare Chicory
     runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - StyraInc/opa-java-wasm
     steps:
       - name: Checkout Chicory sources
         uses: actions/checkout@v4
-      - name: Checkout ${{ matrix.project }} sources
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ matrix.project }}
-          path: ecosystem-project
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -39,10 +28,66 @@ jobs:
           cache: maven
       - name: Build Chicory
         run: ./mvnw -B -Dquickly
+      - name: Upload .m2 repo for reuse
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-repo
+          path: ~/.m2/repository
+
+  ecosystem:
+    name: Ecosystem CI
+    needs: build-chicory
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - StyraInc/opa-java-wasm
+    steps:
+      - name: Checkout ${{ matrix.project }} sources
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.project }}
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+      - name: Restore .m2 repo
+        uses: actions/download-artifact@v4
+        with:
+          name: m2-repo
+          path: ~/.m2/repository
       - name: Replace Java version
-        working-directory: ecosystem-project
         run: |
           sed -i "s|<chicory.version>.*</chicory.version>|<chicory.version>999-SNAPSHOT</chicory.version>|" pom.xml
+
+      # Ecosystem projects specific setup
+
+      # opa-java-wasm
+      - name: Checkout OPA
+        if: matrix.project == 'StyraInc/opa-java-wasm'
+        uses: actions/checkout@v4
+        with:
+          repository: open-policy-agent/opa
+          ref: main
+          path: opa
+      - name: Prep OPA cases
+        if: matrix.project == 'StyraInc/opa-java-wasm'
+        working-directory: opa
+        run: |
+          WASM_BUILD_ONLY=true make wasm-rego-test
+          cp opa/.go/cache/testcases.tar.gz ecosystem-project
+      - name: Install Open Policy Agent
+        if: matrix.project == 'StyraInc/opa-java-wasm'
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: 0.70.0
+
+      # Common install and test
+
       - name: Test Java and Check Style
         working-directory: ecosystem-project
         run: mvn -B clean install -Dspotless.check.skip=true
