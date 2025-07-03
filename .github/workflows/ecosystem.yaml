@@ -1,0 +1,48 @@
+name: Ecosystem
+
+# on:
+#   schedule:
+#    - cron: "0 0 * * *" # everyday
+# TODO: remove this
+on:
+  push:
+  #   branches: [ main ]
+  # pull_request:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  ecosystem:
+    name: Ecosystem CI
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        version: [21]
+        project:
+          - StyraInc/opa-java-wasm
+    steps:
+      - name: Checkout ${{ matrix.project }} sources
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.project }}
+          path: project
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '${{ matrix.version }}'
+          cache: maven
+      - name: Build Chicory
+        run: ./mvnw -B -Dquickly
+      - name: Replace Java version
+        working-directory: project
+        run: |
+          sed -i "s|<chicory.version>.*</chicory.version>|<chicory.version>999-SNAPSHOT</chicory.version>|" pom.xml
+      - name: Test Java and Check Style
+        working-directory: project
+        run: mvn -B clean install
