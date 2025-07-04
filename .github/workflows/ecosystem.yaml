@@ -48,9 +48,16 @@ jobs:
           - roastedroot/quickjs4j
     steps:
       - name: Checkout ${{ matrix.project }} sources
+        if: matrix.project != 'roastedroot/sqlite4j'
         uses: actions/checkout@v4
         with:
           repository: ${{ matrix.project }}
+      - name: Checkout ${{ matrix.project }} sources
+        if: matrix.project == 'roastedroot/sqlite4j'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.project }}
+          branch: fix-flaky-hammer
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
