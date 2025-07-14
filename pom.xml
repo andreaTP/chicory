@@ -506,15 +506,17 @@
             <importOrder/>
             <jsr223>
               <name>Wildcard Imports Not Allowed</name>
-              <dependency>org.apache.groovy:groovy-jsr223:4.0.27</dependency>
-              <engine>groovy</engine>
-              <script>def pattern = ~/import\s+(?:static\s+)?[^\*\s]+\*;(\r\n|\r|\n)/
-                def matcher = pattern.matcher(source)
-                if (matcher.find()) {
-                   def importText = matcher.group().trim()
-                   throw new Exception("Wildcard imports not allowed:\n\n    " + importText + "\n\nPlease fully expand the imports.\n")
+              <dependency>io.roastedroot:quickjs4j-scripting-experimental:999-SNAPSHOT</dependency>
+              <engine>js</engine>
+              <script>const pattern = /import\s+(?:static\s+)?[^\*\s]+\*;(?:\r\n|\r|\n)/;
+                const matcher = source.match(pattern);
+                if (matcher) {
+                  const importText = matcher[0].trim();
+                  throw new Error(
+                   `Wildcard imports not allowed:\n\n    ${importText}\n\nPlease fully expand the imports.\n`
+                  );
                 }
-                source</script>
+                return source;</script>
             </jsr223>
             <removeUnusedImports/>
           </java>
