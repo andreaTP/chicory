@@ -633,7 +633,7 @@ public final class Parser {
     private static TableLimits readTableLimits(ByteBuffer buffer) {
         var limitType = readByte(buffer);
         if (!(limitType == 0x00 || limitType == 0x01)) {
-            throw new MalformedException("integer representation too long, integer too large");
+            throw new MalformedException("integer representation too long, integer too large " + limitType);
         }
         var min = readVarUInt32(buffer);
         var limits =

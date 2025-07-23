@@ -38,6 +38,11 @@ public class WasmValue {
             case EXN_REF:
             case FUNC_REF:
             case REF_NULL:
+            case ANY_REF:
+            case NULL_REF:
+            case NULL_FUNC_REF:
+            case NULL_EXN_REF:
+            case NULL_EXTERN_REF:
                 if (result.equals("null")) {
                     return "Value.REF_NULL_VALUE";
                 }
@@ -135,11 +140,18 @@ public class WasmValue {
                     return new NameExpr(
                             "assertNotEquals(" + resultVar + ", " + "REF_NULL_VALUE" + ")");
                 case REF_NULL:
+                case NULL_REF:
+                case NULL_FUNC_REF:
+                case NULL_EXN_REF:
+                case NULL_EXTERN_REF:
                     return new NameExpr(
                             "assertEquals(" + resultVar + ", " + "REF_NULL_VALUE" + ")");
                 default:
                     throw new IllegalArgumentException(
-                            "cannot generate assertion for WasmValue: " + this);
+                            "cannot generate assertion for WasmValue: "
+                                    + this
+                                    + " of type: "
+                                    + type);
             }
         }
 
@@ -184,6 +196,8 @@ public class WasmValue {
             case EXTERN_REF:
             case EXN_REF:
             case FUNC_REF:
+            case ANY_REF:
+            case NULL_REF:
                 if (value[0].equals("null")) {
                     return "Value.REF_NULL_VALUE";
                 }

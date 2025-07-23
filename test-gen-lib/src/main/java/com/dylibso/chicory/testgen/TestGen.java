@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -119,27 +118,6 @@ public final class TestGen {
         }
     }
 
-    private static final class Proposal {
-        final String remapping;
-
-        private Proposal(String remapping) {
-            this.remapping = remapping;
-        }
-    }
-
-    private static Map<String, Proposal> proposals =
-            Map.of(
-                    "gc",
-                    new Proposal("gc"),
-                    "tail-call",
-                    new Proposal("tc"),
-                    "exception-handling",
-                    new Proposal("eh"),
-                    "function-references",
-                    new Proposal("function-references"),
-                    "threads",
-                    new Proposal("threads"));
-
     private static final class TestGenerator {
 
         private final JavaTestGen testGen;
@@ -167,9 +145,8 @@ public final class TestGen {
 
             var plainName = wastFile.getName().replace(".wast", "");
             if (wastFile.getParentFile().getParentFile().getName().equalsIgnoreCase("proposals")) {
-                var proposal = proposals.get(wastFile.getParentFile().getName());
                 plainName =
-                        proposal.remapping
+                        wastFile.getParentFile().getName()
                                 + plainName.substring(0, 1).toUpperCase(Locale.ROOT)
                                 + plainName.substring(1);
             }

@@ -21,7 +21,17 @@ public enum WasmValueType {
     @JsonProperty("refnull")
     REF_NULL("refnull"),
     @JsonProperty("exnref")
-    EXN_REF("exnref");
+    EXN_REF("exnref"),
+    @JsonProperty("anyref")
+    ANY_REF("anyref"),
+    @JsonProperty("nullref")
+    NULL_REF("nullref"),
+    @JsonProperty("nullfuncref")
+    NULL_FUNC_REF("nullfuncref"),
+    @JsonProperty("nullexnref")
+    NULL_EXN_REF("nullexnref"),
+    @JsonProperty("nullexternref")
+    NULL_EXTERN_REF("nullexternref");
 
     private final String value;
 
