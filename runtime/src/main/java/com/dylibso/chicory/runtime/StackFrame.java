@@ -22,7 +22,7 @@ import java.util.List;
  */
 public class StackFrame {
     private final List<AnnotatedInstruction> code;
-    private AnnotatedInstruction currentInstruction;
+    AnnotatedInstruction currentInstruction;
 
     private final int funcId;
     private int pc;
@@ -214,5 +214,9 @@ public class StackFrame {
             long value = returns[returns.length - 1 - i];
             stack.push(value);
         }
+    }
+
+    public AnnotatedInstruction currentInstruction() {
+        return currentInstruction;
     }
 }

@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -67,6 +68,8 @@ public class Instance {
     private final ExecutionListener listener;
     private final Exports fluentExports;
 
+    private final Optional<DebugMapper> debugMapper;
+
     private final Map<Integer, WasmException> exnRefs;
 
     Instance(
@@ -85,7 +88,8 @@ public class Instance {
             Function<Instance, Machine> machineFactory,
             boolean initialize,
             boolean start,
-            ExecutionListener listener) {
+            ExecutionListener listener,
+            Optional<DebugMapper> debugMapper) {
         this.module = module;
         this.globalInitializers = globalInitializers.clone();
         this.globals = new GlobalInstance[globalInitializers.length];
@@ -106,6 +110,8 @@ public class Instance {
         this.exports = exports;
         this.listener = listener;
         this.fluentExports = new Exports(this);
+
+        this.debugMapper = debugMapper;
 
         this.exnRefs = new HashMap<>();
 
@@ -343,6 +349,10 @@ public class Instance {
         return machine;
     }
 
+    public Optional<DebugMapper> debugMapper() {
+        return debugMapper;
+    }
+
     void onExecution(Instruction instruction, MStack stack) {
         if (listener != null) {
             listener.onExecution(instruction, stack);
@@ -363,6 +373,7 @@ public class Instance {
         private ExecutionListener listener;
         private ImportValues importValues;
         private Function<Instance, Machine> machineFactory;
+        private DebugMapper debugMapper;
 
         private Builder(WasmModule module) {
             this.module = Objects.requireNonNull(module);
@@ -385,6 +396,11 @@ public class Instance {
 
         public Builder withMemoryFactory(Function<MemoryLimits, Memory> memoryFactory) {
             this.memoryFactory = memoryFactory;
+            return this;
+        }
+
+        public Builder withDebugMapper(DebugMapper debugMapper) {
+            this.debugMapper = debugMapper;
             return this;
         }
 
@@ -886,7 +902,8 @@ public class Instance {
                     machineFactory,
                     initialize,
                     start,
-                    listener);
+                    listener,
+                    Optional.ofNullable(debugMapper));
         }
     }
 }

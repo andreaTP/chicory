@@ -1195,6 +1195,11 @@ public final class Compiler {
                         visitedTargets.add(ins.operand(0));
                     }
                     break;
+                case LINE_NUMBER:
+                    int line = (int) ins.operand(0);
+                    label = labels.get(ins.operand(1));
+                    asm.visitLineNumber(line, label);
+                    break;
                 case GOTO:
                     if (visitedTargets.contains(ins.operand(0))) {
                         emitInvokeStatic(asm, CHECK_INTERRUPTION);

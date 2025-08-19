@@ -284,6 +284,8 @@ public final class Parser {
 
             validator.validateSectionType(sectionId);
 
+            var sectionAddress = buffer.position();
+
             ByteBuffer sectionByteBuffer = buffer.asReadOnlyBuffer();
             sectionByteBuffer.order(buffer.order());
 
@@ -377,7 +379,9 @@ public final class Parser {
                         }
                     case SectionId.CODE:
                         {
-                            var codeSection = parseCodeSection(sectionByteBuffer, typeSection);
+                            var codeSection =
+                                    parseCodeSection(
+                                            sectionByteBuffer, typeSection, sectionAddress);
                             listener.onSection(codeSection);
                             break;
                         }
@@ -867,7 +871,8 @@ public final class Parser {
         return locals;
     }
 
-    private static CodeSection parseCodeSection(ByteBuffer buffer, TypeSection typeSection) {
+    private static CodeSection parseCodeSection(
+            ByteBuffer buffer, TypeSection typeSection, int sectionAddress) {
         var funcBodyCount = readVarUInt32(buffer);
 
         var root = new ControlTree();
@@ -1067,7 +1072,7 @@ public final class Parser {
             codeSection.addFunctionBody(functionBody);
         }
 
-        return codeSection.build();
+        return codeSection.withSectionAddress(sectionAddress).build();
     }
 
     private static DataSection parseDataSection(ByteBuffer buffer) {

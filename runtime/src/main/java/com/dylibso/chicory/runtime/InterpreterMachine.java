@@ -14,6 +14,7 @@ import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.ValType;
 import com.dylibso.chicory.wasm.types.Value;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -170,7 +171,8 @@ public class InterpreterMachine implements Machine {
             instance.onExecution(instruction, stack);
             switch (opcode) {
                 case UNREACHABLE:
-                    throw new TrapException("Trapped on unreachable instruction");
+                    THROW_UNREACHABLE(callStack);
+                    break;
                 case NOP:
                     break;
                 case LOOP:
@@ -2911,6 +2913,72 @@ public class InterpreterMachine implements Machine {
             stack.push(ref);
             BR(frame, stack, instruction);
         }
+    }
+
+    private void THROW_UNREACHABLE(Deque<StackFrame> callStack) {
+        TrapException e = new TrapException("Trapped on unreachable instruction");
+        enhanceStackTrace(e, callStack);
+        throw e;
+    }
+
+    protected void enhanceStackTrace(Throwable e, Deque<StackFrame> callStack) {
+        int size = callStack.size();
+        var funcIds = new int[size];
+        var instructionAddresses = new int[size];
+        for (int i = 0; i < size; i++) {
+            var frame = callStack.pop();
+            funcIds[i] = frame.funcId();
+            instructionAddresses[i] = frame.currentInstruction().address();
+        }
+
+        if (instance.debugMapper().isEmpty()) {
+            return;
+        }
+        var debugMapper = instance.debugMapper().get();
+
+        var traces = new ArrayList<>();
+
+        for (var trace : e.getStackTrace()) {
+            if (!trace.getClassName().startsWith("com.dylibso.chicory")) {
+                // just keep all the non-chicory produced frames
+                traces.add(trace);
+                continue;
+            }
+
+            // add the wasm debug info.
+            var codeSectionAddress = instance.module().codeSection().address();
+            for (int instructionAddress = 0;
+                    instructionAddress < instructionAddresses.length;
+                    instructionAddress++) {
+                var funcId = funcIds[instructionAddress];
+
+                // This address is relative to the start of the wasm module.  We display this as
+                // it will match the output of `wasm-tools dump` and other tools.
+                var address = instructionAddresses[instructionAddress];
+
+                // Convert to an address relative to the start of code section.
+                int addressRelativeToCodeSection = address - codeSectionAddress;
+                var debugInfo = debugMapper.getDebugInfo(addressRelativeToCodeSection);
+
+                String functionName = null;
+                String fileName = null;
+                int line = 0;
+                if (debugInfo != null) {
+                    functionName = debugInfo.functionName();
+                    fileName = debugInfo.fileName();
+                    line = (int) debugInfo.line();
+                } else {
+                    functionName = String.format("func_%d", funcId);
+                    fileName = "{wasm}";
+                    line = address;
+                }
+
+                String className = String.format("0x%06x: %s", address, this.getClass().getName());
+                traces.add(new StackTraceElement(className, functionName, fileName, line));
+            }
+        }
+
+        e.setStackTrace(traces.toArray(new StackTraceElement[traces.size()]));
     }
 
     protected static long[] extractArgsForParams(MStack stack, List<ValType> params) {

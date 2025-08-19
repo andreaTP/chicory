@@ -88,6 +88,7 @@ final class WasmAnalyzer {
         var stack = new TypeStack();
         int nextLabel = body.instructions().size();
         List<CompilerInstruction> result = new ArrayList<>();
+        int codeSectionAddress = module.codeSection().address();
 
         // find label targets
         Set<Integer> labels = new HashSet<>();
@@ -143,6 +144,12 @@ final class WasmAnalyzer {
         for (int idx = 0; idx < body.instructions().size(); idx++) {
             AnnotatedInstruction ins = body.instructions().get(idx);
 
+            // TODO: verify the "off-by-one"
+            result.add(
+                    new CompilerInstruction(
+                            CompilerOpCode.LINE_NUMBER,
+                            ins.address() - codeSectionAddress - 1,
+                            idx));
             if (labels.contains(idx)) {
                 result.add(new CompilerInstruction(CompilerOpCode.LABEL, idx));
             }

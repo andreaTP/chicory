@@ -14,6 +14,7 @@ import com.dylibso.chicory.runtime.WasmRuntimeException;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.InvalidException;
 import com.dylibso.chicory.wasm.types.FunctionType;
+import java.util.ArrayList;
 
 /**
  * This class will get shaded into the compiled code.
@@ -313,8 +314,10 @@ public final class Shaded {
         throw new WasmRuntimeException("out of bounds memory access");
     }
 
-    public static RuntimeException throwTrapException() {
-        throw new TrapException("Trapped on unreachable instruction");
+    public static RuntimeException throwTrapException(Instance instance) {
+        TrapException trapException = new TrapException("Trapped on unreachable instruction");
+        enhanceStackTrace(instance, trapException);
+        throw trapException;
     }
 
     public static RuntimeException throwUnknownFunction(int index) {
@@ -964,5 +967,49 @@ public final class Shaded {
         synchronized (memory.lock(ptr)) {
             return memory.notify(ptr, count);
         }
+    }
+
+    private static void enhanceStackTrace(Instance instance, Throwable e) {
+        if (instance.debugMapper().isEmpty()) {
+            return;
+        }
+        var debugMapper = instance.debugMapper().get();
+
+        var elements = e.getStackTrace();
+        var traces = new ArrayList<>();
+
+        for (int i = 0; i < elements.length; i++) {
+            var element = elements[i];
+            if ((element.getMethodName().equals("throwTrapException")
+                    && element.getClassName().startsWith("com.dylibso.chicory"))) {
+                // skipping the shaded throwTrapException frame
+                continue;
+            }
+            if (!element.getClassName().startsWith("com.dylibso.chicory")) {
+                // just keep all the non-chicory produced frames
+                traces.add(element);
+                continue;
+            }
+
+            int address = element.getLineNumber();
+            var debugInfo = debugMapper.getDebugInfo(address);
+
+            String functionName = null;
+            String fileName = null;
+            int line = 0;
+            if (debugInfo != null) {
+                functionName = element.getMethodName() + "." + debugInfo.functionName();
+                fileName = debugInfo.fileName();
+                line = (int) debugInfo.line();
+            } else {
+                functionName = element.getMethodName();
+                fileName = "{wasm}";
+                line = address;
+            }
+
+            String className = String.format("0x%06x: %s", address, element.getClassName());
+            traces.add(new StackTraceElement(className, functionName, fileName, line));
+        }
+        e.setStackTrace(traces.toArray(new StackTraceElement[traces.size()]));
     }
 }
