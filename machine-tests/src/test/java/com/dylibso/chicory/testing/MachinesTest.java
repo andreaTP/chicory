@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dylibso.chicory.compiler.MachineFactoryCompiler;
+import com.dylibso.chicory.runtime.HostFunction;
+import com.dylibso.chicory.runtime.ImportFunction;
 import com.dylibso.chicory.runtime.ImportTable;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
@@ -18,11 +20,13 @@ import com.dylibso.chicory.runtime.TrapException;
 import com.dylibso.chicory.testing.gen.DynamicHelloJS;
 import com.dylibso.chicory.testing.gen.QuickJS;
 import com.dylibso.chicory.wabt.Wat2Wasm;
+import com.dylibso.chicory.wasi.Files;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.ExternalType;
+import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.Table;
 import com.dylibso.chicory.wasm.types.TableLimits;
 import com.dylibso.chicory.wasm.types.ValType;
@@ -31,7 +35,9 @@ import io.roastedroot.zerofs.ZeroFs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -278,5 +284,161 @@ public final class MachinesTest {
         var ex = assertThrows(TrapException.class, instance.export("call-other-fail")::apply);
         var className = ex.getStackTrace()[0].getClassName();
         assertTrue(className.contains("InterpreterMachine"), className);
+    }
+
+    private long[] invokeBuiltin(Instance instance, long[] args) {
+        String moduleName = readJavyString((int) args[0], (int) args[1]);
+        String funcName = readJavyString((int) args[2], (int) args[3]);
+        String argsString = readJavyString((int) args[4], (int) args[5]);
+
+        if (!builtins.containsKey(moduleName)) {
+            throw new IllegalArgumentException("Failed to find builtin module name " + moduleName);
+        }
+        if (builtins.get(moduleName).byName(funcName) == null) {
+            throw new IllegalArgumentException(
+                    "Failed to find function with name " + funcName + " in module " + moduleName);
+        }
+        var receiver = builtins.get(moduleName).byName(funcName);
+
+        var argsList = new ArrayList<>();
+        try {
+            JsonNode tree = mapper.readTree(argsString);
+
+            for (int i = 0; i < receiver.paramTypes().size(); i++) {
+                var clazz = receiver.paramTypes().get(i);
+                JsonNode value = null;
+                if (tree.size() > i) {
+                    value = tree.get(i);
+                }
+
+                if (clazz == HostRef.class) {
+                    argsList.add(javaRefs.get(value.intValue()));
+                } else {
+                    argsList.add(mapper.treeToValue(value, clazz));
+                }
+            }
+
+            var res = receiver.invoke(argsList);
+
+            // Converting Java references into pointers for JS
+            var returnType = receiver.returnType();
+            if (returnType == HostRef.class) {
+                returnType = Integer.class;
+                if (res instanceof HostRef) {
+                    res = ((HostRef) res).pointer();
+                } else {
+                    javaRefs.add(res);
+                    res = javaRefs.size() - 1;
+                }
+            }
+
+            var returnStr =
+                    (returnType == Void.class)
+                            ? "null"
+                            : mapper.writerFor(returnType).writeValueAsString(res);
+            var returnBytes = returnStr.getBytes();
+
+            var returnPtr =
+                    exports.canonicalAbiRealloc(
+                            0, // original_ptr
+                            0, // original_size
+                            ALIGNMENT, // alignment
+                            returnBytes.length // new size
+                    );
+            exports.memory().write(returnPtr, returnBytes);
+
+            var LEN = 8;
+            var widePtr =
+                    exports.canonicalAbiRealloc(
+                            0, // original_ptr
+                            0, // original_size
+                            ALIGNMENT, // alignment
+                            LEN // new size
+                    );
+
+            instance.memory().writeI32(widePtr, returnPtr);
+            instance.memory().writeI32(widePtr + 4, returnBytes.length);
+
+            return new long[] {widePtr};
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private final HostFunction invokeFn =
+            new HostFunction(
+                    "chicory",
+                    "invoke",
+                    FunctionType.of(
+                    List.of(
+                            ValType.I32,
+                            ValType.I32,
+                            ValType.I32,
+                            ValType.I32,
+                            ValType.I32,
+                            ValType.I32),
+                    List.of(ValType.I32)),
+                    this::invokeBuiltin);
+
+
+    @Test
+    public void testPyO3() throws IOException {
+        var pyo3Path = Path.of("/home/andreatp/workspace/cpython4j/pyo3-plugin/target/wasm32-wasip1/release/pyo3_plugin.wasm");
+
+        WasmModule module = Parser.parse(pyo3Path);
+
+        var pythonCode = "print(\"Hello from Python inside WASM!\")\n" +
+                "import pyo3_plugin; print(pyo3_plugin.invoke(\"com.example.MyClass\", \"myMethod\", '{\"arg1\": \"value1\"}'))\n";
+//        +
+//                "\n" +
+//                "# Non-trivial: list comprehension, dict, and f-string\n" +
+//                "nums = [i * 2 for i in range(5)]\n" +
+//                "data = {i: n for i, n in enumerate(nums)}\n" +
+//                "\n" +
+//                "print(f\"Generated numbers: {nums}\")\n" +
+//                "print(f\"As dictionary: {data}\")\n" +
+//                "print(\"Sum:\", sum(nums))";
+
+        var wasiOpts = WasiOptions.builder().inheritSystem();
+
+        try (FileSystem fs =
+                     ZeroFs.newFileSystem(
+                             Configuration.unix().toBuilder()
+                                     .setAttributeViews("unix")
+                                     .build())) {
+
+            Path inputFolder = fs.getPath("/usr");
+            // can we load different versions of Python in this way?
+            // or is it better to bake it into the wasm payload?
+            Path copyFrom = Path.of("/home/andreatp/workspace/python-pdk/lib/target/wasm32-wasi/wasi-deps/usr");
+            Files.copyDirectory(copyFrom, inputFolder);
+            wasiOpts.withDirectory(inputFolder.toString(), inputFolder);
+
+            try (var wasi = WasiPreview1.builder().withOptions(wasiOpts.build()).build()) {
+                var pythonInstance = Instance.builder(module)
+                        .withImportValues(ImportValues.builder()
+                                .addFunction(wasi.toHostFunctions())
+                                // TODO: change the names
+                                .addFunction(new HostFunction("chicory", "wasm_invoke", FunctionType.of(
+                                        List.of(ValType.I32, ValType.I32, ValType.I32, ValType.I32, ValType.I32, ValType.I32),
+                                        List.of(ValType.I32)),
+                                        (inst, args) -> {
+
+                                            return new long[] {};
+                                        }
+                                ))
+                                .build())
+                        .build();
+
+                // Initialize the plugin
+                pythonInstance.exports().function("plugin_init").apply();
+
+                var codeLen = pythonCode.getBytes(UTF_8).length;
+                var pythonPtr = (int) pythonInstance.exports().function("plugin_malloc").apply(codeLen)[0];
+                pythonInstance.memory().writeCString(pythonPtr, pythonCode);
+
+                pythonInstance.exports().function("plugin_eval").apply(pythonPtr, codeLen);
+            }
+        }
     }
 }
