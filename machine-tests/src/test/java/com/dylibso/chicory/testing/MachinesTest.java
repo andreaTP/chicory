@@ -286,18 +286,16 @@ public final class MachinesTest {
         assertTrue(className.contains("InterpreterMachine"), className);
     }
 
-    private long[] invokeBuiltin(Instance instance, long[] args) {
-        String moduleName = readJavyString((int) args[0], (int) args[1]);
-        String funcName = readJavyString((int) args[2], (int) args[3]);
-        String argsString = readJavyString((int) args[4], (int) args[5]);
+    private String readString(Instance instance, int ptr, int len) {
+        var bytes = instance.memory().readBytes(ptr, len);
+        return new String(bytes, UTF_8);
+    }
 
-        if (!builtins.containsKey(moduleName)) {
-            throw new IllegalArgumentException("Failed to find builtin module name " + moduleName);
-        }
-        if (builtins.get(moduleName).byName(funcName) == null) {
-            throw new IllegalArgumentException(
-                    "Failed to find function with name " + funcName + " in module " + moduleName);
-        }
+    private long[] invokeBuiltin(Instance instance, long[] args) {
+        String moduleName = readString(instance, (int) args[0], (int) args[1]);
+        String funcName = readString(instance, (int) args[2], (int) args[3]);
+        String argsString = readString(instance, (int) args[4], (int) args[5]);
+
         var receiver = builtins.get(moduleName).byName(funcName);
 
         var argsList = new ArrayList<>();
@@ -388,7 +386,7 @@ public final class MachinesTest {
         WasmModule module = Parser.parse(pyo3Path);
 
         var pythonCode = "print(\"Hello from Python inside WASM!\")\n" +
-                "import pyo3_plugin; print(pyo3_plugin.invoke(\"com.example.MyClass\", \"myMethod\", '{\"arg1\": \"value1\"}'))\n";
+                    "import pyo3_plugin; print(pyo3_plugin.invoke(\"com.example.MyClass\", \"myMethod\", '{\"arg1\": \"value1\"}'))\n";
 //        +
 //                "\n" +
 //                "# Non-trivial: list comprehension, dict, and f-string\n" +
