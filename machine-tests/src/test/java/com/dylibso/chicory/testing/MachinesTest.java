@@ -32,7 +32,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
@@ -278,5 +280,69 @@ public final class MachinesTest {
         var ex = assertThrows(TrapException.class, instance.export("call-other-fail")::apply);
         var className = ex.getStackTrace()[0].getClassName();
         assertTrue(className.contains("InterpreterMachine"), className);
+    }
+
+    @Test
+    public void checkPhotonMonochrome() throws Exception {
+        WasmModule module = Parser.parse(Path.of("/home/andreatp/workspace/graalvm-demos/native-image/wasm-chicory/photon/photon-example/target/wasm32-unknown-unknown/release/photon_example.wasm"));
+
+        var instance = Instance.builder(module)
+                .withMachineFactory(MachineFactoryCompiler::compile)
+                .build();
+
+        var imageBytes = Files.readAllBytes(Path.of("/home/andreatp/workspace/wasm-bench/photon/bench/src/test-image.png"));
+
+        var imgPtr = (int) instance.exports().function("alloc").apply(imageBytes.length)[0];
+        instance.memory().write(imgPtr, imageBytes);
+
+        var outPtr = (int) instance.exports().function("alloc").apply(4)[0];
+        var outLen = (int) instance.exports().function("alloc").apply(4)[0];
+
+        var result = instance.exports().function("apply_monochrome").apply(imgPtr, imageBytes.length, outPtr, outLen)[0];
+
+        assert result == 0;
+
+        var resultImg = instance.memory().readBytes(
+                instance.memory().readInt(outPtr),
+                instance.memory().readInt(outLen));
+
+        Files.write(Path.of("/home/andreatp/workspace/graalvm-demos/native-image/wasm-chicory/result.png"), resultImg);
+    }
+
+    @Test
+    public void checkPhotonEffect() throws Exception {
+        WasmModule module = Parser.parse(Path.of("/home/andreatp/workspace/graalvm-demos/native-image/wasm-chicory/photon/photon-example/target/wasm32-unknown-unknown/release/photon_example.wasm"));
+
+        var instance = Instance.builder(module)
+                .withMachineFactory(MachineFactoryCompiler::compile)
+                .build();
+
+        var imageBytes = Files.readAllBytes(Path.of("/home/andreatp/workspace/wasm-bench/photon/bench/src/test-image.png"));
+
+        var imgPtr = (int) instance.exports().function("alloc").apply(imageBytes.length)[0];
+        instance.memory().write(imgPtr, imageBytes);
+
+        var effect = "firenze".getBytes(UTF_8);
+        var effectPtr = (int) instance.exports().function("alloc").apply(effect.length)[0];
+        instance.memory().write(effectPtr, effect);
+
+        var outPtr = (int) instance.exports().function("alloc").apply(4)[0];
+        var outLen = (int) instance.exports().function("alloc").apply(4)[0];
+
+        var result = instance.exports().function("apply_effect").apply(
+                imgPtr,
+                imageBytes.length,
+                effectPtr,
+                effect.length,
+                outPtr,
+                outLen)[0];
+
+        assert result == 0;
+
+        var resultImg = instance.memory().readBytes(
+                instance.memory().readInt(outPtr),
+                instance.memory().readInt(outLen));
+
+        Files.write(Path.of("/home/andreatp/workspace/graalvm-demos/native-image/wasm-chicory/result-effect.png"), resultImg);
     }
 }
