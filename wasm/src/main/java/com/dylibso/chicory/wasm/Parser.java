@@ -83,7 +83,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Parser for Web Assembly binaries.
@@ -494,7 +493,7 @@ public final class Parser {
     private static TypeSection parseTypeSection(ByteBuffer buffer) {
 
         var typeCount = readVarUInt32(buffer);
-        TypeSection.Builder typeSection = TypeSection.builder();
+        TypeSection.Builder typeSectionBuilder = TypeSection.builder();
 
         // Parse individual types in the type section
         for (int i = 0; i < typeCount; i++) {
@@ -528,29 +527,45 @@ public final class Parser {
             }
 
             // a type can only refer to types with idx less than it
-            var maxTypeIdx = i - 1;
-            Stream.concat(Arrays.stream(paramsBuilder), Arrays.stream(returnsBuilder))
-                    .forEach(
-                            v -> {
-                                if (v.isReference()) {
-                                    var typeIdx = v.typeIdx();
-                                    if (typeIdx > maxTypeIdx) {
-                                        throw new InvalidException(
-                                                "unknown type: recursive type, type mismatch");
-                                    }
-                                }
-                            });
+            //            var maxTypeIdx = i - 1;
+            //            Stream.concat(Arrays.stream(paramsBuilder), Arrays.stream(returnsBuilder))
+            //                    .forEach(
+            //                            v -> {
+            //                                if (v.isReference()) {
+            //                                    var typeIdx = v.typeIdx();
+            //                                    if (typeIdx > maxTypeIdx) {
+            //                                        throw new InvalidException(
+            //                                                "unknown type: recursive type, type
+            // mismatch");
+            //                                    }
+            //                                }
+            //                            });
 
-            Function<ValType.Builder, ValType> build =
-                    (ValType.Builder builder) -> builder.build(typeSection.getTypes()::get);
+            var params =
+                    Arrays.stream(paramsBuilder)
+                            .map(ValType.Builder::build)
+                            .toArray(ValType[]::new);
+            var returns =
+                    Arrays.stream(returnsBuilder)
+                            .map(ValType.Builder::build)
+                            .toArray(ValType[]::new);
 
-            var params = Arrays.stream(paramsBuilder).map(build).toArray(ValType[]::new);
-            var returns = Arrays.stream(returnsBuilder).map(build).toArray(ValType[]::new);
-
-            typeSection.addFunctionType(FunctionType.of(params, returns));
+            typeSectionBuilder.addFunctionType(FunctionType.of(params, returns));
         }
 
-        return typeSection.build();
+        var typeSection = typeSectionBuilder.build();
+
+        // Recursive types need the full typeSection to be populated to perform the resolution
+        for (var t : typeSection.types()) {
+            for (var p : t.params()) {
+                p.resolve(typeSection);
+            }
+            for (var r : t.returns()) {
+                r.resolve(typeSection);
+            }
+        }
+
+        return typeSection;
     }
 
     private static ImportSection parseImportSection(ByteBuffer buffer, TypeSection typeSection) {
@@ -1349,11 +1364,11 @@ public final class Parser {
 
     private static ValType readValueTypeFromOpCode(
             ByteBuffer buffer, int valueTypeOpCode, TypeSection typeSection) {
-        return readValueTypeBuilderFromOpCode(buffer, valueTypeOpCode).build(typeSection::getType);
+        return readValueTypeBuilderFromOpCode(buffer, valueTypeOpCode).build().resolve(typeSection);
     }
 
     private static ValType readValueType(ByteBuffer buffer, TypeSection typeSection) {
-        return readValueTypeBuilder(buffer).build(typeSection::getType);
+        return readValueTypeBuilder(buffer).build().resolve(typeSection);
     }
 
     private static Instruction[] parseExpression(ByteBuffer buffer) {

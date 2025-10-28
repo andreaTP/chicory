@@ -8,6 +8,7 @@ import com.dylibso.chicory.wasm.types.ExternalType;
 import com.dylibso.chicory.wasm.types.FunctionBody;
 import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.TagImport;
+import com.dylibso.chicory.wasm.types.TypeSection;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.util.ArrayList;
 import java.util.List;
@@ -108,6 +109,10 @@ final class Context {
 
     public FunctionType type(int idx) {
         return module.typeSection().getType(idx);
+    }
+
+    public TypeSection typeSection() {
+        return module.typeSection();
     }
 
     public FunctionType[] types() {
