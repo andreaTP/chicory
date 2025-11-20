@@ -103,7 +103,7 @@ public class Instance {
         this.tags = (tags == null) ? new TagInstance[0] : new TagInstance[tags.length];
         for (int i = 0; i < this.tags.length; i++) {
             this.tags[i] = new TagInstance(tags[i]);
-            this.tags[i].setType(types[tags[i].typeIdx()]);
+            this.tags[i].setType(type(tags[i].typeIdx()));
         }
         this.exports = exports;
         this.listener = listener;
@@ -279,7 +279,11 @@ public class Instance {
         if (idx >= types.length) {
             throw new InvalidException("unknown type " + idx);
         }
-        return types[idx];
+        var type = types[idx];
+        if (type == null) {
+            throw new InvalidException("type " + idx + " is not a function type");
+        }
+        return type;
     }
 
     public int functionType(int idx) {
@@ -784,7 +788,7 @@ public class Instance {
                 Import imprt = module.importSection().getImport(i);
                 if (imprt.importType() == FUNCTION) {
                     var type = ((FunctionImport) imprt).typeIndex();
-                    if (type >= this.module.typeSection().typeCount()) {
+                    if (type >= this.module.typeSection().definedTypeCount()) {
                         throw new InvalidException("unknown type");
                     }
                     functionTypes[funcIdx] = type;

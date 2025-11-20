@@ -74,8 +74,7 @@ public final class ValType {
     public ValType resolve(TypeSection typeSection) {
         if (resolvedFunctionTypeId >= 0 && resolvedFunctionTypeHash == -1) {
             try {
-                resolvedFunctionTypeHash =
-                        typeSection.getSubType(resolvedFunctionTypeId).hashCode();
+                resolvedFunctionTypeHash = typeSection.canonicalTypeId(resolvedFunctionTypeId);
             } catch (IndexOutOfBoundsException e) {
                 throw new InvalidException("unknown type: " + resolvedFunctionTypeId);
             }

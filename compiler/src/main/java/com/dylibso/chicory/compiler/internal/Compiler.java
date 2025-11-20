@@ -449,8 +449,11 @@ public final class Compiler {
         // call_indirect_xxx() bridges for native CALL_INDIRECT
         var allTypes = module.typeSection().types();
         for (int i = 0; i < allTypes.length; i++) {
-            var typeId = i;
             var type = allTypes[i];
+            if (type == null) {
+                continue;
+            }
+            var typeId = i;
             emitFunction(
                     classWriter,
                     callIndirectMethodName(typeId),

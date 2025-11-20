@@ -352,7 +352,7 @@ final class Validator {
         if (ValType.isValid(typeId)) {
             return List.of();
         }
-        if (typeId >= module.typeSection().typeCount()) {
+        if (typeId >= module.typeSection().definedTypeCount()) {
             throw new MalformedException("unexpected end");
         }
         return getType((int) typeId).params();
@@ -366,7 +366,7 @@ final class Validator {
     }
 
     private FunctionType getType(int idx) {
-        if (idx < 0 || idx >= module.typeSection().typeCount()) {
+        if (idx < 0 || idx >= module.typeSection().definedTypeCount()) {
             throw new InvalidException("unknown type " + idx);
         }
         return module.typeSection().getType(idx);
@@ -458,27 +458,98 @@ final class Validator {
     }
 
     void validateTypes() {
+        // Build a map of recursion group boundaries for forward reference checking
+        int currentSubTypeIdx = 0;
         for (var i = 0; i < module.typeSection().typeCount(); i++) {
-            var t = module.typeSection().getRecType(i);
-            // TODO: fix me!
-            if (t.isLegacy()) {
-                // The following code fixes the 2 tests, but breaks many things in GC:
-                // FunctionReferencesType-equivalence.test2
-                // FunctionReferencesType-equivalence.test3
-                // TODO: seems "wrong" when using WasmGC
-                final int idx = i;
-                Consumer<ValType> noForwardRef =
-                        v -> {
-                            if (v.resolvedFunctionTypeId() >= idx) {
-                                throw new InvalidException("unknown type " + v.typeIdx());
-                            }
-                        };
-                t.legacy().params().forEach(noForwardRef);
-                t.legacy().returns().forEach(noForwardRef);
+            var recType = module.typeSection().getRecType(i);
+            var subTypes = recType.subTypes();
+            int recursionGroupStart = currentSubTypeIdx;
+            int recursionGroupEnd = currentSubTypeIdx + subTypes.length;
 
-                t.legacy().params().forEach(this::validateValueType);
-                t.legacy().returns().forEach(this::validateValueType);
+            // Validate each subtype in the recursion group
+            for (int j = 0; j < subTypes.length; j++) {
+                var subType = subTypes[j];
+
+                // Validate supertypes - they must be defined before this recursion group
+                // (forward references are only allowed within the same recursion group)
+                for (int superIdx : subType.typeIdx()) {
+                    if (superIdx < 0 || superIdx >= module.typeSection().definedTypeCount()) {
+                        throw new InvalidException("unknown supertype " + superIdx);
+                    }
+                    // Forward references outside the recursion group are invalid
+                    if (superIdx >= recursionGroupStart && superIdx < recursionGroupEnd) {
+                        // Forward reference within recursion group - allowed
+                        continue;
+                    }
+                    if (superIdx >= recursionGroupEnd) {
+                        // Forward reference to a later recursion group - invalid
+                        throw new InvalidException("forward reference to type " + superIdx);
+                    }
+                }
+
+                // Validate the composite type
+                var compType = subType.compType();
+                if (compType != null) {
+                    if (compType.funcType() != null) {
+                        // Legacy function type validation
+                        final int funcTypeIdx = i;
+                        Consumer<ValType> noForwardRef =
+                                v -> {
+                                    if (v.resolvedFunctionTypeId() >= funcTypeIdx) {
+                                        throw new InvalidException("unknown type " + v.typeIdx());
+                                    }
+                                };
+                        compType.funcType().params().forEach(noForwardRef);
+                        compType.funcType().returns().forEach(noForwardRef);
+                        compType.funcType().params().forEach(this::validateValueType);
+                        compType.funcType().returns().forEach(this::validateValueType);
+                    }
+                }
+
+                // Validate value types in this subtype (for GC types, this validates field types)
+                // This includes struct/array field validation with recursion group awareness
+                validateSubType(subType, recursionGroupEnd);
             }
+
+            currentSubTypeIdx += subTypes.length;
+        }
+    }
+
+    private void validateSubType(
+            com.dylibso.chicory.wasm.types.SubType subType, int recursionGroupEnd) {
+        var compType = subType.compType();
+        if (compType == null) {
+            return;
+        }
+
+        // Validate that all type references in this subtype are valid
+        // For structs and arrays, validate field types
+        if (compType.structType() != null) {
+            var fields = compType.structType().fieldTypes();
+            for (var field : fields) {
+                validateFieldType(field, recursionGroupEnd);
+            }
+        } else if (compType.arrayType() != null) {
+            validateFieldType(compType.arrayType().fieldType(), recursionGroupEnd);
+        }
+    }
+
+    private void validateFieldType(
+            com.dylibso.chicory.wasm.types.FieldType fieldType, int recursionGroupEnd) {
+        if (fieldType.storageType() == null) {
+            return;
+        }
+        var storageType = fieldType.storageType();
+        if (storageType.valType() != null) {
+            var valType = storageType.valType();
+            if (valType.isReference() && valType.typeIdx() >= 0) {
+                int refIdx = valType.typeIdx();
+                // Forward references are only allowed within the same recursion group
+                if (refIdx >= recursionGroupEnd) {
+                    throw new InvalidException("forward reference to type " + refIdx);
+                }
+            }
+            validateValueType(valType);
         }
     }
 
@@ -676,8 +747,15 @@ final class Validator {
     private void validateValueType(ValType valueType) {
         if (valueType.isReference() && valueType.typeIdx() >= 0) {
             int idx = valueType.typeIdx();
-            if (idx >= module.typeSection().typeCount()) {
+            if (idx >= module.typeSection().definedTypeCount()) {
                 throw new InvalidException("unknown type " + idx);
+            }
+            // Basic validation - just check that the type exists
+            // Detailed validation (forward references, recursion groups) is done in validateTypes()
+            try {
+                module.typeSection().getSubType(idx);
+            } catch (IndexOutOfBoundsException e) {
+                throw new InvalidException("unknown type " + idx, e);
             }
         }
     }
