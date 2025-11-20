@@ -1,5 +1,7 @@
 package com.dylibso.chicory.wasm.types;
 
+import java.util.Objects;
+
 public final class StorageType {
     private final ValType valType;
     private final PackedType packedType;
@@ -15,6 +17,23 @@ public final class StorageType {
 
     public PackedType packedType() {
         return packedType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof StorageType)) {
+            return false;
+        }
+        StorageType that = (StorageType) o;
+        return Objects.equals(valType, that.valType) && packedType == that.packedType;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(valType, packedType);
     }
 
     public static Builder builder() {

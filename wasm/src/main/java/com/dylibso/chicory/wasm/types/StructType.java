@@ -1,6 +1,7 @@
 package com.dylibso.chicory.wasm.types;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class StructType {
@@ -12,6 +13,23 @@ public final class StructType {
 
     public FieldType[] fieldTypes() {
         return fieldTypes;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof StructType)) {
+            return false;
+        }
+        StructType structType = (StructType) o;
+        return Arrays.equals(fieldTypes, structType.fieldTypes);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(fieldTypes);
     }
 
     public static Builder builder() {

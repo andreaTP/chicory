@@ -72,7 +72,7 @@ public final class ValType {
     }
 
     public ValType resolve(TypeSection typeSection) {
-        if (resolvedFunctionTypeId >= 0) {
+        if (resolvedFunctionTypeId >= 0 && resolvedFunctionTypeHash == -1) {
             try {
                 resolvedFunctionTypeHash =
                         typeSection.getSubType(resolvedFunctionTypeId).hashCode();
@@ -111,6 +111,11 @@ public final class ValType {
     }
 
     public int resolvedFunctionTypeId() {
+        if (resolvedFunctionTypeId >= 0 && this.isReference()) {
+            // This is a GC heap type. Validator-level forward reference checks are based on
+            // legacy function indices and must not run for heap types – report "not applicable".
+            return -1;
+        }
         return resolvedFunctionTypeId;
     }
 
@@ -295,7 +300,7 @@ public final class ValType {
     @Override
     public int hashCode() {
         if (resolvedFunctionTypeHash != -1) {
-            return resolvedFunctionTypeHash;
+            return 31 * opcode() + resolvedFunctionTypeHash;
         }
         return Long.hashCode(id);
     }
