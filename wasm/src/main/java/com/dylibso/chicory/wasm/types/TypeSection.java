@@ -14,13 +14,20 @@ public final class TypeSection extends Section {
     private final List<SubType> definedTypes;
     private final FunctionType[] functionTypes;
     private final int[] canonicalTypeIds;
+    private final int[] groupStart;
+    private final int[] groupOffset;
 
     private TypeSection(List<RecType> types) {
         super(SectionId.TYPE);
         this.types = List.copyOf(types);
         this.definedTypes = flatten(types);
         this.functionTypes = buildFunctionTypes(this.definedTypes);
-        this.canonicalTypeIds = computeCanonicalTypeIds(this.definedTypes);
+        GroupMetadata metadata = computeGroupMetadata(types);
+        this.groupStart = metadata.groupStart;
+        this.groupOffset = metadata.groupOffset;
+        validateForwardReferences(this.definedTypes, groupStart);
+        this.canonicalTypeIds =
+                computeCanonicalTypeIds(types, this.definedTypes, groupStart, metadata.groupOffset);
     }
 
     private static List<SubType> flatten(List<RecType> recTypes) {
@@ -42,39 +49,160 @@ public final class TypeSection extends Section {
         return functionTypes;
     }
 
+    private static GroupMetadata computeGroupMetadata(List<RecType> recTypes) {
+        int total = recTypes.stream().mapToInt(rt -> rt.subTypes().length).sum();
+        int[] groupStart = new int[total];
+        int[] groupOffset = new int[total];
+        int index = 0;
+        for (RecType recType : recTypes) {
+            var subTypes = recType.subTypes();
+            int start = index;
+            for (int i = 0; i < subTypes.length; i++) {
+                groupStart[index] = start;
+                groupOffset[index] = i;
+                index++;
+            }
+        }
+        return new GroupMetadata(groupStart, groupOffset);
+    }
+
+    private static void validateForwardReferences(List<SubType> definedTypes, int[] groupStart) {
+        int typeCount = definedTypes.size();
+        for (int i = 0; i < typeCount; i++) {
+            SubType subType = definedTypes.get(i);
+
+            for (int superIdx : subType.typeIdx()) {
+                if (superIdx < 0 || superIdx >= typeCount) {
+                    throw new InvalidException("unknown type " + superIdx);
+                }
+                if (groupStart[superIdx] > groupStart[i]) {
+                    throw new InvalidException("unknown type " + superIdx);
+                }
+            }
+
+            validateCompTypeForwardRefs(i, subType.compType(), groupStart, typeCount);
+        }
+    }
+
+    private static void validateCompTypeForwardRefs(
+            int contextIdx, CompType compType, int[] groupStart, int typeCount) {
+        if (compType == null) {
+            return;
+        }
+        if (compType.funcType() != null) {
+            validateFunctionTypeForwardRefs(contextIdx, compType.funcType(), groupStart, typeCount);
+        } else if (compType.structType() != null) {
+            for (FieldType field : compType.structType().fieldTypes()) {
+                validateFieldTypeForwardRefs(contextIdx, field, groupStart, typeCount);
+            }
+        } else if (compType.arrayType() != null) {
+            validateFieldTypeForwardRefs(
+                    contextIdx, compType.arrayType().fieldType(), groupStart, typeCount);
+        }
+    }
+
+    private static void validateFunctionTypeForwardRefs(
+            int contextIdx, FunctionType functionType, int[] groupStart, int typeCount) {
+        functionType
+                .params()
+                .forEach(v -> validateValTypeForwardRef(contextIdx, v, groupStart, typeCount));
+        functionType
+                .returns()
+                .forEach(v -> validateValTypeForwardRef(contextIdx, v, groupStart, typeCount));
+    }
+
+    private static void validateFieldTypeForwardRefs(
+            int contextIdx, FieldType fieldType, int[] groupStart, int typeCount) {
+        var storageType = fieldType.storageType();
+        if (storageType == null) {
+            return;
+        }
+        if (storageType.valType() != null) {
+            validateValTypeForwardRef(contextIdx, storageType.valType(), groupStart, typeCount);
+        }
+    }
+
+    private static void validateValTypeForwardRef(
+            int contextIdx, ValType valType, int[] groupStart, int typeCount) {
+        if (!valType.isReference()) {
+            return;
+        }
+        int refIdx = valType.typeIdx();
+        if (refIdx < 0) {
+            return;
+        }
+        if (refIdx >= typeCount) {
+            throw new InvalidException("unknown type " + refIdx);
+        }
+        if (groupStart[refIdx] > groupStart[contextIdx]) {
+            throw new InvalidException("unknown type " + refIdx);
+        }
+    }
+
     /**
-     * Computes canonical type IDs by iteratively comparing SubTypes structurally until convergence.
-     * Two types get the same canonical ID if they are structurally equivalent.
-     * Uses a custom comparator that handles normalization on-the-fly.
+     * Computes canonical IDs by processing recursion groups with deterministic fingerprints.
+     * Uses iterative refinement: groups are normalized using current canonical IDs, and
+     * equivalent groups are assigned the same canonical IDs. Process continues until convergence.
      */
-    private static int[] computeCanonicalTypeIds(List<SubType> definedTypes) {
-        int n = definedTypes.size();
-        // Start with raw indices as canonical IDs
-        int[] canonicalIds = new int[n];
-        for (int i = 0; i < n; i++) {
+    private static int[] computeCanonicalTypeIds(
+            List<RecType> recTypes,
+            List<SubType> definedTypes,
+            int[] groupStart,
+            int[] groupOffset) {
+        int total = definedTypes.size();
+        int[] canonicalIds = new int[total];
+        // Initialize with raw indices
+        for (int i = 0; i < total; i++) {
             canonicalIds[i] = i;
         }
 
-        // Iteratively refine canonical IDs until convergence
-        int[] prevIds = Arrays.copyOf(canonicalIds, n);
-        int[] nextIds = new int[n];
-        final int maxIterations = Math.max(4, n * 4);
+        // Iteratively refine until convergence
+        int[] prevIds = Arrays.copyOf(canonicalIds, total);
+        int[] nextIds = new int[total];
+        final int maxIterations = Math.max(4, total * 4);
         boolean changed = true;
         int iteration = 0;
 
         while (changed && iteration++ < maxIterations) {
             changed = false;
-            // Use wrapper class that implements equals/hashCode with normalization
-            Map<NormalizedSubType, Integer> normalizedToId = new HashMap<>();
-            for (int i = 0; i < n; i++) {
-                NormalizedSubType normalized = new NormalizedSubType(definedTypes.get(i), prevIds);
-                nextIds[i] = normalizedToId.computeIfAbsent(normalized, k -> normalizedToId.size());
-                if (nextIds[i] != prevIds[i]) {
-                    changed = true;
+            Map<NormalizedGroup, int[]> groupToCanonicalIds = new HashMap<>();
+            int nextCanonicalId = 0;
+            int definedIndex = 0;
+
+            // Process each recursion group
+            for (RecType recType : recTypes) {
+                var subTypes = recType.subTypes();
+                NormalizedSubType[] normalizedSubTypes = new NormalizedSubType[subTypes.length];
+                for (int j = 0; j < subTypes.length; j++) {
+                    normalizedSubTypes[j] =
+                            new NormalizedSubType(
+                                    subTypes[j],
+                                    definedIndex + j,
+                                    prevIds,
+                                    groupStart,
+                                    groupOffset);
                 }
+                NormalizedGroup signature = new NormalizedGroup(normalizedSubTypes);
+                int[] assignedIds = groupToCanonicalIds.get(signature);
+                if (assignedIds == null) {
+                    assignedIds = new int[subTypes.length];
+                    for (int j = 0; j < subTypes.length; j++) {
+                        assignedIds[j] = nextCanonicalId++;
+                    }
+                    groupToCanonicalIds.put(signature, assignedIds);
+                }
+                for (int j = 0; j < subTypes.length; j++) {
+                    nextIds[definedIndex + j] = assignedIds[j];
+                    if (nextIds[definedIndex + j] != prevIds[definedIndex + j]) {
+                        changed = true;
+                    }
+                }
+                definedIndex += subTypes.length;
             }
-            System.arraycopy(nextIds, 0, prevIds, 0, n);
+
+            System.arraycopy(nextIds, 0, prevIds, 0, total);
         }
+
         return prevIds;
     }
 
@@ -84,11 +212,22 @@ public final class TypeSection extends Section {
      */
     private static class NormalizedSubType {
         private final SubType subType;
+        private final int subTypeIndex;
         private final int[] canonicalIds;
+        private final int[] groupStart;
+        private final int[] groupOffset;
 
-        NormalizedSubType(SubType subType, int[] canonicalIds) {
+        NormalizedSubType(
+                SubType subType,
+                int subTypeIndex,
+                int[] canonicalIds,
+                int[] groupStart,
+                int[] groupOffset) {
             this.subType = subType;
+            this.subTypeIndex = subTypeIndex;
             this.canonicalIds = canonicalIds;
+            this.groupStart = groupStart;
+            this.groupOffset = groupOffset;
         }
 
         @Override
@@ -97,7 +236,12 @@ public final class TypeSection extends Section {
                 return false;
             }
             NormalizedSubType that = (NormalizedSubType) o;
-            return new StructuralTypeComparator(canonicalIds).compare(this.subType, that.subType)
+            return new StructuralTypeComparator(canonicalIds, groupStart, groupOffset)
+                            .compare(
+                                    this.subTypeIndex,
+                                    this.subType,
+                                    that.subTypeIndex,
+                                    that.subType)
                     == 0;
         }
 
@@ -106,61 +250,65 @@ public final class TypeSection extends Section {
             // Compute hash based on structural comparison
             // We'll use a simplified hash that matches the comparison logic
             int result = Boolean.hashCode(subType.isFinal());
-            result = 31 * result + Arrays.hashCode(normalizeSuperTypes(subType.typeIdx()));
-            result = 31 * result + hashCompType(subType.compType());
+            result =
+                    31 * result
+                            + Arrays.hashCode(normalizeSuperTypes(subTypeIndex, subType.typeIdx()));
+            result = 31 * result + hashCompType(subTypeIndex, subType.compType());
             return result;
         }
 
-        private int[] normalizeSuperTypes(int[] superTypes) {
+        private int[] normalizeSuperTypes(int contextIdx, int[] superTypes) {
             int[] normalized = new int[superTypes.length];
             for (int i = 0; i < superTypes.length; i++) {
-                normalized[i] = normalizeTypeIdx(superTypes[i]);
+                normalized[i] = normalizeTypeIdx(contextIdx, superTypes[i]);
             }
             return normalized;
         }
 
-        private int hashCompType(CompType compType) {
+        private int hashCompType(int contextIdx, CompType compType) {
             if (compType == null) {
                 return 0;
             }
             if (compType.funcType() != null) {
-                return hashFunctionType(compType.funcType());
+                return hashFunctionType(contextIdx, compType.funcType());
             }
             if (compType.structType() != null) {
-                return hashStructType(compType.structType());
+                return hashStructType(contextIdx, compType.structType());
             }
             if (compType.arrayType() != null) {
-                return hashArrayType(compType.arrayType());
+                return hashArrayType(contextIdx, compType.arrayType());
             }
             return 0;
         }
 
-        private int hashFunctionType(FunctionType funcType) {
-            return hashValTypeList(funcType.params()) * 31 + hashValTypeList(funcType.returns());
+        private int hashFunctionType(int contextIdx, FunctionType funcType) {
+            return hashValTypeList(contextIdx, funcType.params()) * 31
+                    + hashValTypeList(contextIdx, funcType.returns());
         }
 
-        private int hashStructType(StructType structType) {
+        private int hashStructType(int contextIdx, StructType structType) {
             int result = structType.fieldTypes().length;
             for (FieldType field : structType.fieldTypes()) {
-                result = 31 * result + hashFieldType(field);
+                result = 31 * result + hashFieldType(contextIdx, field);
             }
             return result;
         }
 
-        private int hashArrayType(ArrayType arrayType) {
-            return hashFieldType(arrayType.fieldType());
+        private int hashArrayType(int contextIdx, ArrayType arrayType) {
+            return hashFieldType(contextIdx, arrayType.fieldType());
         }
 
-        private int hashFieldType(FieldType fieldType) {
-            return fieldType.mut().hashCode() * 31 + hashStorageType(fieldType.storageType());
+        private int hashFieldType(int contextIdx, FieldType fieldType) {
+            return fieldType.mut().hashCode() * 31
+                    + hashStorageType(contextIdx, fieldType.storageType());
         }
 
-        private int hashStorageType(StorageType storageType) {
+        private int hashStorageType(int contextIdx, StorageType storageType) {
             if (storageType == null) {
                 return 0;
             }
             if (storageType.valType() != null) {
-                return hashValType(storageType.valType());
+                return hashValType(contextIdx, storageType.valType());
             }
             if (storageType.packedType() != null) {
                 return storageType.packedType().hashCode();
@@ -168,26 +316,37 @@ public final class TypeSection extends Section {
             return 0;
         }
 
-        private int hashValTypeList(List<ValType> valTypes) {
+        private int hashValTypeList(int contextIdx, List<ValType> valTypes) {
             int result = valTypes.size();
             for (ValType vt : valTypes) {
-                result = 31 * result + hashValType(vt);
+                result = 31 * result + hashValType(contextIdx, vt);
             }
             return result;
         }
 
-        private int hashValType(ValType valType) {
+        private int hashValType(int contextIdx, ValType valType) {
             int result = valType.opcode();
-            if (valType.isReference() && valType.typeIdx() >= 0) {
-                result = 31 * result + normalizeTypeIdx(valType.typeIdx());
+            if (valType.isReference()) {
+                int typeIdx = valType.typeIdx();
+                if (typeIdx >= 0) {
+                    result = 31 * result + normalizeTypeIdx(contextIdx, typeIdx);
+                } else {
+                    result = 31 * result + typeIdx;
+                }
             } else {
                 result = 31 * result + valType.typeIdx();
             }
             return result;
         }
 
-        private int normalizeTypeIdx(int idx) {
+        private int normalizeTypeIdx(int contextIdx, int idx) {
             if (idx >= 0 && idx < canonicalIds.length) {
+                if (groupStart[idx] == groupStart[contextIdx]) {
+                    return -(groupOffset[idx] + 1);
+                }
+                if (groupStart[idx] > groupStart[contextIdx]) {
+                    throw new InvalidException("unknown type " + idx);
+                }
                 return canonicalIds[idx];
             }
             return Integer.MIN_VALUE;
@@ -200,12 +359,16 @@ public final class TypeSection extends Section {
      */
     private static class StructuralTypeComparator {
         private final int[] canonicalIds;
+        private final int[] groupStart;
+        private final int[] groupOffset;
 
-        StructuralTypeComparator(int[] canonicalIds) {
+        StructuralTypeComparator(int[] canonicalIds, int[] groupStart, int[] groupOffset) {
             this.canonicalIds = canonicalIds;
+            this.groupStart = groupStart;
+            this.groupOffset = groupOffset;
         }
 
-        int compare(SubType a, SubType b) {
+        int compare(int idxA, SubType a, int idxB, SubType b) {
             // Compare final flag
             if (a.isFinal() != b.isFinal()) {
                 return Boolean.compare(a.isFinal(), b.isFinal());
@@ -218,18 +381,18 @@ public final class TypeSection extends Section {
                 return Integer.compare(aSuperTypes.length, bSuperTypes.length);
             }
             for (int i = 0; i < aSuperTypes.length; i++) {
-                int aCanonical = normalizeTypeIdx(aSuperTypes[i]);
-                int bCanonical = normalizeTypeIdx(bSuperTypes[i]);
+                int aCanonical = normalizeTypeIdx(idxA, aSuperTypes[i]);
+                int bCanonical = normalizeTypeIdx(idxB, bSuperTypes[i]);
                 if (aCanonical != bCanonical) {
                     return Integer.compare(aCanonical, bCanonical);
                 }
             }
 
             // Compare composite types
-            return compareCompType(a.compType(), b.compType());
+            return compareCompType(idxA, a.compType(), idxB, b.compType());
         }
 
-        private int compareCompType(CompType a, CompType b) {
+        private int compareCompType(int idxA, CompType a, int idxB, CompType b) {
             if (a == null && b == null) {
                 return 0;
             }
@@ -242,7 +405,7 @@ public final class TypeSection extends Section {
 
             // Compare function types
             if (a.funcType() != null && b.funcType() != null) {
-                return compareFunctionType(a.funcType(), b.funcType());
+                return compareFunctionType(idxA, a.funcType(), idxB, b.funcType());
             }
             if (a.funcType() != null) {
                 return 1;
@@ -253,7 +416,7 @@ public final class TypeSection extends Section {
 
             // Compare struct types
             if (a.structType() != null && b.structType() != null) {
-                return compareStructType(a.structType(), b.structType());
+                return compareStructType(idxA, a.structType(), idxB, b.structType());
             }
             if (a.structType() != null) {
                 return 1;
@@ -264,7 +427,7 @@ public final class TypeSection extends Section {
 
             // Compare array types
             if (a.arrayType() != null && b.arrayType() != null) {
-                return compareArrayType(a.arrayType(), b.arrayType());
+                return compareArrayType(idxA, a.arrayType(), idxB, b.arrayType());
             }
             if (a.arrayType() != null) {
                 return 1;
@@ -276,22 +439,22 @@ public final class TypeSection extends Section {
             return 0;
         }
 
-        private int compareFunctionType(FunctionType a, FunctionType b) {
-            int paramCmp = compareValTypeList(a.params(), b.params());
+        private int compareFunctionType(int idxA, FunctionType a, int idxB, FunctionType b) {
+            int paramCmp = compareValTypeList(idxA, a.params(), idxB, b.params());
             if (paramCmp != 0) {
                 return paramCmp;
             }
-            return compareValTypeList(a.returns(), b.returns());
+            return compareValTypeList(idxA, a.returns(), idxB, b.returns());
         }
 
-        private int compareStructType(StructType a, StructType b) {
+        private int compareStructType(int idxA, StructType a, int idxB, StructType b) {
             FieldType[] aFields = a.fieldTypes();
             FieldType[] bFields = b.fieldTypes();
             if (aFields.length != bFields.length) {
                 return Integer.compare(aFields.length, bFields.length);
             }
             for (int i = 0; i < aFields.length; i++) {
-                int cmp = compareFieldType(aFields[i], bFields[i]);
+                int cmp = compareFieldType(idxA, aFields[i], idxB, bFields[i]);
                 if (cmp != 0) {
                     return cmp;
                 }
@@ -299,19 +462,19 @@ public final class TypeSection extends Section {
             return 0;
         }
 
-        private int compareArrayType(ArrayType a, ArrayType b) {
-            return compareFieldType(a.fieldType(), b.fieldType());
+        private int compareArrayType(int idxA, ArrayType a, int idxB, ArrayType b) {
+            return compareFieldType(idxA, a.fieldType(), idxB, b.fieldType());
         }
 
-        private int compareFieldType(FieldType a, FieldType b) {
+        private int compareFieldType(int idxA, FieldType a, int idxB, FieldType b) {
             int mutCmp = a.mut().compareTo(b.mut());
             if (mutCmp != 0) {
                 return mutCmp;
             }
-            return compareStorageType(a.storageType(), b.storageType());
+            return compareStorageType(idxA, a.storageType(), idxB, b.storageType());
         }
 
-        private int compareStorageType(StorageType a, StorageType b) {
+        private int compareStorageType(int idxA, StorageType a, int idxB, StorageType b) {
             if (a == null && b == null) {
                 return 0;
             }
@@ -323,7 +486,7 @@ public final class TypeSection extends Section {
             }
 
             if (a.valType() != null && b.valType() != null) {
-                return compareValType(a.valType(), b.valType());
+                return compareValType(idxA, a.valType(), idxB, b.valType());
             }
             if (a.valType() != null) {
                 return 1;
@@ -345,12 +508,12 @@ public final class TypeSection extends Section {
             return 0;
         }
 
-        private int compareValTypeList(List<ValType> a, List<ValType> b) {
+        private int compareValTypeList(int idxA, List<ValType> a, int idxB, List<ValType> b) {
             if (a.size() != b.size()) {
                 return Integer.compare(a.size(), b.size());
             }
             for (int i = 0; i < a.size(); i++) {
-                int cmp = compareValType(a.get(i), b.get(i));
+                int cmp = compareValType(idxA, a.get(i), idxB, b.get(i));
                 if (cmp != 0) {
                     return cmp;
                 }
@@ -358,7 +521,7 @@ public final class TypeSection extends Section {
             return 0;
         }
 
-        private int compareValType(ValType a, ValType b) {
+        private int compareValType(int idxA, ValType a, int idxB, ValType b) {
             // Compare opcodes
             int opcodeCmp = Integer.compare(a.opcode(), b.opcode());
             if (opcodeCmp != 0) {
@@ -367,8 +530,8 @@ public final class TypeSection extends Section {
 
             // For reference types, compare using canonical IDs
             if (a.isReference() && a.typeIdx() >= 0 && b.isReference() && b.typeIdx() >= 0) {
-                int aCanonical = normalizeTypeIdx(a.typeIdx());
-                int bCanonical = normalizeTypeIdx(b.typeIdx());
+                int aCanonical = normalizeTypeIdx(idxA, a.typeIdx());
+                int bCanonical = normalizeTypeIdx(idxB, b.typeIdx());
                 return Integer.compare(aCanonical, bCanonical);
             }
 
@@ -376,11 +539,61 @@ public final class TypeSection extends Section {
             return Integer.compare(a.typeIdx(), b.typeIdx());
         }
 
-        private int normalizeTypeIdx(int idx) {
+        private int normalizeTypeIdx(int contextIdx, int idx) {
             if (idx >= 0 && idx < canonicalIds.length) {
+                if (groupStart[idx] == groupStart[contextIdx]) {
+                    return -(groupOffset[idx] + 1);
+                }
+                if (groupStart[idx] > groupStart[contextIdx]) {
+                    throw new InvalidException("unknown type " + idx);
+                }
                 return canonicalIds[idx];
             }
             return Integer.MIN_VALUE;
+        }
+    }
+
+    private static final class GroupMetadata {
+        final int[] groupStart;
+        final int[] groupOffset;
+
+        GroupMetadata(int[] groupStart, int[] groupOffset) {
+            this.groupStart = groupStart;
+            this.groupOffset = groupOffset;
+        }
+    }
+
+    private static final class NormalizedGroup {
+        private final NormalizedSubType[] subTypes;
+
+        NormalizedGroup(NormalizedSubType[] subTypes) {
+            this.subTypes = subTypes;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof NormalizedGroup)) {
+                return false;
+            }
+            NormalizedGroup that = (NormalizedGroup) o;
+            if (this.subTypes.length != that.subTypes.length) {
+                return false;
+            }
+            for (int i = 0; i < this.subTypes.length; i++) {
+                if (!this.subTypes[i].equals(that.subTypes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            for (NormalizedSubType subType : subTypes) {
+                result = 31 * result + subType.hashCode();
+            }
+            return result;
         }
     }
 
@@ -401,6 +614,10 @@ public final class TypeSection extends Section {
             throw new InvalidException("unknown type " + idx);
         }
         return canonicalTypeIds[idx];
+    }
+
+    int[] groupOffset() {
+        return groupOffset;
     }
 
     public FunctionType getType(int idx) {
