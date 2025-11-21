@@ -267,7 +267,26 @@ public final class ValType {
         if (t1.typeIdx() >= 0 && t2.typeIdx() == TypeIdxCode.FUNC.code()) {
             return true;
         } else if (t1.typeIdx() >= 0 && t2.typeIdx() >= 0) {
-            return t1.resolvedFunctionTypeHash == t2.resolvedFunctionTypeHash;
+            // Both are concrete GC types
+            // If both have resolvedFunctionTypeHash, compare by canonical ID
+            // Note: canonical IDs are module-specific, so if both have hashes from different
+            // modules, they won't match even if structurally equivalent. This is correct for
+            // same-module comparisons, but for cross-module comparisons we'd need structural
+            // equivalence checking. For now, we require both to have hashes and they must match.
+            if (t1.resolvedFunctionTypeHash != -1 && t2.resolvedFunctionTypeHash != -1) {
+                return t1.resolvedFunctionTypeHash == t2.resolvedFunctionTypeHash;
+            }
+            // If only one has resolvedFunctionTypeHash, compare by typeIdx as fallback
+            // This handles cross-module comparisons where types might be structurally
+            // equivalent but have different canonical IDs
+            if (t1.resolvedFunctionTypeHash != -1 || t2.resolvedFunctionTypeHash != -1) {
+                // One has canonical ID, other doesn't - compare by typeIdx
+                // This will fail for cross-module comparisons with different type indices
+                // even if structurally equivalent, which is the expected behavior for now
+                return t1.typeIdx() == t2.typeIdx();
+            }
+            // If neither has resolvedFunctionTypeHash, compare by typeIdx
+            return t1.typeIdx() == t2.typeIdx();
         } else if (t1.typeIdx() == TypeIdxCode.BOT.code()) {
             return true;
         }

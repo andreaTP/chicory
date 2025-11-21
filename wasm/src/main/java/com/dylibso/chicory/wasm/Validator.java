@@ -2305,24 +2305,17 @@ final class Validator {
     }
 
     private void VALIDATE_CALL_REF(int typeId, boolean isReturn) {
-        var rt = popRef();
+        // Per spec: pop_val(Ref(Def(types[x])))
+        // The ref type must match Ref(Def(types[typeId]))
+        var expectedRefType = valType(ValType.ID.Ref, typeId);
+        popVal(expectedRefType);
+
         var funcType = getType(typeId);
         popVals(funcType.params());
         pushVals(funcType.returns());
 
         if (isReturn) {
             validateTailCall(funcType.returns());
-        }
-
-        if (rt.typeIdx() != ValType.TypeIdxCode.BOT.code()) {
-            int idx = rt.typeIdx();
-            if (idx < 0) {
-                // error
-                throw new InvalidException(
-                        "type mismatch: call_ref should be called on a defined"
-                                + " reference type, got operand: "
-                                + idx);
-            }
         }
     }
 

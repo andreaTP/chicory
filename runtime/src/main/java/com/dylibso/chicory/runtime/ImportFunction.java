@@ -12,6 +12,7 @@ public class ImportFunction implements ImportValue {
     private final List<ValType> paramTypes;
     private final List<ValType> returnTypes;
     private final WasmFunctionHandle handle;
+    private final int exportedTypeIndex;
 
     @Deprecated(since = "1.3.0")
     protected static List<ValType> convert(List objs) {
@@ -32,11 +33,21 @@ public class ImportFunction implements ImportValue {
 
     public ImportFunction(
             String module, String name, FunctionType type, WasmFunctionHandle handle) {
+        this(module, name, type, handle, -1);
+    }
+
+    public ImportFunction(
+            String module,
+            String name,
+            FunctionType type,
+            WasmFunctionHandle handle,
+            int exportedTypeIndex) {
         this.module = module;
         this.name = name;
         this.paramTypes = type.params();
         this.returnTypes = type.returns();
         this.handle = handle;
+        this.exportedTypeIndex = exportedTypeIndex;
     }
 
     @Deprecated(since = "1.3.0")
@@ -51,6 +62,11 @@ public class ImportFunction implements ImportValue {
         this.paramTypes = convert(paramTypes);
         this.returnTypes = convert(returnTypes);
         this.handle = handle;
+        this.exportedTypeIndex = -1;
+    }
+
+    public int exportedTypeIndex() {
+        return exportedTypeIndex;
     }
 
     public WasmFunctionHandle handle() {

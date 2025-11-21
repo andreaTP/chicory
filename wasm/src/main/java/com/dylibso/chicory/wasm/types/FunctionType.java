@@ -59,6 +59,40 @@ public final class FunctionType {
         return paramsMatch(other) && returnsMatch(other);
     }
 
+    /**
+     * Check if this function type matches another using ValType.matches() semantics.
+     * This is used for link-time and runtime type matching per the WebAssembly spec.
+     * For GC types, this uses canonical IDs for comparison.
+     *
+     * This method checks if 'other' (actual) matches 'this' (expected).
+     * For params: actual must match expected (contravariant) - matches(actualParam, expectedParam)
+     * For returns: expected must match actual (covariant) - matches(expectedReturn, actualReturn)
+     */
+    public boolean matches(FunctionType other) {
+        if (this.params.size() != other.params.size()
+                || this.returns.size() != other.returns.size()) {
+            return false;
+        }
+
+        // Check params: actual must match expected (contravariant)
+        // matches(actualParam, expectedParam) = matches(other.params[i], this.params[i])
+        for (int i = 0; i < this.params.size(); i++) {
+            if (!ValType.matches(other.params.get(i), this.params.get(i))) {
+                return false;
+            }
+        }
+
+        // Check returns: expected must match actual (covariant)
+        // matches(expectedReturn, actualReturn) = matches(this.returns[i], other.returns[i])
+        for (int i = 0; i < this.returns.size(); i++) {
+            if (!ValType.matches(this.returns.get(i), other.returns.get(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static FunctionType of(List<ValType> params, List<ValType> returns) {
         if (params.isEmpty()) {
             if (returns.isEmpty()) {

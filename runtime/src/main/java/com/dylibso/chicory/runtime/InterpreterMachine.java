@@ -2932,30 +2932,7 @@ public class InterpreterMachine implements Machine {
     }
 
     private static boolean functionTypeMatch(FunctionType actual, FunctionType expected) {
-        if (actual.params().size() != expected.params().size()
-                || actual.returns().size() != expected.returns().size()) {
-            return false;
-        }
-
-        for (int i = 0; i < actual.params().size(); i++) {
-            var actualParam = actual.params().get(i);
-            var expectedParam = expected.params().get(i);
-
-            if (!ValType.matches(actualParam, expectedParam)) {
-                return false;
-            }
-        }
-
-        for (int i = 0; i < actual.returns().size(); i++) {
-            var actualReturn = actual.returns().get(i);
-            var expectedReturn = expected.returns().get(i);
-
-            if (!ValType.matches(expectedReturn, actualReturn)) {
-                return false;
-            }
-        }
-
-        return true;
+        return expected.matches(actual);
     }
 
     protected static void verifyIndirectCall(FunctionType actual, FunctionType expected)

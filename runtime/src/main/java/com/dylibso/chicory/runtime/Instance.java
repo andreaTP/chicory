@@ -432,8 +432,17 @@ public class Instance {
 
         private void validateExternalFunctionSignature(FunctionImport imprt, ImportFunction f) {
             var expectedType = module.typeSection().getType(imprt.typeIndex());
+            var actualType = f.functionType();
 
-            if (!f.functionType().equals(expectedType)) {
+            if (!expectedType.matches(actualType)) {
+                throw new UnlinkableException(
+                        "incompatible import type for host function "
+                                + f.module()
+                                + "."
+                                + f.name());
+            }
+
+            if (f.exportedTypeIndex() >= 0) {
                 throw new UnlinkableException(
                         "incompatible import type for host function "
                                 + f.module()

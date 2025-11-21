@@ -112,9 +112,14 @@ public class Store {
                 case FUNCTION:
                     ExportFunction f = instance.export(exportName);
                     FunctionType ftype = instance.exportType(exportName);
+                    int exportedTypeIndex = instance.functionType(export.index());
                     this.addFunction(
                             new ImportFunction(
-                                    name, exportName, ftype, (inst, args) -> f.apply(args)));
+                                    name,
+                                    exportName,
+                                    ftype,
+                                    (inst, args) -> f.apply(args),
+                                    exportedTypeIndex));
                     break;
 
                 case TABLE:
