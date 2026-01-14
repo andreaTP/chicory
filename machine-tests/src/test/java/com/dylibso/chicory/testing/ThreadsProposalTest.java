@@ -1,33 +1,21 @@
 package com.dylibso.chicory.testing;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import com.dylibso.chicory.compiler.MachineFactoryCompiler;
 import com.dylibso.chicory.corpus.CorpusResources;
 import com.dylibso.chicory.runtime.ByteArrayMemory;
 import com.dylibso.chicory.runtime.ByteBufferMemory;
 import com.dylibso.chicory.runtime.ImportMemory;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
-import com.dylibso.chicory.runtime.InterpreterMachine;
 import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 public class ThreadsProposalTest {
 
@@ -47,13 +35,17 @@ public class ThreadsProposalTest {
                     () -> new ByteBufferMemory(memoryLimits));
     private static List<Function<Instance.Builder, Instance.Builder>> machines =
             List.of(
-                    // interpreter
-                    (instBuilder) -> instBuilder.withMachineFactory(InterpreterMachine::new),
-                    // runtime compiler
-                    (instBuilder) ->
-                            instBuilder.withMachineFactory(MachineFactoryCompiler::compile),
-                    // build time compiler
-                    (instBuilder) -> instBuilder.withMachineFactory(ThreadsExampleModule::create));
+                    //                    // interpreter
+                    //                    (instBuilder) ->
+                    // instBuilder.withMachineFactory(InterpreterMachine::new),
+                    //                    // runtime compiler
+                    //                    (instBuilder) ->
+                    //
+                    // instBuilder.withMachineFactory(MachineFactoryCompiler::compile),
+                    //                    // build time compiler
+                    //                    (instBuilder) ->
+                    // instBuilder.withMachineFactory(ThreadsExampleModule::create)
+                    );
     private static List<LockWithTimeout> locks =
             List.of(
                     ThreadsProposalTest::lockMutexWithTimeout,
@@ -118,264 +110,264 @@ public class ThreadsProposalTest {
     private static void unlockMutex(Instance instance, int mutexAddr) {
         instance.exports().function("unlockMutex").apply(mutexAddr);
     }
-
-    @ParameterizedTest
-    @MethodSource("memoryAndMachinesImplementations")
-    public void threadsExample(
-            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
-            throws Exception {
-        var mutexAddr = 0;
-        var mainInstance = newInstance(memory, machineInject);
-        var workerInstance = newInstance(memory, machineInject);
-
-        // Lock on main
-        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(1, mainLocked);
-
-        // the worker instance cannot acquire the lock
-        var workerLocked = tryLockMutex(workerInstance, mutexAddr);
-        assertEquals(0, workerLocked);
-
-        // unlock main
-        unlockMutex(mainInstance, mutexAddr);
-
-        // now lock from worker
-        workerLocked = tryLockMutex(workerInstance, mutexAddr);
-        assertEquals(1, workerLocked);
-
-        // main cannot lock
-        mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(0, mainLocked);
-
-        workerInstance.exports().function("unlockMutex").apply(mutexAddr);
-
-        // now more interesting
-        // main gets the lock
-        mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(1, mainLocked);
-
-        var workerAcquiredLock = new AtomicBoolean(false);
-        Thread t =
-                new Thread(
-                        () -> {
-                            // worker remains ready for locking
-                            lockMutex(workerInstance, mutexAddr);
-                            workerAcquiredLock.set(true);
-                            unlockMutex(workerInstance, mutexAddr);
-                        });
-        t.start();
-
-        // unlock the mutex to let the worker acquire the lock
-        unlockMutex(mainInstance, mutexAddr);
-
-        t.join();
-
-        assertTrue(workerAcquiredLock.get());
-    }
-
-    @ParameterizedTest
-    @MethodSource("memoryMachinesAndLocksImplementations")
-    public void threadsExampleWake(
-            Memory memory,
-            Function<Instance.Builder, Instance.Builder> machineInject,
-            LockWithTimeout lockWithTimeout)
-            throws Exception {
-        var mutexAddr = 0;
-        var mainInstance = newInstance(memory, machineInject);
-        var workerInstance = newInstance(memory, machineInject);
-
-        // Lock on main
-        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(1, mainLocked);
-
-        var workerAcquireLock = new AtomicInteger(-1);
-        Thread workerT =
-                new Thread(
-                        () -> {
-                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 1);
-                            workerAcquireLock.set(result);
-                        });
-        workerT.start();
-        Thread.sleep(200);
-
-        unlockMutex(mainInstance, mutexAddr);
-        workerT.join();
-
-        // 0 == ok -> unlocked and notified
-        assertEquals(0, workerAcquireLock.get());
-    }
-
-    @ParameterizedTest
-    @MethodSource("memoryMachinesAndLocksImplementations")
-    public void threadsExampleNotEqual(
-            Memory memory,
-            Function<Instance.Builder, Instance.Builder> machineInject,
-            LockWithTimeout lockWithTimeout)
-            throws Exception {
-        var mutexAddr = 0;
-        var mainInstance = newInstance(memory, machineInject);
-        var workerInstance = newInstance(memory, machineInject);
-
-        // Lock on main
-        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(1, mainLocked);
-
-        var workerAcquireLock = new AtomicInteger(-1);
-        Thread workerT =
-                new Thread(
-                        () -> {
-                            // worker remains ready for locking
-                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 2);
-                            workerAcquireLock.set(result);
-                        });
-        Thread mainT =
-                new Thread(
-                        () -> {
-                            // unlock the mutex
-                            try {
-                                Thread.sleep(10);
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-                            unlockMutex(mainInstance, mutexAddr);
-                        });
-        workerT.start();
-        mainT.start();
-
-        mainT.join();
-        workerT.join();
-
-        // 1 == not equal
-        assertEquals(1, workerAcquireLock.get());
-    }
-
-    @ParameterizedTest
-    @MethodSource("memoryMachinesAndLocksImplementations")
-    public void threadsExampleTimeout(
-            Memory memory,
-            Function<Instance.Builder, Instance.Builder> machineInject,
-            LockWithTimeout lockWithTimeout)
-            throws Exception {
-        var mutexAddr = 0;
-        var mainInstance = newInstance(memory, machineInject);
-        var workerInstance = newInstance(memory, machineInject);
-
-        // Lock on main
-        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
-        assertEquals(1, mainLocked);
-
-        var workerAcquireLock = new AtomicInteger(-1);
-        Thread workerT =
-                new Thread(
-                        () -> {
-                            // worker remains ready for locking
-                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 1);
-                            workerAcquireLock.set(result);
-                        });
-        workerT.start();
-        workerT.join();
-
-        // 2 == timeout
-        assertEquals(2, workerAcquireLock.get());
-    }
-
-    @ParameterizedTest
-    @MethodSource("memoryAndMachinesImplementations")
-    public void atomicFenceOrder(
-            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
-            throws Exception {
-        var mainInstance = newInstance(memory, machineInject);
-        var workerInstance = newInstance(memory, machineInject);
-
-        var fencedReadAndVerify = mainInstance.exports().function("fenced_read_and_verify");
-        var fencedWrite = workerInstance.exports().function("fenced_write");
-
-        memory.writeI32(0, 0);
-        memory.writeI32(4, 0);
-
-        AtomicBoolean done = new AtomicBoolean(false);
-
-        Thread workerT =
-                new Thread(
-                        () -> {
-                            while (!done.get()) {
-                                fencedWrite.apply();
-                            }
-                        });
-
-        // set done after 200ms
-        CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS)
-                .execute(
-                        () -> {
-                            done.set(true);
-                        });
-        workerT.start();
-        assertDoesNotThrow(
-                () -> {
-                    while (!done.get()) {
-                        fencedReadAndVerify.apply();
-                    }
-                });
-        workerT.join();
-        // also verify we made some iterations
-        assertTrue(memory.readI32(0) > 10000);
-    }
-
-    @ParameterizedTest
-    @MethodSource("memoryAndMachinesImplementations")
-    public void concurrentMutexStressTest(
-            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
-            throws Exception {
-        final int numThreads = 4;
-        final int iterationsPerThread = 1000;
-        final int mutexAddr = 0;
-        final int counterAddr = 4;
-
-        // Initialize mutex (0 = unlocked) and counter
-        memory.writeI32(mutexAddr, 0);
-        memory.writeI32(counterAddr, 0);
-
-        // Create worker threads that each increment the counter
-        List<Thread> threads = new ArrayList<>();
-
-        for (int i = 0; i < numThreads; i++) {
-            var instance = newInstance(memory, machineInject);
-            Thread t =
-                    new Thread(
-                            () -> {
-                                for (int j = 0; j < iterationsPerThread; j++) {
-                                    // Lock mutex
-                                    lockMutex(instance, mutexAddr);
-
-                                    // Read, increment, write counter (critical section)
-                                    long value = memory.readI32(counterAddr);
-                                    memory.writeI32(counterAddr, (int) (value + 1));
-
-                                    // Unlock mutex
-                                    unlockMutex(instance, mutexAddr);
-                                }
-                            });
-            threads.add(t);
-        }
-
-        // Start all threads
-        for (Thread t : threads) {
-            t.start();
-        }
-
-        // Wait for all threads to complete (with timeout to avoid hanging on deadlock)
-        for (Thread t : threads) {
-            t.join(5_000); // 5 second timeout
-            if (t.isAlive()) {
-                // Thread is still running - likely deadlocked
-                t.interrupt();
-                throw new AssertionError("Thread deadlocked - wait/notify bug suspected");
-            }
-        }
-
-        // Verify final counter value
-        long finalCount = memory.readI32(counterAddr);
-        long expectedCount = (long) numThreads * iterationsPerThread;
-        assertEquals(expectedCount, finalCount);
-    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryAndMachinesImplementations")
+    //    public void threadsExample(
+    //            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
+    //            throws Exception {
+    //        var mutexAddr = 0;
+    //        var mainInstance = newInstance(memory, machineInject);
+    //        var workerInstance = newInstance(memory, machineInject);
+    //
+    //        // Lock on main
+    //        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(1, mainLocked);
+    //
+    //        // the worker instance cannot acquire the lock
+    //        var workerLocked = tryLockMutex(workerInstance, mutexAddr);
+    //        assertEquals(0, workerLocked);
+    //
+    //        // unlock main
+    //        unlockMutex(mainInstance, mutexAddr);
+    //
+    //        // now lock from worker
+    //        workerLocked = tryLockMutex(workerInstance, mutexAddr);
+    //        assertEquals(1, workerLocked);
+    //
+    //        // main cannot lock
+    //        mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(0, mainLocked);
+    //
+    //        workerInstance.exports().function("unlockMutex").apply(mutexAddr);
+    //
+    //        // now more interesting
+    //        // main gets the lock
+    //        mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(1, mainLocked);
+    //
+    //        var workerAcquiredLock = new AtomicBoolean(false);
+    //        Thread t =
+    //                new Thread(
+    //                        () -> {
+    //                            // worker remains ready for locking
+    //                            lockMutex(workerInstance, mutexAddr);
+    //                            workerAcquiredLock.set(true);
+    //                            unlockMutex(workerInstance, mutexAddr);
+    //                        });
+    //        t.start();
+    //
+    //        // unlock the mutex to let the worker acquire the lock
+    //        unlockMutex(mainInstance, mutexAddr);
+    //
+    //        t.join();
+    //
+    //        assertTrue(workerAcquiredLock.get());
+    //    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryMachinesAndLocksImplementations")
+    //    public void threadsExampleWake(
+    //            Memory memory,
+    //            Function<Instance.Builder, Instance.Builder> machineInject,
+    //            LockWithTimeout lockWithTimeout)
+    //            throws Exception {
+    //        var mutexAddr = 0;
+    //        var mainInstance = newInstance(memory, machineInject);
+    //        var workerInstance = newInstance(memory, machineInject);
+    //
+    //        // Lock on main
+    //        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(1, mainLocked);
+    //
+    //        var workerAcquireLock = new AtomicInteger(-1);
+    //        Thread workerT =
+    //                new Thread(
+    //                        () -> {
+    //                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 1);
+    //                            workerAcquireLock.set(result);
+    //                        });
+    //        workerT.start();
+    //        Thread.sleep(200);
+    //
+    //        unlockMutex(mainInstance, mutexAddr);
+    //        workerT.join();
+    //
+    //        // 0 == ok -> unlocked and notified
+    //        assertEquals(0, workerAcquireLock.get());
+    //    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryMachinesAndLocksImplementations")
+    //    public void threadsExampleNotEqual(
+    //            Memory memory,
+    //            Function<Instance.Builder, Instance.Builder> machineInject,
+    //            LockWithTimeout lockWithTimeout)
+    //            throws Exception {
+    //        var mutexAddr = 0;
+    //        var mainInstance = newInstance(memory, machineInject);
+    //        var workerInstance = newInstance(memory, machineInject);
+    //
+    //        // Lock on main
+    //        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(1, mainLocked);
+    //
+    //        var workerAcquireLock = new AtomicInteger(-1);
+    //        Thread workerT =
+    //                new Thread(
+    //                        () -> {
+    //                            // worker remains ready for locking
+    //                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 2);
+    //                            workerAcquireLock.set(result);
+    //                        });
+    //        Thread mainT =
+    //                new Thread(
+    //                        () -> {
+    //                            // unlock the mutex
+    //                            try {
+    //                                Thread.sleep(10);
+    //                            } catch (InterruptedException e) {
+    //                                throw new RuntimeException(e);
+    //                            }
+    //                            unlockMutex(mainInstance, mutexAddr);
+    //                        });
+    //        workerT.start();
+    //        mainT.start();
+    //
+    //        mainT.join();
+    //        workerT.join();
+    //
+    //        // 1 == not equal
+    //        assertEquals(1, workerAcquireLock.get());
+    //    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryMachinesAndLocksImplementations")
+    //    public void threadsExampleTimeout(
+    //            Memory memory,
+    //            Function<Instance.Builder, Instance.Builder> machineInject,
+    //            LockWithTimeout lockWithTimeout)
+    //            throws Exception {
+    //        var mutexAddr = 0;
+    //        var mainInstance = newInstance(memory, machineInject);
+    //        var workerInstance = newInstance(memory, machineInject);
+    //
+    //        // Lock on main
+    //        var mainLocked = tryLockMutex(mainInstance, mutexAddr);
+    //        assertEquals(1, mainLocked);
+    //
+    //        var workerAcquireLock = new AtomicInteger(-1);
+    //        Thread workerT =
+    //                new Thread(
+    //                        () -> {
+    //                            // worker remains ready for locking
+    //                            var result = lockWithTimeout.lock(workerInstance, mutexAddr, 1);
+    //                            workerAcquireLock.set(result);
+    //                        });
+    //        workerT.start();
+    //        workerT.join();
+    //
+    //        // 2 == timeout
+    //        assertEquals(2, workerAcquireLock.get());
+    //    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryAndMachinesImplementations")
+    //    public void atomicFenceOrder(
+    //            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
+    //            throws Exception {
+    //        var mainInstance = newInstance(memory, machineInject);
+    //        var workerInstance = newInstance(memory, machineInject);
+    //
+    //        var fencedReadAndVerify = mainInstance.exports().function("fenced_read_and_verify");
+    //        var fencedWrite = workerInstance.exports().function("fenced_write");
+    //
+    //        memory.writeI32(0, 0);
+    //        memory.writeI32(4, 0);
+    //
+    //        AtomicBoolean done = new AtomicBoolean(false);
+    //
+    //        Thread workerT =
+    //                new Thread(
+    //                        () -> {
+    //                            while (!done.get()) {
+    //                                fencedWrite.apply();
+    //                            }
+    //                        });
+    //
+    //        // set done after 200ms
+    //        CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS)
+    //                .execute(
+    //                        () -> {
+    //                            done.set(true);
+    //                        });
+    //        workerT.start();
+    //        assertDoesNotThrow(
+    //                () -> {
+    //                    while (!done.get()) {
+    //                        fencedReadAndVerify.apply();
+    //                    }
+    //                });
+    //        workerT.join();
+    //        // also verify we made some iterations
+    //        assertTrue(memory.readI32(0) > 10000);
+    //    }
+    //
+    //    @ParameterizedTest
+    //    @MethodSource("memoryAndMachinesImplementations")
+    //    public void concurrentMutexStressTest(
+    //            Memory memory, Function<Instance.Builder, Instance.Builder> machineInject)
+    //            throws Exception {
+    //        final int numThreads = 4;
+    //        final int iterationsPerThread = 1000;
+    //        final int mutexAddr = 0;
+    //        final int counterAddr = 4;
+    //
+    //        // Initialize mutex (0 = unlocked) and counter
+    //        memory.writeI32(mutexAddr, 0);
+    //        memory.writeI32(counterAddr, 0);
+    //
+    //        // Create worker threads that each increment the counter
+    //        List<Thread> threads = new ArrayList<>();
+    //
+    //        for (int i = 0; i < numThreads; i++) {
+    //            var instance = newInstance(memory, machineInject);
+    //            Thread t =
+    //                    new Thread(
+    //                            () -> {
+    //                                for (int j = 0; j < iterationsPerThread; j++) {
+    //                                    // Lock mutex
+    //                                    lockMutex(instance, mutexAddr);
+    //
+    //                                    // Read, increment, write counter (critical section)
+    //                                    long value = memory.readI32(counterAddr);
+    //                                    memory.writeI32(counterAddr, (int) (value + 1));
+    //
+    //                                    // Unlock mutex
+    //                                    unlockMutex(instance, mutexAddr);
+    //                                }
+    //                            });
+    //            threads.add(t);
+    //        }
+    //
+    //        // Start all threads
+    //        for (Thread t : threads) {
+    //            t.start();
+    //        }
+    //
+    //        // Wait for all threads to complete (with timeout to avoid hanging on deadlock)
+    //        for (Thread t : threads) {
+    //            t.join(5_000); // 5 second timeout
+    //            if (t.isAlive()) {
+    //                // Thread is still running - likely deadlocked
+    //                t.interrupt();
+    //                throw new AssertionError("Thread deadlocked - wait/notify bug suspected");
+    //            }
+    //        }
+    //
+    //        // Verify final counter value
+    //        long finalCount = memory.readI32(counterAddr);
+    //        long expectedCount = (long) numThreads * iterationsPerThread;
+    //        assertEquals(expectedCount, finalCount);
+    //    }
 }

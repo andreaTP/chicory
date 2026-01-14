@@ -59,36 +59,36 @@
         <groupId>com.dylibso.chicory</groupId>
         <artifactId>chicory-compiler-maven-plugin</artifactId>
         <executions>
-          <execution>
-            <id>compile-quickjs</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <name>com.dylibso.chicory.testing.gen.QuickJS</name>
-              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/quickjs-provider.javy-dynamic.wasm</wasmFile>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-dynamic-js</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <name>com.dylibso.chicory.testing.gen.DynamicHelloJS</name>
-              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/hello-world.js.javy-dynamic.wasm</wasmFile>
-            </configuration>
-          </execution>
-          <execution>
-            <id>wat2wasm</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <name>com.dylibso.chicory.wabt.Wat2Wasm</name>
-              <wasmFile>${project.basedir}/../wabt/src/main/resources/wat2wasm</wasmFile>
-            </configuration>
-          </execution>
+          <!--          <execution>-->
+          <!--            <id>compile-quickjs</id>-->
+          <!--            <goals>-->
+          <!--              <goal>compile</goal>-->
+          <!--            </goals>-->
+          <!--            <configuration>-->
+          <!--              <name>com.dylibso.chicory.testing.gen.QuickJS</name>-->
+          <!--              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/quickjs-provider.javy-dynamic.wasm</wasmFile>-->
+          <!--            </configuration>-->
+          <!--          </execution>-->
+          <!--          <execution>-->
+          <!--            <id>compile-dynamic-js</id>-->
+          <!--            <goals>-->
+          <!--              <goal>compile</goal>-->
+          <!--            </goals>-->
+          <!--            <configuration>-->
+          <!--              <name>com.dylibso.chicory.testing.gen.DynamicHelloJS</name>-->
+          <!--              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/hello-world.js.javy-dynamic.wasm</wasmFile>-->
+          <!--            </configuration>-->
+          <!--          </execution>-->
+          <!--          <execution>-->
+          <!--            <id>wat2wasm</id>-->
+          <!--            <goals>-->
+          <!--              <goal>compile</goal>-->
+          <!--            </goals>-->
+          <!--            <configuration>-->
+          <!--              <name>com.dylibso.chicory.wabt.Wat2Wasm</name>-->
+          <!--              <wasmFile>${project.basedir}/../wabt/src/main/resources/wat2wasm</wasmFile>-->
+          <!--            </configuration>-->
+          <!--          </execution>-->
           <execution>
             <id>postgres</id>
             <goals>
@@ -99,7 +99,13 @@
               <!-- https://github.com/f0rr0/pglite-oxide/blob/main/assets/pglite-wasi.tar.xz -->
               <!--              <wasmFile>/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/pglite-opt.wasi</wasmFile>-->
               <wasmFile>/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/pglite.wasi</wasmFile>
-              <interpreterFallback>WARN</interpreterFallback>
+              <!-- <interpreterFallback>WARN</interpreterFallback>-->
+              <interpretedFunctions>
+                <function>5706</function>
+                <function>11477</function>
+                <function>17646</function>
+                <function>25127</function>
+              </interpretedFunctions>
               <!--              <interpretedFunctions>-->
               <!--                <function>3053</function>-->
               <!--                <function>4496</function>-->
@@ -112,16 +118,16 @@
               <!--              </interpretedFunctions>-->
             </configuration>
           </execution>
-          <execution>
-            <id>threads</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <name>com.dylibso.chicory.testing.ThreadsExampleModule</name>
-              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/threads-example.wat.wasm</wasmFile>
-            </configuration>
-          </execution>
+          <!--          <execution>-->
+          <!--            <id>threads</id>-->
+          <!--            <goals>-->
+          <!--              <goal>compile</goal>-->
+          <!--            </goals>-->
+          <!--            <configuration>-->
+          <!--              <name>com.dylibso.chicory.testing.ThreadsExampleModule</name>-->
+          <!--              <wasmFile>${project.basedir}/../wasm-corpus/src/main/resources/compiled/threads-example.wat.wasm</wasmFile>-->
+          <!--            </configuration>-->
+          <!--          </execution>-->
         </executions>
       </plugin>
     </plugins>

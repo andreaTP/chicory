@@ -52,7 +52,8 @@ public class TableInstance {
 
     public int ref(int index) {
         if (index < 0 || index >= this.refs.length) {
-            throw new ChicoryException("undefined element");
+            throw new ChicoryException(
+                    "undefined element: index=" + index + ", table size=" + this.refs.length);
         }
         return this.refs[index];
     }
