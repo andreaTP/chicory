@@ -19,6 +19,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -345,48 +346,46 @@ public final class MachinesTest {
                         .withMemoryLimits(new MemoryLimits(100))
                         .build();
 
-        // === STEP 1: pgl_initdb ===
         System.out.println("pgl_initdb: " + instance.exports().function("pgl_initdb").apply()[0]);
         assertEquals("17\n", Files.readString(pgdata.resolve("PG_VERSION")));
 
-        // === STEP 2: pgl_backend (may trap - expected) ===
         try {
             instance.exports().function("pgl_backend").apply();
+            System.out.println("pgl_backend: OK");
         } catch (Exception e) {
+            // pglite-oxide: "pgl_backend may emit warnings about locale operations
+            // (OpenPipeStream) because WASI doesn't support process spawning.
+            // These are safe to ignore."
             System.out.println("pgl_backend trapped (expected): " + e.getMessage());
         }
 
-        // === STEP 3: Get CMA buffer ===
         int channel = (int) instance.exports().function("get_channel").apply()[0];
         int addr = (int) instance.exports().function("get_buffer_addr").apply(channel)[0];
         System.out.println("CMA: channel=" + channel + " addr=" + addr);
 
-        // === STEP 4: Wire protocol handshake ===
-        instance.exports().function("use_wire").apply(1); // MUST use wire in CMA mode
+        // Clear CMA state before handshake (like pglite-oxide's clear_wire_pending)
+        instance.exports().function("interactive_write").apply(0);
 
         // Send startup message
         byte[] startup = wireStartup("postgres", "template1");
-        wireSend(instance, addr, startup);
+        int pendingLen = wireSendCma(instance, addr, startup);
 
         // Drain responses until ReadyForQuery
         boolean ready = false;
-        int lastMsgLen = startup.length;
         for (int round = 0; round < 100 && !ready; round++) {
             instance.exports().function("interactive_one").apply();
-            int len = (int) instance.exports().function("interactive_read").apply()[0];
-            if (len > 0) {
-                byte[] resp = instance.memory().readBytes(addr + lastMsgLen + 1, len);
+            byte[] resp = wireRecvCma(instance, addr, pendingLen);
+            if (resp != null) {
+                pendingLen = 0; // Clear after successful read (like pglite-oxide)
                 int[] auth = wireGetAuth(resp);
                 System.out.println("Handshake: " + wireParseSimple(resp) + " auth=" + auth[0]);
                 if (auth[0] == 5) { // MD5 password
                     byte[] salt = {(byte) auth[1], (byte) auth[2], (byte) auth[3], (byte) auth[4]};
-                    byte[] pwMsg = wireMd5Password("password", "postgres", salt);
-                    wireSend(instance, addr, pwMsg);
-                    lastMsgLen = pwMsg.length;
+                    pendingLen =
+                            wireSendCma(
+                                    instance, addr, wireMd5Password("password", "postgres", salt));
                 } else if (auth[0] == 3) { // Cleartext
-                    byte[] pwMsg = wirePassword("password");
-                    wireSend(instance, addr, pwMsg);
-                    lastMsgLen = pwMsg.length;
+                    pendingLen = wireSendCma(instance, addr, wirePassword("password"));
                 }
                 if (wireHasReadyForQuery(resp)) ready = true;
             }
@@ -394,25 +393,67 @@ public final class MachinesTest {
         System.out.println("Handshake complete: " + ready);
 
         // === STEP 5: Run query ===
-        byte[] query = wireQuery("SELECT 1 AS result");
-        wireSend(instance, addr, query);
+        // Clear error state before query
+        instance.exports().function("clear_error").apply();
 
-        // Drain response
-        for (int i = 0; i < 50; i++) {
+        // Clear CMA state
+        instance.exports().function("interactive_write").apply(0);
+
+        byte[] query = wireQuery("select 1;");
+        System.out.println("Sending query (" + query.length + " bytes)");
+        pendingLen = wireSendCma(instance, addr, query);
+        System.out.println("Buffer at addr " + addr + ": " + dumpMemoryHex(instance, addr, 50));
+
+        // Simple query execution: just call interactive_one a few times and check response
+        System.out.println("Running query...");
+        for (int i = 0; i < 5; i++) {
+            System.out.println("  Iteration " + i + ": calling interactive_one");
             instance.exports().function("interactive_one").apply();
-            int len = (int) instance.exports().function("interactive_read").apply()[0];
-            if (len > 0) {
-                byte[] resp = instance.memory().readBytes(addr + query.length + 1, len);
-                System.out.println("Query response: " + wireParseSimple(resp));
-                if (wireHasReadyForQuery(resp)) break;
-            }
+            int respLen = (int) instance.exports().function("interactive_read").apply()[0];
+            System.out.println("  Iteration " + i + ": interactive_read() = " + respLen);
+            System.out.println("  Buffer after: " + dumpMemoryHex(instance, addr, 60));
+            if (respLen <= 0) break;
         }
+        System.out.println("Query execution finished");
     }
 
-    // Send wire message (write to buffer and set length)
-    private void wireSend(Instance inst, int addr, byte[] msg) {
+    // Send wire message CMA style (returns pending length for reads)
+    // Note: pglite-oxide calls use_wire(true) before EACH send in forward_wire
+    private int wireSendCma(Instance inst, int addr, byte[] msg) {
+        var len = msg.length;
+        msg = Arrays.copyOf(msg, len + 1);
+        msg[len] = 0;
+        inst.exports().function("use_wire").apply(1); // Enable wire mode before each send
         inst.memory().write(addr, msg);
         inst.exports().function("interactive_write").apply(msg.length);
+        return msg.length;
+    }
+
+    // Receive wire message CMA style
+    // Receive wire message CMA style
+    // Response is written at addr + pendingLen + 1 (after the request message)
+    private byte[] wireRecvCma(Instance inst, int addr, int pendingLen) {
+        int len = (int) inst.exports().function("interactive_read").apply()[0];
+        if (len <= 0) return null;
+        byte[] resp = inst.memory().readBytes(addr + pendingLen + 1, len);
+        // Note: Don't clear cma_rsize here - pglite-oxide only clears pending_wire_len (Rust side)
+        // The cma_rsize is cleared at the end of interactive_one
+        return resp;
+    }
+
+    // Dump memory as hex
+    private String dumpMemoryHex(Instance inst, int addr, int len) {
+        StringBuilder sb = new StringBuilder();
+        byte[] data = inst.memory().readBytes(addr, len);
+        for (int i = 0; i < data.length; i++) {
+            sb.append(String.format("%02x ", data[i] & 0xFF));
+        }
+        sb.append(" | ");
+        for (int i = 0; i < data.length; i++) {
+            char c = (char) (data[i] & 0xFF);
+            sb.append(c >= 32 && c < 127 ? c : '.');
+        }
+        return sb.toString();
     }
 
     // Hex dump for debugging
@@ -457,7 +498,7 @@ public final class MachinesTest {
         return new int[] {-1, 0, 0, 0, 0};
     }
 
-    // Check if response contains ReadyForQuery
+    // Check if response contains ReadyForQuery and print transaction status
     private boolean wireHasReadyForQuery(byte[] data) {
         int i = 0;
         while (i + 5 <= data.length) {
@@ -468,7 +509,15 @@ public final class MachinesTest {
                             | ((data[i + 3] & 0xFF) << 8)
                             | (data[i + 4] & 0xFF);
             if (len < 4) break;
-            if (tag == 'Z') return true;
+            if (tag == 'Z') {
+                // ReadyForQuery contains a single byte: transaction status
+                // 'I' = idle, 'T' = in transaction, 'E' = failed transaction
+                if (len == 5 && i + 6 <= data.length) {
+                    char txStatus = (char) data[i + 5];
+                    System.out.println("ReadyForQuery: transaction status = '" + txStatus + "'");
+                }
+                return true;
+            }
             i += 1 + len;
         }
         return false;
@@ -509,10 +558,21 @@ public final class MachinesTest {
         return sb.toString().trim();
     }
 
-    // Wire protocol: StartupMessage
+    // Wire protocol: StartupMessage (matching pglite-oxide)
     private byte[] wireStartup(String user, String db) {
-        byte[] params = ("user\0" + user + "\0database\0" + db + "\0\0").getBytes(UTF_8);
-        byte[] msg = new byte[4 + 4 + params.length];
+        // Parameters: user, database, client_encoding, application_name (like pglite-oxide)
+        String params =
+                "user\0"
+                        + user
+                        + "\0"
+                        + "database\0"
+                        + db
+                        + "\0"
+                        + "client_encoding\0UTF8\0"
+                        + "application_name\0chicory\0"
+                        + "\0"; // Final null terminator
+        byte[] paramsBytes = params.getBytes(UTF_8);
+        byte[] msg = new byte[4 + 4 + paramsBytes.length];
         int len = msg.length;
         msg[0] = (byte) (len >> 24);
         msg[1] = (byte) (len >> 16);
@@ -521,8 +581,8 @@ public final class MachinesTest {
         msg[4] = 0;
         msg[5] = 3;
         msg[6] = 0;
-        msg[7] = 0; // Protocol 3.0
-        System.arraycopy(params, 0, msg, 8, params.length);
+        msg[7] = 0; // Protocol 3.0 = 196608 = 0x00030000
+        System.arraycopy(paramsBytes, 0, msg, 8, paramsBytes.length);
         return msg;
     }
 
