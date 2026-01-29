@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.dylibso.chicory</groupId>
+    <artifactId>chicory</artifactId>
+    <version>999-SNAPSHOT</version>
+  </parent>
+  <artifactId>demo-tests</artifactId>
+  <packaging>jar</packaging>
+
+  <name>Chicory - Machines tests</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>wasm</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>compiler</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>wasi</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>wasm-corpus</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.roastedroot</groupId>
+      <artifactId>zerofs</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.dylibso.chicory</groupId>
+        <artifactId>chicory-compiler-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>lumis</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <name>com.dylibso.chicory.testing.Lumis</name>
+              <wasmFile>/home/andreatp/workspace/chicory4/lumis-hello-world/target/wasm32-wasip1/release/hello_world.wasm</wasmFile>
+              <interpreterFallback>WARN</interpreterFallback>
+            </configuration>
+          </execution>
+          <execution>
+            <id>syntastica</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <name>com.dylibso.chicory.testing.Syntastica</name>
+              <wasmFile>/home/andreatp/workspace/chicory4/syntastica-hello-world/target/wasm32-unknown-unknown/release/hello_world.wasm</wasmFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

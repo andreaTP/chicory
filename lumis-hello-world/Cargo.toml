@@ -1,0 +1,12 @@
+[package]
+name = "hello-world"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lumis = { version = "0.1", default-features = false, features = ["lang-rust", "lang-javascript"] }
+# lumis = { version = "0.1.1", features = ["all-languages"] }
+
+[profile.release]
+opt-level = 3
