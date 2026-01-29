@@ -60,24 +60,13 @@
         <artifactId>chicory-compiler-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>lumis</id>
+            <id>ratatui</id>
             <goals>
               <goal>compile</goal>
             </goals>
             <configuration>
-              <name>com.dylibso.chicory.testing.Lumis</name>
-              <wasmFile>/home/andreatp/workspace/chicory4/lumis-hello-world/target/wasm32-wasip1/release/hello_world.wasm</wasmFile>
-              <interpreterFallback>WARN</interpreterFallback>
-            </configuration>
-          </execution>
-          <execution>
-            <id>syntastica</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <name>com.dylibso.chicory.testing.Syntastica</name>
-              <wasmFile>/home/andreatp/workspace/chicory4/syntastica-hello-world/target/wasm32-unknown-unknown/release/hello_world.wasm</wasmFile>
+              <name>com.dylibso.chicory.testing.Ratatui</name>
+              <wasmFile>/home/andreatp/workspace/chicory4/ratatui-hello-world/target/wasm32-unknown-unknown/release/ratatui_hello_world.wasm</wasmFile>
             </configuration>
           </execution>
         </executions>
