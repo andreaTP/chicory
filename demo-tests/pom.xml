@@ -22,6 +22,11 @@
       <artifactId>wasm</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.jline</groupId>
+      <artifactId>jline</artifactId>
+      <version>3.25.1</version>
+    </dependency>
+    <dependency>
       <groupId>com.dylibso.chicory</groupId>
       <artifactId>compiler</artifactId>
       <scope>test</scope>
@@ -70,6 +75,17 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.dylibso.chicory.testing.RatatuiDemo</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
       </plugin>
     </plugins>
   </build>
