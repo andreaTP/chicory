@@ -9,6 +9,8 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # default = []
 
+# Thanks to: https://github.com/NfNitLoop/ratatui-wasm-backend
+
 # Enables anes/parser and the `ctrl` module to parse "Control Characters".
 #
 # !!!: If you use this feature, be aware of this bug:
