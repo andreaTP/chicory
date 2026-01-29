@@ -8,7 +8,10 @@ public final class DemoTest {
     private String unpackString(Instance instance, long packed) {
         var addr = (int) ((packed >>> 32) & 0xFFFFFFFFL);
         var len = (int) (packed & 0xFFFFFFFFL);
-        return instance.memory().readString(addr, len);
+
+        var result = instance.memory().readString(addr, len);
+        instance.exports().function("wasm_free").apply(addr, len);
+        return result;
     }
 
     @Test
