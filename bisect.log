@@ -1,0 +1,120 @@
+Checking commit: 5d249c46abc 8275071: [macos] A11y cursor gets stuck when combobox is closed
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+Conversion succeeded, output bytes: 1447649
+Checking commit: 3a7b663b6f3 8265776: Improve Stream handling for SSL
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: 32895ac6094 8275650: Problemlist java/io/File/createTempFile/SpecialTempFile.java for Windows 11
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: ce3ed65ac34 8273154: Provide a JavadocTester method for non-overlapping, unordered output matching
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: bd92674be56 8276184: Exclude lambda proxy class from the CDS archive if its caller class is excluded
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: 8f5a8f740b6 8264293: Create implementation for NSAccessibilityMenu protocol peer 8264296: Create implementation for NSAccessibilityPopUpButton protocol peer 8264295: Create implementation for NSAccessibilityMenuItem protocol peer 8264294: Create implementation for NSAccessibilityMenuBar protocol peer
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+Conversion succeeded, output bytes: 1447649
+Checking commit: f3eb5014aa7 8276162: Optimise unsigned comparison pattern
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+Conversion succeeded, output bytes: 1447649
+Checking commit: a9cb8bdbaac 8274168: Avoid String.compareTo == 0 to check String equality in java.management
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: c06df25a4fb 8274662: Replace 'while' cycles with iterator with enhanced-for in jdk.hotspot.agent
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: 7906eb050d4 8277119: Add asserts in GenericTaskQueueSet methods
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: 9a9a157a7d4 8276905: Use appropriate macosx_version_minimum value while compiling metal shaders
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.6.3:java (default-cli) on project wabt: An exception occurred while executing the Java class. out of bounds memory access: attempted to access address: 100663296 but limit is: 56819712 and size: 8 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+Checking commit: 79c774acbcd 8276162: Optimise unsigned comparison pattern
+RESULT:
+Loading pre-generated WAT from classpath: big-50k-0.wat
+WAT size (chars): 7555561
+Invoking Wat2Wasm.parse(...)
+Conversion succeeded, output bytes: 1447649

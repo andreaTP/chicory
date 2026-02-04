@@ -12,6 +12,9 @@ cd "$SCRIPT_DIR"
 echo "[reproducer] Building wabt and dependencies (no tests)..."
 mvn -q -Pdev -pl wabt -am \
   -DskipTests \
+  -Dspotless.check.skip=true \
+  -Dspotless.apply.skip=true \
+  -Dmaven.compiler.failOnError=false \
   package test-compile
 
 echo "[reproducer] Running Wat2WasmReproducerMain..."

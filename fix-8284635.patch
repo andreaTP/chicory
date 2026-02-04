@@ -1,0 +1,93 @@
+From a81c5d3a23163164a79763421935d0262a36f27e Mon Sep 17 00:00:00 2001
+From: vamsi-parasa <srinivas.vamsi.parasa@intel.com>
+Date: Thu, 14 Apr 2022 16:24:29 +0000
+Subject: [PATCH] 8284635: Crashes after 8282221: assert(ctrl == kit.control())
+ failed: Control flow was added although the intrinsic bailed out
+
+Reviewed-by: kvn
+---
+ src/hotspot/share/opto/library_call.cpp | 51 ++++++++++++++++---------
+ test/jdk/ProblemList-Xcomp.txt          |  1 -
+ 2 files changed, 34 insertions(+), 18 deletions(-)
+
+diff --git a/src/hotspot/share/opto/library_call.cpp b/src/hotspot/share/opto/library_call.cpp
+index 41e8adc93c681..cb8cede789cdf 100644
+--- a/src/hotspot/share/opto/library_call.cpp
++++ b/src/hotspot/share/opto/library_call.cpp
+@@ -2194,32 +2194,49 @@ bool LibraryCallKit::inline_number_methods(vmIntrinsics::ID id) {
+ }
+ 
+ //--------------------------inline_unsigned_divmod_methods-----------------------------
+-// inline int Integer.divideUnsigned(init, int)
++// inline int Integer.divideUnsigned(int, int)
+ // inline int Integer.remainderUnsigned(int, int)
++// inline long Long.divideUnsigned(long, long)
++// inline long Long.remainderUnsigned(long, long)
+ bool LibraryCallKit::inline_divmod_methods(vmIntrinsics::ID id) {
+   Node* n = NULL;
+-  switch(id) {
+-    case vmIntrinsics::_divideUnsigned_i:
++  switch (id) {
++    case vmIntrinsics::_divideUnsigned_i: {
+       zero_check_int(argument(1));
+-      // Compile-time detect of null-exception?
+-      if (stopped()) return false;
++      // Compile-time detect of null-exception
++      if (stopped()) {
++        return true; // keep the graph constructed so far
++      }
+       n = new UDivINode(control(), argument(0), argument(1));
+       break;
+-    case vmIntrinsics::_divideUnsigned_l:
++    }
++    case vmIntrinsics::_divideUnsigned_l: {
+       zero_check_long(argument(2));
+-      // Compile-time detect of null-exception?
+-      if (stopped()) return false;
+-      n = new UDivLNode(control(), argument(0), argument(2));  break;
+-    case vmIntrinsics::_remainderUnsigned_i:
++      // Compile-time detect of null-exception
++      if (stopped()) {
++        return true; // keep the graph constructed so far
++      }
++      n = new UDivLNode(control(), argument(0), argument(2));
++      break;
++    }
++    case vmIntrinsics::_remainderUnsigned_i: {
+       zero_check_int(argument(1));
+-      // Compile-time detect of null-exception?
+-      if (stopped()) return false;
+-      n = new UModINode(control(), argument(0), argument(1));  break;
+-    case vmIntrinsics::_remainderUnsigned_l:
++      // Compile-time detect of null-exception
++      if (stopped()) {
++        return true; // keep the graph constructed so far
++      }
++      n = new UModINode(control(), argument(0), argument(1));
++      break;
++    }
++    case vmIntrinsics::_remainderUnsigned_l: {
+       zero_check_long(argument(2));
+-      // Compile-time detect of null-exception?
+-      if (stopped()) return false;
+-      n = new UModLNode(control(), argument(0), argument(2));  break;
++      // Compile-time detect of null-exception
++      if (stopped()) {
++        return true; // keep the graph constructed so far
++      }
++      n = new UModLNode(control(), argument(0), argument(2));
++      break;
++    }
+     default:  fatal_unexpected_iid(id);  break;
+   }
+   set_result(_gvn.transform(n));
+diff --git a/test/jdk/ProblemList-Xcomp.txt b/test/jdk/ProblemList-Xcomp.txt
+index 37ba68ef714e1..31edd809cccb4 100644
+--- a/test/jdk/ProblemList-Xcomp.txt
++++ b/test/jdk/ProblemList-Xcomp.txt
+@@ -27,5 +27,4 @@
+ #
+ #############################################################################
+ 
+-java/lang/Integer/Unsigned.java 8284635 generic-all
+ java/lang/invoke/MethodHandles/CatchExceptionTest.java 8146623 generic-all

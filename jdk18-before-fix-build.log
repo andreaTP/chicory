@@ -1,0 +1,34 @@
+Building target 'images' in configuration 'linux-x86_64-server-release'
+Compiling 1 files for BUILD_TOOLS_HOTSPOT
+Compiling 8 files for BUILD_TOOLS_LANGTOOLS
+Creating hotspot/variant-server/tools/adlc/adlc from 13 file(s)
+Compiling 2 files for BUILD_JVMTI_TOOLS
+Generating classes for compiler.properties launcher.properties
+Compiling 20 properties into resource bundles for jdk.compiler
+Compiling 17 properties into resource bundles for jdk.javadoc
+Compiling 15 properties into resource bundles for jdk.jdeps
+Compiling 9 properties into resource bundles for jdk.jshell
+Compiling 127 files for BUILD_java.compiler.interim
+Compiling 406 files for BUILD_jdk.compiler.interim
+Compiling 242 files for BUILD_jdk.javadoc.interim
+Creating support/modules_libs/java.base/server/libjvm.so from 1078 file(s)
+In file included from /home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/classfile/classLoaderData.hpp:33,
+                 from /home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/precompiled/precompiled.hpp:34:
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/growableArray.hpp:121:24: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]
+  121 |   GrowableArrayView<E>(E* data, int initial_max, int initial_len) :
+      |                        ^
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/growableArray.hpp:121:24: note: remove the '< >'
+In file included from /home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/memory/allocation.hpp:29,
+                 from /home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/classfile/classLoaderData.hpp:28:
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/linkedlist.hpp:85:15: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]
+   85 |   NONCOPYABLE(LinkedList<E>);
+      |               ^~~~~~~~~~~~~
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/globalDefinitions.hpp:84:26: note: in definition of macro 'NONCOPYABLE'
+   84 | #define NONCOPYABLE(C) C(C const&) = delete; C& operator=(C const&) = delete /* next token must be ; */
+      |                          ^
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/linkedlist.hpp:85:15: note: remove the '< >'
+   85 |   NONCOPYABLE(LinkedList<E>);
+      |               ^~~~~~~~~~~~~
+/home/andreatp/workspace/chicory4/openjdk-bisect/src/hotspot/share/utilities/globalDefinitions.hpp:84:26: note: in definition of macro 'NONCOPYABLE'
+   84 | #define NONCOPYABLE(C) C(C const&) = delete; C& operator=(C const&) = delete /* next token must be ; */
+      |                          ^
