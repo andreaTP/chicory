@@ -1,30 +1,93 @@
 package com.dylibso.chicory.wabt;
 
+import com.dylibso.chicory.runtime.ImportValues;
+import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.wasi.WasiExitException;
+import com.dylibso.chicory.wasi.WasiOptions;
+import com.dylibso.chicory.wasi.WasiPreview1;
+import com.dylibso.chicory.wasm.WasmModule;
+import io.roastedroot.zerofs.Configuration;
+import io.roastedroot.zerofs.ZeroFs;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+
+import static java.nio.file.Files.copy;
 
 public final class Wat2WasmReproducerMain {
+    private static final WasmModule MODULE = Wat2WasmModule.load();
 
     private Wat2WasmReproducerMain() {}
 
-    private static String loadPreGeneratedWat() throws IOException {
-        try (InputStream is = Wat2WasmReproducerMain.class.getResourceAsStream("big-50k-0.wat")) {
-            if (is == null) {
-                throw new IOException("Resource big-50k-0.wat not found on classpath");
+    private static String createBigWat(int funcCount) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("(module\n");
+
+        for (int func = 1; func <= funcCount; func++) {
+            sb.append("  (func $func_").append(func)
+                    .append(" (export 'func_").append(func).append("')\n");
+            if (func != 1) {
+                sb.append("\n");
+                sb.append("    call $func_0\n");
             }
-            byte[] bytes = is.readAllBytes();
-            return new String(bytes, StandardCharsets.UTF_8);
+            sb.append("  )\n");
+        }
+
+        sb.append(")\n");
+        return sb.toString();
+    }
+
+    private static byte[] parse(InputStream is) {
+        try (ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
+             ByteArrayOutputStream stderrStream = new ByteArrayOutputStream()) {
+
+            WasiOptions wasiOpts =
+                    WasiOptions.builder()
+                            .withStdin(is)
+                            .withStdout(stdoutStream)
+                            .withStderr(stderrStream)
+                            .withArguments(List.of("wat2wasm", "-"))
+                            .build();
+
+                try (var wasi =
+                             WasiPreview1.builder().withOptions(wasiOpts).build()) {
+                    ImportValues imports =
+                            ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+                    Instance.builder(MODULE)
+                            .withMachineFactory(Wat2WasmModule::create)
+                            .withImportValues(imports)
+                            .build();
+                } catch (WasiExitException e) {
+                    if (e.exitCode() != 0) {
+                        throw new WatParseException(
+                                stdoutStream.toString(StandardCharsets.UTF_8)
+                                        + stderrStream.toString(StandardCharsets.UTF_8),
+                                e);
+                    }
+                }
+
+                return stdoutStream.toByteArray();
+            } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println("Loading pre-generated WAT from classpath: big-50k-0.wat");
-        String wat = loadPreGeneratedWat();
+        int funcCount = 1500;
+
+        String wat = createBigWat(funcCount);
         System.out.println("WAT size (chars): " + wat.length());
 
         System.out.println("Invoking Wat2Wasm.parse(...)");
-        byte[] result = Wat2Wasm.parse(wat);
+        byte[] result = parse(new ByteArrayInputStream(wat.getBytes(StandardCharsets.UTF_8)));
         System.out.println("Conversion succeeded, output bytes: " + result.length);
     }
 }
