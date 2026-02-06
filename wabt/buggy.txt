@@ -1,0 +1,205 @@
+     63    1     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLLLLLL)L (native)   (static)
+     68    2     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLL)L (native)   (static)
+     70    3     n 0       java.lang.invoke.MethodHandle::invokeBasic(LLLLLL)L (native)   
+     70    4     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLLLLLL)L (native)   (static)
+     74    5     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)V (native)   (static)
+     75    6     n 0       java.lang.invoke.MethodHandle::invokeBasic(LL)L (native)   
+     75    7     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)L (native)   (static)
+     79    8     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLL)L (native)   (static)
+     87    9     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLL)V (native)   (static)
+     88   10     n 0       java.lang.invoke.MethodHandle::invokeBasic(L)L (native)   
+     91   11     n 0       java.lang.invoke.MethodHandle::linkToStatic(LL)L (native)   (static)
+    104   12     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)I (native)   (static)
+    108   13     n 0       java.lang.invoke.MethodHandle::linkToVirtual(LL)V (native)   (static)
+    109   14     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLL)I (native)   (static)
+    113   15     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLLL)L (native)   (static)
+    116   16     n 0       java.lang.invoke.MethodHandle::invokeBasic()L (native)   
+    116   17     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)L (native)   (static)
+    119   18     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)V (native)   (static)
+    120   19     n 0       java.lang.invoke.MethodHandle::linkToInterface(LLL)I (native)   (static)
+    159   20     n 0       java.lang.invoke.MethodHandle::linkToInterface(LL)L (native)   (static)
+    162   21     n 0       java.lang.invoke.MethodHandle::linkToStatic(LL)I (native)   (static)
+    163   22     n 0       java.lang.invoke.MethodHandle::linkToVirtual(LL)L (native)   (static)
+    165   23     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)I (native)   (static)
+Resolving klass java/nio/charset/Charset at 123
+Resolving klass java/util/ArrayList at 731
+Resolving klass java/util/List at 749
+Resolving klass [Ljava/lang/String; at 754
+Resolving klass java/lang/StringLatin1$CharsSpliterator at 936
+Resolving klass java/util/stream/StreamSupport at 947
+Resolving klass java/util/Arrays at 89
+Resolving klass java/util/stream/Stream at 99
+Resolving klass java/util/stream/Collectors at 111
+Resolving klass java/lang/ClassLoader at 152
+Resolving klass java/lang/Module at 200
+Resolving klass jdk/internal/loader/BootLoader at 209
+Resolving klass java/lang/NoSuchMethodException at 247
+Resolving klass java/util/ArrayList at 587
+Resolving klass java/lang/reflect/Field at 842
+Resolving klass sun/invoke/util/Wrapper at 1151
+Resolving klass java/lang/invoke/LambdaMetafactory at 1556
+Resolving klass java/nio/ByteBuffer at 367
+Resolving klass java/util/Enumeration at 449
+Resolving klass java/lang/CompoundEnumeration at 459
+Resolving klass java/util/Objects at 71
+Resolving klass jdk/internal/reflect/Reflection at 102
+Resolving klass java/lang/Class at 130
+Resolving klass jdk/internal/logger/LazyLoggers at 306
+Resolving klass java/lang/Throwable at 2
+Resolving klass java/security/Permission at 102
+Resolving klass java/security/AllPermission at 115
+Resolving klass sun/security/util/FilePermCompat at 118
+Resolving klass java/lang/Exception at 2
+Resolving klass jdk/internal/ref/Cleaner at 36
+Resolving klass java/util/Hashtable$Enumerator at 207
+Resolving klass java/util/Objects at 44
+Resolving klass java/util/Properties$LineReader at 49
+Resolving klass java/lang/StringBuilder at 63
+Resolving klass java/util/Set at 185
+Resolving klass java/util/Iterator at 191
+Resolving klass java/util/Map$Entry at 200
+Resolving klass java/util/Map at 284
+Resolving klass java/util/Collections at 289
+Resolving klass java/util/Properties$EntrySet at 354
+Resolving klass java/lang/System at 80
+Resolving klass jdk/internal/reflect/Reflection at 25
+Resolving klass java/lang/reflect/Modifier at 98
+Resolving klass java/lang/ref/WeakReference at 227
+Resolving klass java/lang/reflect/Field at 2
+Resolving klass java/lang/reflect/AccessibleObject at 40
+Resolving klass java/lang/reflect/Modifier at 171
+Resolving klass java/lang/invoke/MethodHandle$1 at 469
+Resolving klass java/util/function/Function at 493
+Resolving klass java/lang/invoke/DirectMethodHandle$Special at 125
+Resolving klass java/lang/invoke/BoundMethodHandle at 208
+Resolving klass java/lang/Object at 8
+Resolving klass java/lang/invoke/VarHandle$AccessType at 76
+Resolving klass java/lang/invoke/VarHandle$AccessDescriptor at 84
+Resolving klass java/lang/invoke/VarHandle$TypesAndInvokers at 124
+Resolving klass java/lang/StringBuilder at 70
+Resolving klass java/lang/invoke/VarHandle at 252
+Resolving klass java/lang/invoke/VarHandle$AccessMode at 297
+Resolving klass java/lang/invoke/VarHandle$AccessDescriptor at 308
+Resolving klass java/lang/invoke/VarHandle$AccessType at 315
+Resolving klass java/lang/invoke/VarHandleGuards at 350
+Resolving klass java/lang/invoke/MemberName$Factory at 364
+Resolving klass sun/invoke/util/Wrapper at 388
+Resolving klass java/util/Collections at 230
+Resolving klass java/lang/invoke/MethodHandleNatives at 23
+Resolving klass java/lang/Integer at 22
+Resolving klass java/io/InputStream at 2
+Resolving klass java/io/ByteArrayInputStream at 8
+Resolving klass java/io/OutputStream at 52
+Resolving klass java/net/URLConnection at 350
+Resolving klass java/net/URL at 148
+Resolving klass java/lang/module/ModuleReader at 158
+Resolving klass java/util/Optional at 164
+Resolving klass jdk/internal/module/Resources at 171
+Resolving klass java/util/List at 203
+Resolving klass java/util/ArrayList at 210
+Resolving klass jdk/internal/loader/BuiltinClassLoader$1 at 222
+Resolving klass java/lang/ref/SoftReference at 228
+Resolving klass jdk/internal/loader/BuiltinClassLoader$2 at 234
+Resolving klass java/security/AccessController at 240
+Resolving klass java/util/Collections at 290
+Resolving klass jdk/internal/module/ModulePatcher$PatchedModuleReader at 376
+Resolving klass java/nio/ByteBuffer at 393
+Resolving klass jdk/internal/loader/BuiltinClassLoader$5 at 530
+Resolving klass java/util/AbstractMap at 8
+Resolving klass java/util/Set at 14
+Resolving klass java/util/Iterator at 25
+Resolving klass java/util/Map$Entry at 34
+Resolving klass java/util/Map at 53
+Resolving klass java/util/concurrent/ConcurrentHashMap$KeySetView at 265
+Resolving klass java/util/concurrent/ConcurrentHashMap$EntrySetView at 282
+Resolving klass java/util/AbstractList$Itr at 77
+Resolving klass [Ljava/lang/Object; at 56
+Resolving klass java/util/ArrayList$SubList at 267
+Resolving klass java/util/ArrayList$ArrayListSpliterator at 281
+Resolving klass jdk/internal/math/FloatingDecimal at 6
+Resolving klass java/lang/String at 5
+Resolving klass java/lang/Integer at 18
+Resolving klass java/lang/Long$LongCache at 234
+Resolving klass java/lang/Number at 277
+    277   24    b  4       java.lang.Long::compareUnsigned (14 bytes)
+
+============================= C2-compiled nmethod ==============================
+----------------------- MetaData before Compile_id = 24 ------------------------
+{method}
+ - this oop:          0x00007f1fcd536eb0
+ - method holder:     'java/lang/Long'
+ - constants:         0x00007f1fcd532c00 constant pool [506] {0x00007f1fcd532c00} for 'java/lang/Long' cache=0x00007f1fcd73d798
+ - access:            0x81000009  public static 
+ - name:              'compareUnsigned'
+ - signature:         '(JJ)I'
+ - max stack:         7
+ - max locals:        4
+ - size of params:    4
+ - method size:       13
+ - vtable index:      -2
+ - i2i entry:         0x00007f1ff500dc00
+ - adapters:          AHE@0x00007f20043143e0: 0xbebe i2c: 0x00007f1ff5099b60 c2i: 0x00007f1ff5099c44 c2iUV: 0x00007f1ff5099c0e c2iNCI: 0x00007f1ff5099c81
+ - compiled entry     0x00007f1ff5099c44
+ - code size:         14
+ - code start:        0x00007f1fcd536e80
+ - code end (excl):   0x00007f1fcd536e8e
+ - method data:       0x00007f1f998a2480
+ - checked ex length: 0
+ - linenumber start:  0x00007f1fcd536e8e
+ - localvar length:   2
+ - localvar start:    0x00007f1fcd536e96
+
+------------------------ OptoAssembly for Compile_id = 24 -----------------------
+#
+#  int ( long, half, long, half )
+#
+#r018 rsi:rsi   : parm 0: long
+#r016 rdx:rdx   : parm 2: long
+# -- Old rsp -- Framesize: 32 --
+#r591 rsp+28: in_preserve
+#r590 rsp+24: return address
+#r589 rsp+20: in_preserve
+#r588 rsp+16: saved fp register
+#r587 rsp+12: pad2, stack alignment
+#r586 rsp+ 8: pad2, stack alignment
+#r585 rsp+ 4: Fixed slot 1
+#r584 rsp+ 0: Fixed slot 0
+#
+000     N1: #	out( B1 ) <- in( B5 )  Freq: 1
+
+000     B1: #	out( B4 B2 ) <- BLOCK HEAD IS JUNK  Freq: 1
+000     # stack bang (96 bytes)
+	pushq   rbp	# Save rbp
+	subq    rsp, #16	# Create frame
+
+00c     movq    R10, #-9223372036854775808	# long
+016     addq    RSI, R10	# long
+019     addq    RDX, R10	# long
+01c     cmpq    RSI, RDX
+01f     jl,s   B4  P=0.500000 C=-1.000000
+
+021     B2: #	out( B6 B3 ) <- in( B1 )  Freq: 0.5
+021     cmpq    RSI, RDX
+024     je,s   B6  P=0.100000 C=-1.000000
+
+026     B3: #	out( B5 ) <- in( B2 )  Freq: 0.45
+026     movl    RAX, #1	# int
+02b     jmp,s   B5
+
+02d     B4: #	out( B5 ) <- in( B1 )  Freq: 0.5
+02d     movl    RAX, #-1	# int
+
+032     B5: #	out( N1 ) <- in( B3 B6 B4 )  Freq: 1
+032     addq    rsp, 16	# Destroy frame
+	popq    rbp
+	cmpq     rsp, poll_offset[r15_thread] 
+	ja       #safepoint_stub	# Safepoint: poll for GC
+
+044     ret
+
+045     B6: #	out( B5 ) <- in( B2 )  Freq: 0.05
+045     xorl    RAX, RAX	# int
+047     jmp,s   B5
+
+--------------------------------------------------------------------------------
+                              @ 10   java.lang.Long::compare (22 bytes)   force inline by ciReplay

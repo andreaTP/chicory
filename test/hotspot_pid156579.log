@@ -1,0 +1,137 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hotspot_log version='160 1' process='156579' time_ms='1770383112713'>
+<vm_version>
+<name>
+OpenJDK 64-Bit Server VM
+</name>
+<release>
+17-internal+0-adhoc.andreatp.jdk
+</release>
+<info>
+OpenJDK 64-Bit Server VM (fastdebug 17-internal+0-adhoc.andreatp.jdk) for linux-amd64 JRE (17-internal+0-adhoc.andreatp.jdk), built on Feb  6 2026 11:19:56 by &quot;andreatp&quot; with gcc 15.2.1 20251211 (Red Hat 15.2.1-5)
+</info>
+</vm_version>
+<vm_arguments>
+<args>
+-XX:+UnlockDiagnosticVMOptions -XX:+ReplayCompiles -XX:ReplayDataFile=/tmp/replay.txt -XX:CompileCommand=compileonly,ReplayTest::hotMethod -XX:+PrintCompilation </args>
+<command>
+ReplayTest
+</command>
+<launcher>
+SUN_STANDARD
+</launcher>
+<properties>
+java.vm.specification.name=Java Virtual Machine Specification
+java.vm.version=17-internal+0-adhoc.andreatp.jdk
+java.vm.name=OpenJDK 64-Bit Server VM
+jdk.debug=fastdebug
+sun.boot.library.path=/home/andreatp/workspace/jdk/build/linux-x86_64-server-fastdebug/jdk/lib
+java.library.path=/tmp/.mount_CursorOqQjLI/usr/lib/:/tmp/.mount_CursorOqQjLI/usr/lib32/:/tmp/.mount_CursorOqQjLI/usr/lib64/:/tmp/.mount_CursorOqQjLI/lib/:/tmp/.mount_CursorOqQjLI/lib/i386-linux-gnu/:/tmp/.mount_CursorOqQjLI/lib/x86_64-linux-gnu/:/tmp/.mount_CursorOqQjLI/lib/aarch64-linux-gnu/:/tmp/.mount_CursorOqQjLI/lib32/:/tmp/.mount_CursorOqQjLI/lib64/::/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib
+java.home=/home/andreatp/workspace/jdk/build/linux-x86_64-server-fastdebug/jdk
+java.class.path=.
+jdk.boot.class.path.append=
+java.vm.info=mixed mode, sharing
+java.vm.specification.vendor=Oracle Corporation
+java.vm.specification.version=17
+java.vm.vendor=Oracle Corporation
+sun.java.command=ReplayTest
+sun.java.launcher=SUN_STANDARD
+</properties>
+</vm_arguments>
+<tty>
+<writer thread='156580'/>
+CompileCommand: compileonly ReplayTest.hotMethod bool compileonly = true
+<blob name='MethodHandlesAdapterBlob' size='10000'>
+<sect index='1' size='10000' free='8069'/>
+</blob>
+     89    1     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLLLLLL)L (native)   (static)
+     98    2     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLL)L (native)   (static)
+    100    3     n 0       java.lang.invoke.MethodHandle::invokeBasic(LLLLLL)L (native)   
+    101    4     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLLLLLL)L (native)   (static)
+    106    5     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)V (native)   (static)
+    108    6     n 0       java.lang.invoke.MethodHandle::invokeBasic(LL)L (native)   
+    108    7     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)L (native)   (static)
+    116    8     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLL)L (native)   (static)
+    127    9     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLL)V (native)   (static)
+    129   10     n 0       java.lang.invoke.MethodHandle::invokeBasic(L)L (native)   
+    133   11     n 0       java.lang.invoke.MethodHandle::linkToStatic(LL)L (native)   (static)
+    161   12     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LLLL)I (native)   (static)
+    168   13     n 0       java.lang.invoke.MethodHandle::linkToVirtual(LL)V (native)   (static)
+    169   14     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLL)I (native)   (static)
+    174   15     n 0       java.lang.invoke.MethodHandle::linkToStatic(LLLL)L (native)   (static)
+    178   16     n 0       java.lang.invoke.MethodHandle::invokeBasic()L (native)   
+    179   17     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)L (native)   (static)
+    182   18     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)V (native)   (static)
+    183   19     n 0       java.lang.invoke.MethodHandle::linkToInterface(LLL)I (native)   (static)
+    218   20     n 0       java.lang.invoke.MethodHandle::linkToInterface(LL)L (native)   (static)
+    222   21     n 0       java.lang.invoke.MethodHandle::linkToStatic(LL)I (native)   (static)
+    224   22     n 0       java.lang.invoke.MethodHandle::linkToVirtual(LL)L (native)   (static)
+    226   23     n 0       java.lang.invoke.MethodHandle::linkToSpecial(LL)I (native)   (static)
+C1 Runtime statistics:
+ _resolve_invoke_virtual_cnt:     0
+ _resolve_invoke_opt_virtual_cnt: 0
+ _resolve_invoke_static_cnt:      0
+ _handle_wrong_method_cnt:        0
+ _ic_miss_cnt:                    0
+ _generic_arraycopystub_cnt:      0
+ _byte_arraycopy_cnt:             0
+ _short_arraycopy_cnt:            0
+ _int_arraycopy_cnt:              0
+ _long_arraycopy_cnt:             0
+ _oop_arraycopy_cnt:              0
+ _arraycopy_slowcase_cnt:         0
+ _arraycopy_checkcast_cnt:        0
+ _arraycopy_checkcast_attempt_cnt:0
+ _new_type_array_slowcase_cnt:    0
+ _new_object_array_slowcase_cnt:  0
+ _new_instance_slowcase_cnt:      0
+ _new_multi_array_slowcase_cnt:   0
+ _monitorenter_slowcase_cnt:      0
+ _monitorexit_slowcase_cnt:       0
+ _patch_code_slowcase_cnt:        0
+ _throw_range_check_exception_count:            0:
+ _throw_index_exception_count:                  0:
+ _throw_div0_exception_count:                   0:
+ _throw_null_pointer_exception_count:           0:
+ _throw_class_cast_exception_count:             0:
+ _throw_incompatible_class_change_error_count:  0:
+ _throw_count:                                  0:
+
+<statistics type='SharedRuntime'>
+    0 inline cache miss in compiled
+    0 wrong method
+    0 unresolved static call site
+    0 unresolved virtual call site
+    0 unresolved opt virtual call site
+  276 slow partial subtype
+  182 byte array copies
+   83 short array copies
+   54 int array copies
+   54 long array copies
+  325 unsafe array copies
+AdapterHandlerTable: empty 120 longest 4 total 243 average 1.404624
+AdapterHandlerTable: lookups 4247 buckets 4586 equals 3594 hits 3594 compact 3594
+</statistics>
+<statistics type='opto'>
+--- Compiler Statistics ---
+Methods seen: 0  Methods parsed: 0  Nodes created: 1443
+Blocks parsed: 0  Blocks seen: 0
+0 made implicit ( 0%)
+CCP: 0  constants found: 0
+Total frameslots = 8, Max frameslots = 4
+Inserted 0 spill loads, 0 spill stores, 0 mem-mem moves and 0 copies.
+Total load cost=      0, store cost =      0, mem-mem cost =  0.00, copy cost =     0.
+Adjusted spill cost =       0.
+Conservatively coalesced 36 copies, 0 pairs, 0 post alloc.
+Average allocation trips 1.000000
+High Pressure Blocks = 0, Low Pressure Blocks = 0
+Nops added 0 bytes to total of 1272 bytes, for 0.00%
+Peephole: peephole rules applied: 0
+PhaseIdealLoop=0, sum _unique=0, long loops=0/0/0
+</statistics>
+<writer thread='156586'/>
+<destroy_vm stamp='0.252'/>
+<tty_done stamp='0.281'/>
+</tty>
+<hotspot_log_done stamp='0.281'/>
+</hotspot_log>
