@@ -2,7 +2,7 @@ Rebuilds OpenJDK 17 twice: once at `jdk-17-ga` and once with a single cherry-pic
 
 To reproduce locally:
 - Run `./build.sh` to build `jdk-repro` (unpatched) and `jdk-repro-patched` (with the fix).
-- Run `./docker-run.sh` to execute `run.sh` inside both images; it runs `wabt-999-SNAPSHOT.jar` and compares buggy vs fixed behavior (see `buggy/` and `fixed/` logs).
+- Run `./docker-run.sh` to execute `run.sh` inside both images; it runs `wabt-999-SNAPSHOT.jar`.
 
 `buggy/replay.log` and `fixed/replay.log` are C2 replay logs for the failing method before/after the patch, and `buggy/asm.txt` vs `fixed/asm.txt` show the corresponding compiled assembly so you can diff the optimization.
 
