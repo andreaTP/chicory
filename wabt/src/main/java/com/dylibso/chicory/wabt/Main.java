@@ -5,14 +5,14 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) {
-        String wat = generateBigWat(50_000);
+        String wat = generateBigWat(500_000);
         // (1500);
-        try {
-            Wat2Wasm.parse(wat);
-        } catch (Exception e) {
-            // exit
-            e.printStackTrace();
-        }
+        //        try {
+        Wat2Wasm.parse(wat);
+        //        } catch (Exception e) {
+        //            // exit
+        //            e.printStackTrace();
+        //        }
     }
 
     private static String generateBigWat(int funcCount) {

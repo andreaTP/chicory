@@ -31,10 +31,6 @@
       <artifactId>wasm</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.roastedroot</groupId>
-      <artifactId>zerofs</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.dylibso.chicory</groupId>
       <artifactId>wasm-corpus</artifactId>
       <scope>test</scope>

@@ -4,6 +4,9 @@ ARG JDK_REPO=https://github.com/openjdk/jdk.git
 ARG JDK_COMMIT=jdk-17-ga
 ARG PATCH=
 
+# Label with PATCH value to ensure cache invalidation when PATCH changes
+LABEL patch="${PATCH}"
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
       git build-essential autoconf make zip unzip \
@@ -17,7 +20,9 @@ RUN apt-get update && \
 
 ENV BOOT_JDK=/usr/lib/jvm/java-17-openjdk-amd64
 
-RUN git clone "${JDK_REPO}" /opt/jdk && \
+# Use PATCH in RUN to ensure cache invalidation
+RUN echo "Building with PATCH=${PATCH}" && \
+    git clone "${JDK_REPO}" /opt/jdk && \
     cd /opt/jdk && \
     git config user.email "build@docker" && \
     git config user.name "Docker Build" && \
