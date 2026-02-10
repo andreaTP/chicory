@@ -1,0 +1,192 @@
+Summary for wabt-999-SNAPSHOT.jar
+Decompiled with CFR 0.152
+
+
+com.dylibso.chicory.wabt.Wat2WasmModuleMachineFuncGroup_0
+----------------------------
+
+func_41(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_44(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_51(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Recovered potentially malformed switches.  Disable with '--allowmalformedswitch false'
+  Unable to fully structure code
+func_53(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_54(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_82(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_87(int int int int int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_114(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_119(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_134(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_135(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_145(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_182(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_183(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_196(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_212(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_227(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_237(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_278(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_342(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_352(int int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_354(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_357(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_406(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_407(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_408(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_448(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Tried to end blocks [7[CASE]], but top level block is 10[SWITCH]
+func_455(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_462(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_467(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_479(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_486(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_513(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_548(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_552(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_554(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_557(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_558(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_560(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_561(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_563(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_567(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_568(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Handled duff style switch with additional control
+func_571(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_801(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Extractable last case doesn't follow previous, and can't clone.
+func_802(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_804(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Started 2 blocks at once
+func_806(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Handled duff style switch with additional control
+func_810(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Handled duff style switch with additional control
+func_852(int int int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_934(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_941(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1082(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Handled impossible loop by adding 'first' condition
+func_1172(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1174(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1175(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Extractable last case doesn't follow previous, and can't clone.
+func_1176(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1177(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1181(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1183(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1186(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1191(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1196(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Extractable last case doesn't follow previous, and can't clone.
+func_1204(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1205(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1207(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1209(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1212(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1220(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1222(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1226(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Handled duff style switch with additional control
+func_1227(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1235(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1243(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1253(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1254(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1257(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1274(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1298(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1300(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1301(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1302(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1722(int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1783(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1808(int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1836(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1860(int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1871(int int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1883(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1884(int int int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1888(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code
+func_1890(int int int com.dylibso.chicory.runtime.Memory com.dylibso.chicory.runtime.Instance )
+  Unable to fully structure code

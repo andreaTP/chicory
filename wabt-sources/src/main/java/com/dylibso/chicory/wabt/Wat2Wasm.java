@@ -1,0 +1,108 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
+package com.dylibso.chicory.wabt;
+
+import com.dylibso.chicory.log.Logger;
+import com.dylibso.chicory.log.SystemLogger;
+import com.dylibso.chicory.runtime.ImportValues;
+import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.wabt.Wat2WasmModule;
+import com.dylibso.chicory.wabt.WatParseException;
+import com.dylibso.chicory.wasi.WasiExitException;
+import com.dylibso.chicory.wasi.WasiOptions;
+import com.dylibso.chicory.wasi.WasiPreview1;
+import com.dylibso.chicory.wasm.WasmModule;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+public final class Wat2Wasm {
+    private static final Logger logger = new SystemLogger();
+    private static final WasmModule MODULE = Wat2WasmModule.load();
+
+    private Wat2Wasm() {
+    }
+
+    public static byte[] parse(File file) {
+        byte[] byArray;
+        FileInputStream is = new FileInputStream(file);
+        try {
+            byArray = Wat2Wasm.parse(is);
+        }
+        catch (Throwable throwable) {
+            try {
+                try {
+                    ((InputStream)is).close();
+                }
+                catch (Throwable throwable2) {
+                    throwable.addSuppressed(throwable2);
+                }
+                throw throwable;
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        ((InputStream)is).close();
+        return byArray;
+    }
+
+    public static byte[] parse(String wat) {
+        byte[] byArray;
+        ByteArrayInputStream is = new ByteArrayInputStream(wat.getBytes(StandardCharsets.UTF_8));
+        try {
+            byArray = Wat2Wasm.parse(is);
+        }
+        catch (Throwable throwable) {
+            try {
+                try {
+                    ((InputStream)is).close();
+                }
+                catch (Throwable throwable2) {
+                    throwable.addSuppressed(throwable2);
+                }
+                throw throwable;
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        ((InputStream)is).close();
+        return byArray;
+    }
+
+    /*
+     * Enabled aggressive exception aggregation
+     */
+    private static byte[] parse(InputStream is) {
+        try (ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();){
+            byte[] byArray;
+            try (ByteArrayOutputStream stderrStream = new ByteArrayOutputStream();){
+                block20: {
+                    WasiOptions wasiOpts = WasiOptions.builder().withStdin(is).withStdout(stdoutStream).withStderr(stderrStream).withArguments(List.of("wat2wasm", "-", "--output=-")).build();
+                    try (WasiPreview1 wasi = WasiPreview1.builder().withLogger(logger).withOptions(wasiOpts).build();){
+                        ImportValues imports = ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
+                        Instance.builder(MODULE).withMachineFactory(Wat2WasmModule::create).withImportValues(imports).build();
+                    }
+                    catch (WasiExitException e) {
+                        if (e.exitCode() == 0) break block20;
+                        throw new WatParseException(stdoutStream.toString(StandardCharsets.UTF_8) + stderrStream.toString(StandardCharsets.UTF_8), e);
+                    }
+                }
+                byArray = stdoutStream.toByteArray();
+            }
+            return byArray;
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+}
+
