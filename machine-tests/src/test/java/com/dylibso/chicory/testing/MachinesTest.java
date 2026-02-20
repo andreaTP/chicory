@@ -3,55 +3,49 @@ package com.dylibso.chicory.testing;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.dylibso.chicory.corpus.CorpusResources;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
-import com.dylibso.chicory.wasm.Parser;
-import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
 import io.roastedroot.zerofs.Configuration;
 import io.roastedroot.zerofs.ZeroFs;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public final class MachinesTest {
 
-    private WasmModule loadModule(String fileName) {
-        return Parser.parse(CorpusResources.getResource(fileName));
-    }
+    //    private WasmModule loadModule(String fileName) {
+    //        return Parser.parse(CorpusResources.getResource(fileName));
+    //    }
 
-    private Instance.Builder quickJsInstanceBuilder() {
-        return Instance.builder(loadModule("compiled/quickjs-provider.javy-dynamic.wasm"));
-    }
-
-    private Instance.Builder moduleInstanceBuilder() {
-        return Instance.builder(loadModule("compiled/hello-world.js.javy-dynamic.wasm"));
-    }
-
-    private WasiPreview1 setupWasi(ByteArrayOutputStream stderr) {
-        InputStream stdin = InputStream.nullInputStream();
-        var stdout = new ByteArrayOutputStream();
-
-        var wasiOpts =
-                WasiOptions.builder()
-                        .withStdout(stdout)
-                        .withStderr(stderr)
-                        .withStdin(stdin)
-                        .build();
-
-        return WasiPreview1.builder().withOptions(wasiOpts).build();
-    }
-
-    private static final String expectedOutput = "Hello world dynamic Javy!\n";
+    //    private Instance.Builder quickJsInstanceBuilder() {
+    //        return Instance.builder(loadModule("compiled/quickjs-provider.javy-dynamic.wasm"));
+    //    }
+    //
+    //    private Instance.Builder moduleInstanceBuilder() {
+    //        return Instance.builder(loadModule("compiled/hello-world.js.javy-dynamic.wasm"));
+    //    }
+    //
+    //    private WasiPreview1 setupWasi(ByteArrayOutputStream stderr) {
+    //        InputStream stdin = InputStream.nullInputStream();
+    //        var stdout = new ByteArrayOutputStream();
+    //
+    //        var wasiOpts =
+    //                WasiOptions.builder()
+    //                        .withStdout(stdout)
+    //                        .withStderr(stderr)
+    //                        .withStdin(stdin)
+    //                        .build();
+    //
+    //        return WasiPreview1.builder().withOptions(wasiOpts).build();
+    //    }
+    //
+    //    private static final String expectedOutput = "Hello world dynamic Javy!\n";
 
     // quickjs -> build time compiled
     // module -> interpreter / runtime compiled
@@ -269,6 +263,9 @@ public final class MachinesTest {
     //        assertTrue(className.contains("InterpreterMachine"), className);
     //    }
 
+    private static final String PGLITE_ARCHIVE =
+            "/home/andreatp/workspace/pglite4j/wasm-build/output/sdk-dist/pglite-wasi.tar.xz";
+
     /**
      * PGLite test - runs PostgreSQL in WebAssembly using WIRE PROTOCOL.
      *
@@ -282,27 +279,22 @@ public final class MachinesTest {
      * 5. Send Query message, get response
      */
     @Test
-    public void shouldRunPGLite() throws Exception {
+    public void shouldRunPGLite(@TempDir Path tempDir) throws Exception {
+        // === EXTRACT ARCHIVE ===
+        Process proc =
+                new ProcessBuilder("tar", "-xf", PGLITE_ARCHIVE, "-C", tempDir.toString())
+                        .inheritIO()
+                        .start();
+        assertEquals(0, proc.waitFor(), "Failed to extract pglite archive");
+        Path extracted = tempDir.resolve("tmp/pglite");
+
         // === SETUP FILESYSTEM ===
         FileSystem fs =
                 ZeroFs.newFileSystem(
                         Configuration.unix().toBuilder().setAttributeViews("unix").build());
         Path pgroot = fs.getPath("tmp");
         Files.createDirectories(pgroot);
-        Path bin = pgroot.resolve("pglite/bin");
-        Files.createDirectories(bin);
-        Files.copy(
-                Path.of("/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/initdb"),
-                bin.resolve("initdb"),
-                StandardCopyOption.COPY_ATTRIBUTES);
-        Files.copy(
-                Path.of("/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/postgres"),
-                bin.resolve("postgres"),
-                StandardCopyOption.COPY_ATTRIBUTES);
-        com.dylibso.chicory.wasi.Files.copyDirectory(
-                Path.of("/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/share"),
-                pgroot.resolve("pglite/share"));
-        Files.writeString(pgroot.resolve("pglite/password"), "password");
+        com.dylibso.chicory.wasi.Files.copyDirectory(extracted, pgroot.resolve("pglite"));
         Path pgdata = pgroot.resolve("pglite/base");
         Files.createDirectories(pgdata);
         Path dev = fs.getPath("dev");
@@ -346,23 +338,27 @@ public final class MachinesTest {
                         .withMemoryLimits(new MemoryLimits(100))
                         .build();
 
+        // === STEP 1: pgl_initdb (matching pglite-oxide: single call) ===
         System.out.println("pgl_initdb: " + instance.exports().function("pgl_initdb").apply()[0]);
         assertEquals("17\n", Files.readString(pgdata.resolve("PG_VERSION")));
 
+        // === STEP 2: pgl_backend (may trap - expected in WASI due to OpenPipeStream) ===
         try {
             instance.exports().function("pgl_backend").apply();
             System.out.println("pgl_backend: OK");
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // pglite-oxide: "pgl_backend may emit warnings about locale operations
             // (OpenPipeStream) because WASI doesn't support process spawning.
             // These are safe to ignore."
             System.out.println("pgl_backend trapped (expected): " + e.getMessage());
         }
 
+        // === STEP 3: Get CMA buffer ===
         int channel = (int) instance.exports().function("get_channel").apply()[0];
         int addr = (int) instance.exports().function("get_buffer_addr").apply(channel)[0];
         System.out.println("CMA: channel=" + channel + " addr=" + addr);
 
+        // === STEP 4: Wire protocol handshake ===
         // Clear CMA state before handshake (like pglite-oxide's clear_wire_pending)
         instance.exports().function("interactive_write").apply(0);
 
@@ -387,57 +383,56 @@ public final class MachinesTest {
                 } else if (auth[0] == 3) { // Cleartext
                     pendingLen = wireSendCma(instance, addr, wirePassword("password"));
                 }
-                if (wireHasReadyForQuery(resp)) ready = true;
+                if (wireHasReadyForQuery(resp)) {
+                    ready = true;
+                }
             }
         }
         System.out.println("Handshake complete: " + ready);
 
-        // === STEP 5: Run query ===
-        // Clear error state before query
-        instance.exports().function("clear_error").apply();
-
-        // Clear CMA state
-        instance.exports().function("interactive_write").apply(0);
-
+        // === STEP 5: Run query (matching pglite-oxide's forward_wire pattern) ===
         byte[] query = wireQuery("select 1;");
-        System.out.println("Sending query (" + query.length + " bytes)");
-        pendingLen = wireSendCma(instance, addr, query);
-        System.out.println("Buffer at addr " + addr + ": " + dumpMemoryHex(instance, addr, 50));
+        int queryPending = wireSendCma(instance, addr, query);
 
-        // Simple query execution: just call interactive_one a few times and check response
-        System.out.println("Running query...");
-        for (int i = 0; i < 5; i++) {
-            System.out.println("  Iteration " + i + ": calling interactive_one");
+        // Poll for response using pglite-oxide's forward_wire pattern:
+        // loop { collect_replies(); run_once(); collect_replies(); if nothing -> break }
+        byte[] queryResp = null;
+        for (int tick = 0; tick < 256; tick++) {
+            queryResp = wireRecvCma(instance, addr, queryPending);
+            if (queryResp != null) {
+                break;
+            }
             instance.exports().function("interactive_one").apply();
-            int respLen = (int) instance.exports().function("interactive_read").apply()[0];
-            System.out.println("  Iteration " + i + ": interactive_read() = " + respLen);
-            System.out.println("  Buffer after: " + dumpMemoryHex(instance, addr, 60));
-            if (respLen <= 0) break;
+            queryResp = wireRecvCma(instance, addr, queryPending);
+            if (queryResp != null) {
+                break;
+            }
         }
-        System.out.println("Query execution finished");
+
+        System.out.println("Query response: " + wireParseSimple(queryResp));
+        System.out.println("Query has ReadyForQuery: " + wireHasReadyForQuery(queryResp));
     }
 
     // Send wire message CMA style (returns pending length for reads)
     // Note: pglite-oxide calls use_wire(true) before EACH send in forward_wire
     private int wireSendCma(Instance inst, int addr, byte[] msg) {
-        var len = msg.length;
-        msg = Arrays.copyOf(msg, len + 1);
-        msg[len] = 0;
         inst.exports().function("use_wire").apply(1); // Enable wire mode before each send
         inst.memory().write(addr, msg);
         inst.exports().function("interactive_write").apply(msg.length);
         return msg.length;
     }
 
-    // Receive wire message CMA style
-    // Receive wire message CMA style
-    // Response is written at addr + pendingLen + 1 (after the request message)
+    // Receive wire message CMA style (matching pglite-oxide's try_recv_wire_cma)
+    // Response is at buffer_addr + pending + 1
+    // After reading, clears CMA state via interactive_write(0)
     private byte[] wireRecvCma(Instance inst, int addr, int pendingLen) {
         int len = (int) inst.exports().function("interactive_read").apply()[0];
-        if (len <= 0) return null;
+        if (len <= 0) {
+            return null;
+        }
         byte[] resp = inst.memory().readBytes(addr + pendingLen + 1, len);
-        // Note: Don't clear cma_rsize here - pglite-oxide only clears pending_wire_len (Rust side)
-        // The cma_rsize is cleared at the end of interactive_one
+        // Clear CMA state after reading (like pglite-oxide)
+        inst.exports().function("interactive_write").apply(0);
         return resp;
     }
 
@@ -456,15 +451,6 @@ public final class MachinesTest {
         return sb.toString();
     }
 
-    // Hex dump for debugging
-    private String wireHexDump(byte[] data, int max) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < Math.min(data.length, max); i++) {
-            sb.append(String.format("%02x ", data[i] & 0xFF));
-        }
-        return sb.toString().trim();
-    }
-
     // Get auth code and salt from response
     private int[] wireGetAuth(byte[] data) {
         int i = 0;
@@ -475,7 +461,9 @@ public final class MachinesTest {
                             | ((data[i + 2] & 0xFF) << 16)
                             | ((data[i + 3] & 0xFF) << 8)
                             | (data[i + 4] & 0xFF);
-            if (len < 4) break;
+            if (len < 4) {
+                break;
+            }
             if (tag == 'R' && len >= 8) {
                 int code =
                         ((data[i + 5] & 0xFF) << 24)
@@ -508,7 +496,9 @@ public final class MachinesTest {
                             | ((data[i + 2] & 0xFF) << 16)
                             | ((data[i + 3] & 0xFF) << 8)
                             | (data[i + 4] & 0xFF);
-            if (len < 4) break;
+            if (len < 4) {
+                break;
+            }
             if (tag == 'Z') {
                 // ReadyForQuery contains a single byte: transaction status
                 // 'I' = idle, 'T' = in transaction, 'E' = failed transaction
@@ -525,7 +515,9 @@ public final class MachinesTest {
 
     // Parse wire response for display
     private String wireParseSimple(byte[] data) {
-        if (data.length == 0) return "(empty)";
+        if (data.length == 0) {
+            return "(empty)";
+        }
         StringBuilder sb = new StringBuilder();
         int i = 0;
         while (i + 5 <= data.length) {
@@ -535,7 +527,9 @@ public final class MachinesTest {
                             | ((data[i + 2] & 0xFF) << 16)
                             | ((data[i + 3] & 0xFF) << 8)
                             | (data[i + 4] & 0xFF);
-            if (len < 4 || i + 1 + len > data.length) break;
+            if (len < 4 || i + 1 + len > data.length) {
+                break;
+            }
             sb.append("[").append(tag).append("] ");
             if (tag == 'D' && len > 6) { // DataRow - extract values
                 int pos = i + 7;
@@ -611,14 +605,16 @@ public final class MachinesTest {
             md5.update(innerHex.getBytes(UTF_8));
             md5.update(salt);
             return wirePassword("md5" + bytesToHex(md5.digest()));
-        } catch (Exception e) {
+        } catch (java.security.NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
     }
 
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) sb.append(String.format("%02x", b & 0xFF));
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b & 0xFF));
+        }
         return sb.toString();
     }
 

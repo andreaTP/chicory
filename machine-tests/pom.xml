@@ -98,14 +98,8 @@
               <name>com.dylibso.chicory.testing.PostgresModule</name>
               <!-- https://github.com/f0rr0/pglite-oxide/blob/main/assets/pglite-wasi.tar.xz -->
               <!--              <wasmFile>/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/pglite-opt.wasi</wasmFile>-->
-              <wasmFile>/home/andreatp/workspace/pglite-oxide/assets/tmp/pglite/bin/pglite.wasi</wasmFile>
-              <!-- <interpreterFallback>WARN</interpreterFallback>-->
-              <interpretedFunctions>
-                <function>5706</function>
-                <function>11477</function>
-                <function>17646</function>
-                <function>25127</function>
-              </interpretedFunctions>
+              <wasmFile>/home/andreatp/workspace/pglite4j/wasm-build/output/sdk-dist/pglite.wasi</wasmFile>
+              <interpreterFallback>WARN</interpreterFallback>
               <!--              <interpretedFunctions>-->
               <!--                <function>3053</function>-->
               <!--                <function>4496</function>-->
