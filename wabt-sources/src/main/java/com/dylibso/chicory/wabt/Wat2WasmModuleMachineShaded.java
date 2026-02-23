@@ -20,8 +20,7 @@ import com.dylibso.chicory.wasm.types.FunctionType;
 final class Wat2WasmModuleMachineShaded {
     private static final boolean memCopyWorkaround;
 
-    private Wat2WasmModuleMachineShaded() {
-    }
+    private Wat2WasmModuleMachineShaded() {}
 
     public static long[] callIndirect(long[] args, int typeId, int funcId, Instance instance) {
         FunctionType expectedType = instance.type(typeId);
@@ -61,15 +60,18 @@ final class Wat2WasmModuleMachineShaded {
         return instance.table(tableIndex).size();
     }
 
-    public static void tableFill(int offset, int value, int size, int tableIndex, Instance instance) {
+    public static void tableFill(
+            int offset, int value, int size, int tableIndex, Instance instance) {
         OpcodeImpl.TABLE_FILL(instance, tableIndex, size, value, offset);
     }
 
-    public static void tableCopy(int d, int s, int size, int dstTableIndex, int srcTableIndex, Instance instance) {
+    public static void tableCopy(
+            int d, int s, int size, int dstTableIndex, int srcTableIndex, Instance instance) {
         OpcodeImpl.TABLE_COPY(instance, srcTableIndex, dstTableIndex, size, s, d);
     }
 
-    public static void tableInit(int offset, int elemidx, int size, int elementidx, int tableidx, Instance instance) {
+    public static void tableInit(
+            int offset, int elemidx, int size, int elementidx, int tableidx, Instance instance) {
         OpcodeImpl.TABLE_INIT(instance, tableidx, elementidx, size, elemidx, offset);
     }
 
@@ -93,7 +95,8 @@ final class Wat2WasmModuleMachineShaded {
         memory.fill(value, offset, end);
     }
 
-    public static void memoryInit(int destination, int offset, int size, int segmentId, Memory memory) {
+    public static void memoryInit(
+            int destination, int offset, int size, int segmentId, Memory memory) {
         memory.initPassiveSegment(segmentId, destination, offset, size);
     }
 
@@ -241,7 +244,8 @@ final class Wat2WasmModuleMachineShaded {
         memory.atomicWriteByte(ptr, value);
     }
 
-    public static void memoryAtomicLongShortWrite(int base, short value, int offset, Memory memory) {
+    public static void memoryAtomicLongShortWrite(
+            int base, short value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
@@ -297,7 +301,7 @@ final class Wat2WasmModuleMachineShaded {
 
     public static WasmException createWasmException(long[] args, int tagNumber, Instance instance) {
         if (args == null) {
-            args = new long[]{};
+            args = new long[] {};
         }
         WasmException e = new WasmException(instance, tagNumber, args);
         instance.registerException(e);
@@ -310,7 +314,9 @@ final class Wat2WasmModuleMachineShaded {
         }
         TagInstance currentCatchTag = instance.tag(tag);
         TagInstance exceptionTag = exception.instance().tag(exception.tagIdx());
-        return tag < instance.imports().tagCount() && currentCatchTag.type().typesMatch(exceptionTag.type()) && currentCatchTag.type().returnsMatch(exceptionTag.type());
+        return tag < instance.imports().tagCount()
+                && currentCatchTag.type().typesMatch(exceptionTag.type())
+                && currentCatchTag.type().returnsMatch(exceptionTag.type());
     }
 
     public static int memoryAtomicIntRmwAdd(int base, int value, int offset, Memory memory) {
@@ -361,7 +367,8 @@ final class Wat2WasmModuleMachineShaded {
         return memory.atomicXchgInt(ptr, value);
     }
 
-    public static int memoryAtomicIntRmwCmpxchg(int base, int expected, int replacement, int offset, Memory memory) {
+    public static int memoryAtomicIntRmwCmpxchg(
+            int base, int expected, int replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
@@ -371,37 +378,39 @@ final class Wat2WasmModuleMachineShaded {
 
     public static int memoryAtomicIntRmw8AddU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicAddByte(ptr, (byte)value));
+        return Byte.toUnsignedInt(memory.atomicAddByte(ptr, (byte) value));
     }
 
     public static int memoryAtomicIntRmw8SubU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicAddByte(ptr, (byte)(-value)));
+        return Byte.toUnsignedInt(memory.atomicAddByte(ptr, (byte) (-value)));
     }
 
     public static int memoryAtomicIntRmw8AndU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicAndByte(ptr, (byte)value));
+        return Byte.toUnsignedInt(memory.atomicAndByte(ptr, (byte) value));
     }
 
     public static int memoryAtomicIntRmw8OrU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicOrByte(ptr, (byte)value));
+        return Byte.toUnsignedInt(memory.atomicOrByte(ptr, (byte) value));
     }
 
     public static int memoryAtomicIntRmw8XorU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicXorByte(ptr, (byte)value));
+        return Byte.toUnsignedInt(memory.atomicXorByte(ptr, (byte) value));
     }
 
     public static int memoryAtomicIntRmw8XchgU(int base, int value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicXchgByte(ptr, (byte)value));
+        return Byte.toUnsignedInt(memory.atomicXchgByte(ptr, (byte) value));
     }
 
-    public static int memoryAtomicIntRmw8CmpxchgU(int base, int expected, int replacement, int offset, Memory memory) {
+    public static int memoryAtomicIntRmw8CmpxchgU(
+            int base, int expected, int replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedInt(memory.atomicCmpxchgByte(ptr, (byte)expected, (byte)replacement));
+        return Byte.toUnsignedInt(
+                memory.atomicCmpxchgByte(ptr, (byte) expected, (byte) replacement));
     }
 
     public static int memoryAtomicIntRmw16AddU(int base, int value, int offset, Memory memory) {
@@ -409,7 +418,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return memory.atomicAddShort(ptr, (short)value) & 0xFFFF;
+        return memory.atomicAddShort(ptr, (short) value) & 0xFFFF;
     }
 
     public static int memoryAtomicIntRmw16SubU(int base, int value, int offset, Memory memory) {
@@ -417,7 +426,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicAddShort(ptr, (short)(-value)));
+        return Short.toUnsignedInt(memory.atomicAddShort(ptr, (short) (-value)));
     }
 
     public static int memoryAtomicIntRmw16AndU(int base, int value, int offset, Memory memory) {
@@ -425,7 +434,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicAndShort(ptr, (short)value));
+        return Short.toUnsignedInt(memory.atomicAndShort(ptr, (short) value));
     }
 
     public static int memoryAtomicIntRmw16OrU(int base, int value, int offset, Memory memory) {
@@ -433,7 +442,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicOrShort(ptr, (short)value));
+        return Short.toUnsignedInt(memory.atomicOrShort(ptr, (short) value));
     }
 
     public static int memoryAtomicIntRmw16XorU(int base, int value, int offset, Memory memory) {
@@ -441,7 +450,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicXorShort(ptr, (short)value));
+        return Short.toUnsignedInt(memory.atomicXorShort(ptr, (short) value));
     }
 
     public static int memoryAtomicIntRmw16XchgU(int base, int value, int offset, Memory memory) {
@@ -449,50 +458,54 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicXchgShort(ptr, (short)value));
+        return Short.toUnsignedInt(memory.atomicXchgShort(ptr, (short) value));
     }
 
-    public static int memoryAtomicIntRmw16CmpxchgU(int base, int expected, int replacement, int offset, Memory memory) {
+    public static int memoryAtomicIntRmw16CmpxchgU(
+            int base, int expected, int replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedInt(memory.atomicCmpxchgShort(ptr, (short)expected, (short)replacement));
+        return Short.toUnsignedInt(
+                memory.atomicCmpxchgShort(ptr, (short) expected, (short) replacement));
     }
 
     public static long memoryAtomicLongRmw8AddU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicAddByte(ptr, (byte)value));
+        return Byte.toUnsignedLong(memory.atomicAddByte(ptr, (byte) value));
     }
 
     public static long memoryAtomicLongRmw8SubU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicAddByte(ptr, (byte)(-value)));
+        return Byte.toUnsignedLong(memory.atomicAddByte(ptr, (byte) (-value)));
     }
 
     public static long memoryAtomicLongRmw8AndU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicAndByte(ptr, (byte)value));
+        return Byte.toUnsignedLong(memory.atomicAndByte(ptr, (byte) value));
     }
 
     public static long memoryAtomicLongRmw8OrU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicOrByte(ptr, (byte)value));
+        return Byte.toUnsignedLong(memory.atomicOrByte(ptr, (byte) value));
     }
 
     public static long memoryAtomicLongRmw8XorU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicXorByte(ptr, (byte)value));
+        return Byte.toUnsignedLong(memory.atomicXorByte(ptr, (byte) value));
     }
 
     public static long memoryAtomicLongRmw8XchgU(int base, long value, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicXchgByte(ptr, (byte)value));
+        return Byte.toUnsignedLong(memory.atomicXchgByte(ptr, (byte) value));
     }
 
-    public static long memoryAtomicLongRmw8CmpxchgU(int base, long expected, long replacement, int offset, Memory memory) {
+    public static long memoryAtomicLongRmw8CmpxchgU(
+            int base, long expected, long replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
-        return Byte.toUnsignedLong(memory.atomicCmpxchgByte(ptr, (byte)expected, (byte)replacement));
+        return Byte.toUnsignedLong(
+                memory.atomicCmpxchgByte(ptr, (byte) expected, (byte) replacement));
     }
 
     public static long memoryAtomicLongRmw16AddU(int base, long value, int offset, Memory memory) {
@@ -500,7 +513,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicAddShort(ptr, (short)value));
+        return Short.toUnsignedLong(memory.atomicAddShort(ptr, (short) value));
     }
 
     public static long memoryAtomicLongRmw16SubU(int base, long value, int offset, Memory memory) {
@@ -508,7 +521,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicAddShort(ptr, (short)(-value)));
+        return Short.toUnsignedLong(memory.atomicAddShort(ptr, (short) (-value)));
     }
 
     public static long memoryAtomicLongRmw16AndU(int base, long value, int offset, Memory memory) {
@@ -516,7 +529,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicAndShort(ptr, (short)value));
+        return Short.toUnsignedLong(memory.atomicAndShort(ptr, (short) value));
     }
 
     public static long memoryAtomicLongRmw16OrU(int base, long value, int offset, Memory memory) {
@@ -524,7 +537,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicOrShort(ptr, (short)value));
+        return Short.toUnsignedLong(memory.atomicOrShort(ptr, (short) value));
     }
 
     public static long memoryAtomicLongRmw16XorU(int base, long value, int offset, Memory memory) {
@@ -532,7 +545,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicXorShort(ptr, (short)value));
+        return Short.toUnsignedLong(memory.atomicXorShort(ptr, (short) value));
     }
 
     public static long memoryAtomicLongRmw16XchgU(int base, long value, int offset, Memory memory) {
@@ -540,15 +553,17 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicXchgShort(ptr, (short)value));
+        return Short.toUnsignedLong(memory.atomicXchgShort(ptr, (short) value));
     }
 
-    public static long memoryAtomicLongRmw16CmpxchgU(int base, long expected, long replacement, int offset, Memory memory) {
+    public static long memoryAtomicLongRmw16CmpxchgU(
+            int base, long expected, long replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 2 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Short.toUnsignedLong(memory.atomicCmpxchgShort(ptr, (short)expected, (short)replacement));
+        return Short.toUnsignedLong(
+                memory.atomicCmpxchgShort(ptr, (short) expected, (short) replacement));
     }
 
     public static long memoryAtomicLongRmw32AddU(int base, long value, int offset, Memory memory) {
@@ -556,7 +571,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicAddInt(ptr, (int)value));
+        return Integer.toUnsignedLong(memory.atomicAddInt(ptr, (int) value));
     }
 
     public static long memoryAtomicLongRmw32SubU(int base, long value, int offset, Memory memory) {
@@ -564,7 +579,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicAddInt(ptr, (int)(-value)));
+        return Integer.toUnsignedLong(memory.atomicAddInt(ptr, (int) (-value)));
     }
 
     public static long memoryAtomicLongRmw32AndU(int base, long value, int offset, Memory memory) {
@@ -572,7 +587,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicAndInt(ptr, (int)value));
+        return Integer.toUnsignedLong(memory.atomicAndInt(ptr, (int) value));
     }
 
     public static long memoryAtomicLongRmw32OrU(int base, long value, int offset, Memory memory) {
@@ -580,7 +595,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicOrInt(ptr, (int)value));
+        return Integer.toUnsignedLong(memory.atomicOrInt(ptr, (int) value));
     }
 
     public static long memoryAtomicLongRmw32XorU(int base, long value, int offset, Memory memory) {
@@ -588,7 +603,7 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicXorInt(ptr, (int)value));
+        return Integer.toUnsignedLong(memory.atomicXorInt(ptr, (int) value));
     }
 
     public static long memoryAtomicLongRmw32XchgU(int base, long value, int offset, Memory memory) {
@@ -596,15 +611,17 @@ final class Wat2WasmModuleMachineShaded {
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicXchgInt(ptr, (int)value));
+        return Integer.toUnsignedLong(memory.atomicXchgInt(ptr, (int) value));
     }
 
-    public static long memoryAtomicLongRmw32CmpxchgU(int base, long expected, long replacement, int offset, Memory memory) {
+    public static long memoryAtomicLongRmw32CmpxchgU(
+            int base, long expected, long replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
         }
-        return Integer.toUnsignedLong(memory.atomicCmpxchgInt(ptr, (int)expected, (int)replacement));
+        return Integer.toUnsignedLong(
+                memory.atomicCmpxchgInt(ptr, (int) expected, (int) replacement));
     }
 
     public static long memoryAtomicLongRmwAdd(int base, long value, int offset, Memory memory) {
@@ -655,7 +672,8 @@ final class Wat2WasmModuleMachineShaded {
         return memory.atomicXchgLong(ptr, value);
     }
 
-    public static long memoryAtomicLongRmwCmpxchg(int base, long expected, long replacement, int offset, Memory memory) {
+    public static long memoryAtomicLongRmwCmpxchg(
+            int base, long expected, long replacement, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 8 != 0) {
             throw new InvalidException("unaligned atomic");
@@ -663,7 +681,8 @@ final class Wat2WasmModuleMachineShaded {
         return memory.atomicCmpxchgLong(ptr, expected, replacement);
     }
 
-    public static int memoryAtomicWait32(int base, int expected, long timeout, int offset, Memory memory) {
+    public static int memoryAtomicWait32(
+            int base, int expected, long timeout, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 4 != 0) {
             throw new InvalidException("unaligned atomic");
@@ -671,7 +690,8 @@ final class Wat2WasmModuleMachineShaded {
         return memory.atomicWait(ptr, expected, timeout);
     }
 
-    public static int memoryAtomicWait64(int base, long expected, long timeout, int offset, Memory memory) {
+    public static int memoryAtomicWait64(
+            int base, long expected, long timeout, int offset, Memory memory) {
         int ptr = Wat2WasmModuleMachineShaded.getAddr(base, offset);
         if (ptr % 8 != 0) {
             throw new InvalidException("unaligned atomic");
@@ -690,7 +710,7 @@ final class Wat2WasmModuleMachineShaded {
 
     static {
         String prop = System.getProperty("chicory.memCopyWorkaround");
-        memCopyWorkaround = prop != null ? Boolean.valueOf(prop) : MemCopyWorkaround.shouldUseMemWorkaround();
+        memCopyWorkaround =
+                prop != null ? Boolean.valueOf(prop) : MemCopyWorkaround.shouldUseMemWorkaround();
     }
 }
-

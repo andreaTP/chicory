@@ -1,0 +1,1233 @@
+  public static int func_1226(int, int, com.dylibso.chicory.runtime.Memory, com.dylibso.chicory.runtime.Instance);
+    Code:
+       0: iconst_0
+       1: istore        4
+       3: iconst_0
+       4: istore        5
+       6: iconst_0
+       7: istore        6
+       9: iconst_0
+      10: istore        7
+      12: iconst_0
+      13: istore        8
+      15: iconst_0
+      16: istore        9
+      18: iconst_0
+      19: aload_3
+      20: invokestatic  #125                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.readGlobal:(ILcom/dylibso/chicory/runtime/Instance;)J
+      23: l2i
+      24: sipush        160
+      27: isub
+      28: dup
+      29: istore        4
+      31: i2l
+      32: iconst_0
+      33: aload_3
+      34: invokestatic  #129                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.writeGlobal:(JILcom/dylibso/chicory/runtime/Instance;)V
+      37: iconst_1
+      38: istore        5
+      40: iload_0
+      41: bipush        30
+      43: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+      46: aload_2
+      47: aload_3
+      48: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+      51: iconst_1
+      52: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+      55: ifne          2261
+      58: iload_0
+      59: bipush        16
+      61: iadd
+      62: dup
+      63: istore        6
+      65: iload_0
+      66: bipush        96
+      68: iadd
+      69: iconst_0
+      70: aload_2
+      71: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+      74: sipush        255
+      77: iand
+      78: dup
+      79: istore        5
+      81: bipush        40
+      83: imul
+      84: iadd
+      85: bipush        36
+      87: aload_2
+      88: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+      91: sipush        255
+      94: iand
+      95: ifne          309
+      98: iload         4
+     100: bipush        120
+     102: iadd
+     103: iload_0
+     104: iconst_0
+     105: aload_2
+     106: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+     109: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     112: aload_2
+     113: aload_3
+     114: invokestatic  #2897               // Method func_557:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+     117: iload         6
+     119: iload_0
+     120: bipush        96
+     122: aload_2
+     123: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     126: sipush        255
+     129: iand
+     130: dup
+     131: istore        5
+     133: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+     136: bipush        40
+     138: imul
+     139: iadd
+     140: dup
+     141: istore        7
+     143: iload         4
+     145: bipush        120
+     147: aload_2
+     148: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     151: iconst_0
+     152: aload_2
+     153: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     156: iload         7
+     158: bipush        8
+     160: iadd
+     161: iload         4
+     163: bipush        120
+     165: iadd
+     166: bipush        8
+     168: iadd
+     169: iconst_0
+     170: aload_2
+     171: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     174: iconst_0
+     175: aload_2
+     176: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     179: iload         7
+     181: bipush        16
+     183: iadd
+     184: iload         4
+     186: bipush        120
+     188: iadd
+     189: bipush        16
+     191: iadd
+     192: iconst_0
+     193: aload_2
+     194: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     197: iconst_0
+     198: aload_2
+     199: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     202: iload         7
+     204: bipush        24
+     206: iadd
+     207: iload         4
+     209: bipush        120
+     211: iadd
+     212: bipush        24
+     214: iadd
+     215: iconst_0
+     216: aload_2
+     217: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     220: iconst_0
+     221: aload_2
+     222: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     225: iload         7
+     227: bipush        32
+     229: iadd
+     230: iload         4
+     232: bipush        120
+     234: iadd
+     235: bipush        32
+     237: iadd
+     238: iconst_0
+     239: aload_2
+     240: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+     243: iconst_0
+     244: aload_2
+     245: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     248: iload         7
+     250: bipush        36
+     252: aload_2
+     253: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     256: sipush        255
+     259: iand
+     260: ifne          273
+     263: iload         7
+     265: iconst_1
+     266: i2b
+     267: bipush        36
+     269: aload_2
+     270: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+     273: iload         6
+     275: iload         5
+     277: bipush        40
+     279: imul
+     280: iadd
+     281: bipush        36
+     283: aload_2
+     284: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     287: sipush        255
+     290: iand
+     291: ifne          309
+     294: iload_0
+     295: iload         5
+     297: iconst_1
+     298: ixor
+     299: dup
+     300: istore        5
+     302: i2b
+     303: bipush        96
+     305: aload_2
+     306: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+     309: iload         6
+     311: iload         5
+     313: bipush        40
+     315: imul
+     316: iadd
+     317: dup
+     318: istore        5
+     320: bipush        36
+     322: aload_2
+     323: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     326: sipush        255
+     329: iand
+     330: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+     333: ifne          2276
+     336: iload         4
+     338: bipush        96
+     340: iadd
+     341: bipush        8
+     343: iadd
+     344: iload         5
+     346: bipush        8
+     348: iadd
+     349: iconst_0
+     350: aload_2
+     351: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     354: iconst_0
+     355: aload_2
+     356: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     359: iload         4
+     361: bipush        96
+     363: iadd
+     364: bipush        16
+     366: iadd
+     367: iload         5
+     369: bipush        16
+     371: iadd
+     372: iconst_0
+     373: aload_2
+     374: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+     377: iconst_0
+     378: aload_2
+     379: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     382: iload         4
+     384: iload         5
+     386: iconst_0
+     387: aload_2
+     388: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     391: bipush        96
+     393: aload_2
+     394: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     397: iload_0
+     398: iload_1
+     399: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     402: aload_2
+     403: aload_3
+     404: invokestatic  #9636               // Method func_1231:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+     407: iconst_1
+     408: istore        5
+     410: iload_0
+     411: bipush        26
+     413: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     416: aload_2
+     417: aload_3
+     418: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     421: iconst_1
+     422: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     425: ifne          2261
+     428: iload         4
+     430: bipush        80
+     432: iadd
+     433: bipush        8
+     435: iadd
+     436: iconst_0
+     437: iconst_0
+     438: aload_2
+     439: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     442: iload         4
+     444: lconst_0
+     445: bipush        80
+     447: aload_2
+     448: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     451: iload         4
+     453: bipush        64
+     455: iadd
+     456: bipush        8
+     458: iadd
+     459: iconst_0
+     460: iconst_0
+     461: aload_2
+     462: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     465: iload         4
+     467: lconst_0
+     468: bipush        64
+     470: aload_2
+     471: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     474: iconst_1
+     475: istore        5
+     477: iload_0
+     478: iload         4
+     480: bipush        80
+     482: iadd
+     483: iconst_1
+     484: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     487: aload_2
+     488: aload_3
+     489: invokestatic  #9489               // Method func_1196:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     492: iconst_1
+     493: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     496: ifne          2199
+     499: iconst_1
+     500: istore        5
+     502: iload_0
+     503: iload         4
+     505: bipush        64
+     507: iadd
+     508: iconst_1
+     509: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     512: aload_2
+     513: aload_3
+     514: invokestatic  #9489               // Method func_1196:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     517: iconst_1
+     518: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     521: ifne          2199
+     524: iconst_1
+     525: istore        5
+     527: iload_0
+     528: bipush        30
+     530: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     533: aload_2
+     534: aload_3
+     535: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     538: iconst_1
+     539: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     542: ifne          2199
+     545: iload         4
+     547: bipush        56
+     549: iadd
+     550: iconst_0
+     551: iconst_0
+     552: aload_2
+     553: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     556: iload         4
+     558: lconst_0
+     559: bipush        48
+     561: aload_2
+     562: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     565: iload_0
+     566: iconst_0
+     567: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     570: aload_2
+     571: aload_3
+     572: invokestatic  #9174               // Method func_1154:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     575: dup
+     576: istore        5
+     578: bipush        -20
+     580: iadd
+     581: tableswitch   { // 0 to 28
+                     0: 1682
+                     1: 1868
+                     2: 1868
+                     3: 1868
+                     4: 1868
+                     5: 1517
+                     6: 1868
+                     7: 1868
+                     8: 1868
+                     9: 1868
+                    10: 1868
+                    11: 1305
+                    12: 1868
+                    13: 1868
+                    14: 1868
+                    15: 1868
+                    16: 1868
+                    17: 1868
+                    18: 1868
+                    19: 1868
+                    20: 1868
+                    21: 1868
+                    22: 1868
+                    23: 1868
+                    24: 1868
+                    25: 1868
+                    26: 1868
+                    27: 1868
+                    28: 1098
+               default: 712
+          }
+     712: iload         5
+     714: sipush        138
+     717: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+     720: ifne          1868
+     723: iload         6
+     725: iload_0
+     726: bipush        96
+     728: aload_2
+     729: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     732: sipush        255
+     735: iand
+     736: dup
+     737: istore        7
+     739: bipush        40
+     741: imul
+     742: iadd
+     743: dup
+     744: istore        5
+     746: bipush        36
+     748: aload_2
+     749: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     752: sipush        255
+     755: iand
+     756: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+     759: ifne          2276
+     762: iload         5
+     764: bipush        36
+     766: iadd
+     767: iconst_0
+     768: i2b
+     769: iconst_0
+     770: aload_2
+     771: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+     774: iconst_1
+     775: istore        5
+     777: iload_0
+     778: iload         7
+     780: iconst_1
+     781: ixor
+     782: i2b
+     783: bipush        96
+     785: aload_2
+     786: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+     789: iload_0
+     790: iload         4
+     792: bipush        48
+     794: iadd
+     795: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     798: aload_2
+     799: aload_3
+     800: invokestatic  #9220               // Method func_1165:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     803: pop
+     804: iload_0
+     805: iload         4
+     807: bipush        48
+     809: iadd
+     810: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     813: aload_2
+     814: aload_3
+     815: invokestatic  #9671               // Method func_1244:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     818: dup
+     819: istore        6
+     821: bipush        44
+     823: iadd
+     824: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     827: aload_2
+     828: aload_3
+     829: invokestatic  #9320               // Method func_1232:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     832: iconst_1
+     833: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     836: ifne          1067
+     839: iload_0
+     840: iload         6
+     842: bipush        84
+     844: iadd
+     845: iload         6
+     847: sipush        160
+     850: iadd
+     851: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     854: aload_2
+     855: aload_3
+     856: invokestatic  #9647               // Method func_1236:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     859: iconst_1
+     860: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+     863: ifne          1067
+     866: iload         4
+     868: bipush        120
+     870: iadd
+     871: sipush        13044
+     874: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     877: aload_2
+     878: aload_3
+     879: invokestatic  #9229               // Method func_1167:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     882: dup
+     883: istore        7
+     885: bipush        12
+     887: iadd
+     888: sipush        7082
+     891: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     894: aload_2
+     895: aload_3
+     896: invokestatic  #9229               // Method func_1167:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     899: pop
+     900: iload         4
+     902: iconst_2
+     903: bipush        28
+     905: aload_2
+     906: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     909: iload         4
+     911: iload         7
+     913: bipush        24
+     915: aload_2
+     916: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+     919: iload         4
+     921: iload         4
+     923: bipush        24
+     925: aload_2
+     926: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+     929: bipush        8
+     931: aload_2
+     932: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+     935: iload_0
+     936: iload         4
+     938: bipush        32
+     940: iadd
+     941: iload         4
+     943: bipush        8
+     945: iadd
+     946: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     949: aload_2
+     950: aload_3
+     951: invokestatic  #9233               // Method func_1168:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     954: dup
+     955: istore        8
+     957: iconst_0
+     958: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     961: aload_2
+     962: aload_3
+     963: invokestatic  #9216               // Method func_1164:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     966: istore        9
+     968: iload         8
+     970: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+     973: aload_2
+     974: aload_3
+     975: invokestatic  #9237               // Method func_1169:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+     978: pop
+     979: iload         7
+     981: bipush        23
+     983: aload_2
+     984: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+     987: iconst_m1
+     988: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+     991: ifne          1010
+     994: iload         7
+     996: bipush        12
+     998: aload_2
+     999: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1002: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1005: aload_2
+    1006: aload_3
+    1007: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1010: iload         7
+    1012: bipush        11
+    1014: aload_2
+    1015: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1018: iconst_m1
+    1019: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+    1022: ifne          1040
+    1025: iload         7
+    1027: iconst_0
+    1028: aload_2
+    1029: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1032: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1035: aload_2
+    1036: aload_3
+    1037: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1040: iload         9
+    1042: iconst_1
+    1043: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1046: ifne          1067
+    1049: iload_0
+    1050: bipush        44
+    1052: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1055: aload_2
+    1056: aload_3
+    1057: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1060: iconst_1
+    1061: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+    1064: ifne          1990
+    1067: iload         6
+    1069: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1072: ifne          2168
+    1075: iload         6
+    1077: iload         6
+    1079: iconst_0
+    1080: aload_2
+    1081: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1084: iconst_4
+    1085: aload_2
+    1086: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1089: iconst_0
+    1090: aload_2
+    1091: aload_3
+    1092: invokestatic  #117                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachine.call_indirect_0:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1095: goto          2168
+    1098: iload         6
+    1100: iload_0
+    1101: bipush        96
+    1103: aload_2
+    1104: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1107: sipush        255
+    1110: iand
+    1111: dup
+    1112: istore        7
+    1114: bipush        40
+    1116: imul
+    1117: iadd
+    1118: dup
+    1119: istore        5
+    1121: bipush        36
+    1123: aload_2
+    1124: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1127: sipush        255
+    1130: iand
+    1131: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1134: ifne          2276
+    1137: iload         5
+    1139: bipush        36
+    1141: iadd
+    1142: iconst_0
+    1143: i2b
+    1144: iconst_0
+    1145: aload_2
+    1146: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1149: iconst_1
+    1150: istore        5
+    1152: iload_0
+    1153: iload         7
+    1155: iconst_1
+    1156: ixor
+    1157: i2b
+    1158: bipush        96
+    1160: aload_2
+    1161: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1164: iload_0
+    1165: iload         4
+    1167: bipush        48
+    1169: iadd
+    1170: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1173: aload_2
+    1174: aload_3
+    1175: invokestatic  #9220               // Method func_1165:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1178: pop
+    1179: iload_0
+    1180: iload         4
+    1182: bipush        48
+    1184: iadd
+    1185: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1188: aload_2
+    1189: aload_3
+    1190: invokestatic  #9674               // Method func_1245:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1193: dup
+    1194: istore        6
+    1196: bipush        48
+    1198: iadd
+    1199: dup
+    1200: istore        7
+    1202: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1205: aload_2
+    1206: aload_3
+    1207: invokestatic  #9505               // Method func_1200:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1210: iconst_1
+    1211: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1214: ifne          1274
+    1217: iload_0
+    1218: iload         7
+    1220: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1223: aload_2
+    1224: aload_3
+    1225: invokestatic  #9512               // Method func_1201:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1228: iconst_1
+    1229: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1232: ifne          1274
+    1235: iload_0
+    1236: iload         6
+    1238: bipush        72
+    1240: iadd
+    1241: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1244: aload_2
+    1245: aload_3
+    1246: invokestatic  #9485               // Method func_1195:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1249: iconst_1
+    1250: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1253: ifne          1274
+    1256: iload_0
+    1257: bipush        44
+    1259: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1262: aload_2
+    1263: aload_3
+    1264: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1267: iconst_1
+    1268: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+    1271: ifne          1990
+    1274: iload         6
+    1276: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1279: ifne          2168
+    1282: iload         6
+    1284: iload         6
+    1286: iconst_0
+    1287: aload_2
+    1288: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1291: iconst_4
+    1292: aload_2
+    1293: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1296: iconst_0
+    1297: aload_2
+    1298: aload_3
+    1299: invokestatic  #117                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachine.call_indirect_0:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1302: goto          2168
+    1305: iload         6
+    1307: iload_0
+    1308: bipush        96
+    1310: aload_2
+    1311: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1314: sipush        255
+    1317: iand
+    1318: dup
+    1319: istore        7
+    1321: bipush        40
+    1323: imul
+    1324: iadd
+    1325: dup
+    1326: istore        5
+    1328: bipush        36
+    1330: aload_2
+    1331: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1334: sipush        255
+    1337: iand
+    1338: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1341: ifne          2276
+    1344: iload         5
+    1346: bipush        36
+    1348: iadd
+    1349: iconst_0
+    1350: i2b
+    1351: iconst_0
+    1352: aload_2
+    1353: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1356: iconst_1
+    1357: istore        5
+    1359: iload_0
+    1360: iload         7
+    1362: iconst_1
+    1363: ixor
+    1364: i2b
+    1365: bipush        96
+    1367: aload_2
+    1368: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1371: iload_0
+    1372: iload         4
+    1374: bipush        48
+    1376: iadd
+    1377: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1380: aload_2
+    1381: aload_3
+    1382: invokestatic  #9220               // Method func_1165:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1385: pop
+    1386: iload         4
+    1388: bipush        48
+    1390: iadd
+    1391: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1394: aload_2
+    1395: aload_3
+    1396: invokestatic  #9677               // Method func_1246:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1399: dup
+    1400: istore        6
+    1402: bipush        72
+    1404: iadd
+    1405: dup
+    1406: istore        8
+    1408: ldc_w         #579                // int 65536
+    1411: iconst_0
+    1412: aload_2
+    1413: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    1416: iload_0
+    1417: iload         6
+    1419: bipush        48
+    1421: iadd
+    1422: dup
+    1423: istore        7
+    1425: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1428: aload_2
+    1429: aload_3
+    1430: invokestatic  #9505               // Method func_1200:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1433: iconst_1
+    1434: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1437: ifne          1494
+    1440: iload_0
+    1441: iload         7
+    1443: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1446: aload_2
+    1447: aload_3
+    1448: invokestatic  #9512               // Method func_1201:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1451: iconst_1
+    1452: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1455: ifne          1494
+    1458: iload_0
+    1459: iload         8
+    1461: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1464: aload_2
+    1465: aload_3
+    1466: invokestatic  #9517               // Method func_1203:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1469: iconst_1
+    1470: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1473: ifne          1494
+    1476: iload_0
+    1477: bipush        44
+    1479: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1482: aload_2
+    1483: aload_3
+    1484: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1487: iconst_1
+    1488: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+    1491: ifne          1990
+    1494: iload         6
+    1496: iload         6
+    1498: iconst_0
+    1499: aload_2
+    1500: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1503: iconst_4
+    1504: aload_2
+    1505: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1508: iconst_0
+    1509: aload_2
+    1510: aload_3
+    1511: invokestatic  #117                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachine.call_indirect_0:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1514: goto          2168
+    1517: iload         6
+    1519: iload_0
+    1520: bipush        96
+    1522: aload_2
+    1523: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1526: sipush        255
+    1529: iand
+    1530: dup
+    1531: istore        7
+    1533: bipush        40
+    1535: imul
+    1536: iadd
+    1537: dup
+    1538: istore        5
+    1540: bipush        36
+    1542: aload_2
+    1543: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1546: sipush        255
+    1549: iand
+    1550: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1553: ifne          2276
+    1556: iload         5
+    1558: bipush        36
+    1560: iadd
+    1561: iconst_0
+    1562: i2b
+    1563: iconst_0
+    1564: aload_2
+    1565: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1568: iconst_1
+    1569: istore        5
+    1571: iload_0
+    1572: iload         7
+    1574: iconst_1
+    1575: ixor
+    1576: i2b
+    1577: bipush        96
+    1579: aload_2
+    1580: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1583: iload_0
+    1584: iload         4
+    1586: bipush        48
+    1588: iadd
+    1589: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1592: aload_2
+    1593: aload_3
+    1594: invokestatic  #9220               // Method func_1165:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1597: pop
+    1598: iload_0
+    1599: iload         4
+    1601: bipush        48
+    1603: iadd
+    1604: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1607: aload_2
+    1608: aload_3
+    1609: invokestatic  #9680               // Method func_1247:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1612: dup
+    1613: istore        6
+    1615: bipush        32
+    1617: iadd
+    1618: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1621: aload_2
+    1622: aload_3
+    1623: invokestatic  #9667               // Method func_1243:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1626: iconst_1
+    1627: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1630: ifne          1651
+    1633: iload_0
+    1634: bipush        44
+    1636: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1639: aload_2
+    1640: aload_3
+    1641: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1644: iconst_1
+    1645: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+    1648: ifne          1990
+    1651: iload         6
+    1653: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1656: ifne          2168
+    1659: iload         6
+    1661: iload         6
+    1663: iconst_0
+    1664: aload_2
+    1665: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1668: iconst_4
+    1669: aload_2
+    1670: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1673: iconst_0
+    1674: aload_2
+    1675: aload_3
+    1676: invokestatic  #117                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachine.call_indirect_0:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1679: goto          2168
+    1682: iload         6
+    1684: iload_0
+    1685: bipush        96
+    1687: aload_2
+    1688: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1691: sipush        255
+    1694: iand
+    1695: dup
+    1696: istore        7
+    1698: bipush        40
+    1700: imul
+    1701: iadd
+    1702: dup
+    1703: istore        5
+    1705: bipush        36
+    1707: aload_2
+    1708: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1711: sipush        255
+    1714: iand
+    1715: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1718: ifne          2276
+    1721: iload         5
+    1723: bipush        36
+    1725: iadd
+    1726: iconst_0
+    1727: i2b
+    1728: iconst_0
+    1729: aload_2
+    1730: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1733: iconst_1
+    1734: istore        5
+    1736: iload_0
+    1737: iload         7
+    1739: iconst_1
+    1740: ixor
+    1741: i2b
+    1742: bipush        96
+    1744: aload_2
+    1745: invokestatic  #165                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteByte:(IBILcom/dylibso/chicory/runtime/Memory;)V
+    1748: iload_0
+    1749: iload         4
+    1751: bipush        48
+    1753: iadd
+    1754: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1757: aload_2
+    1758: aload_3
+    1759: invokestatic  #9220               // Method func_1165:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1762: pop
+    1763: iload_0
+    1764: iload         4
+    1766: bipush        48
+    1768: iadd
+    1769: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1772: aload_2
+    1773: aload_3
+    1774: invokestatic  #9683               // Method func_1248:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1777: dup
+    1778: istore        6
+    1780: bipush        44
+    1782: iadd
+    1783: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1786: aload_2
+    1787: aload_3
+    1788: invokestatic  #9320               // Method func_1232:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1791: iconst_1
+    1792: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1795: ifne          1837
+    1798: iload_0
+    1799: iload         6
+    1801: bipush        84
+    1803: iadd
+    1804: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1807: aload_2
+    1808: aload_3
+    1809: invokestatic  #9323               // Method func_1233:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1812: iconst_1
+    1813: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    1816: ifne          1837
+    1819: iload_0
+    1820: bipush        44
+    1822: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1825: aload_2
+    1826: aload_3
+    1827: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1830: iconst_1
+    1831: invokestatic  #184                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_NE:(II)I
+    1834: ifne          1990
+    1837: iload         6
+    1839: invokestatic  #111                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQZ:(I)I
+    1842: ifne          2168
+    1845: iload         6
+    1847: iload         6
+    1849: iconst_0
+    1850: aload_2
+    1851: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1854: iconst_4
+    1855: aload_2
+    1856: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1859: iconst_0
+    1860: aload_2
+    1861: aload_3
+    1862: invokestatic  #117                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachine.call_indirect_0:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1865: goto          2168
+    1868: iload         4
+    1870: bipush        32
+    1872: iadd
+    1873: sipush        17677
+    1876: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1879: aload_2
+    1880: aload_3
+    1881: invokestatic  #9229               // Method func_1167:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1884: istore_1
+    1885: iload         4
+    1887: iconst_1
+    1888: bipush        20
+    1890: aload_2
+    1891: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    1894: iload         4
+    1896: iload_1
+    1897: bipush        16
+    1899: aload_2
+    1900: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    1903: iload         4
+    1905: iload         4
+    1907: bipush        16
+    1909: aload_2
+    1910: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+    1913: iconst_0
+    1914: aload_2
+    1915: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+    1918: iload_0
+    1919: iload         4
+    1921: bipush        120
+    1923: iadd
+    1924: iload         4
+    1926: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1929: aload_2
+    1930: aload_3
+    1931: invokestatic  #9233               // Method func_1168:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1934: dup
+    1935: istore        6
+    1937: iconst_0
+    1938: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1941: aload_2
+    1942: aload_3
+    1943: invokestatic  #9212               // Method func_1163:(IIILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1946: istore        5
+    1948: iload         6
+    1950: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1953: aload_2
+    1954: aload_3
+    1955: invokestatic  #9237               // Method func_1169:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    1958: pop
+    1959: iload_1
+    1960: bipush        11
+    1962: aload_2
+    1963: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    1966: iconst_m1
+    1967: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+    1970: ifne          2168
+    1973: iload_1
+    1974: iconst_0
+    1975: aload_2
+    1976: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    1979: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1982: aload_2
+    1983: aload_3
+    1984: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    1987: goto          2168
+    1990: bipush        40
+    1992: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    1995: aload_2
+    1996: aload_3
+    1997: invokestatic  #242                // Method func_1776:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    2000: dup
+    2001: istore        5
+    2003: lconst_0
+    2004: iconst_4
+    2005: aload_2
+    2006: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+    2009: iload         5
+    2011: iconst_2
+    2012: bipush        32
+    2014: aload_2
+    2015: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    2018: iload         5
+    2020: iload         6
+    2022: bipush        36
+    2024: aload_2
+    2025: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    2028: iload         5
+    2030: ldc_w         #7798               // int 50208
+    2033: iconst_0
+    2034: aload_2
+    2035: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    2038: iload         5
+    2040: iload         4
+    2042: bipush        96
+    2044: aload_2
+    2045: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+    2048: bipush        12
+    2050: aload_2
+    2051: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+    2054: iload         5
+    2056: bipush        20
+    2058: iadd
+    2059: iload         4
+    2061: bipush        104
+    2063: iadd
+    2064: iconst_0
+    2065: aload_2
+    2066: invokestatic  #195                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadLong:(IILcom/dylibso/chicory/runtime/Memory;)J
+    2069: iconst_0
+    2070: aload_2
+    2071: invokestatic  #171                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteLong:(IJILcom/dylibso/chicory/runtime/Memory;)V
+    2074: iload         5
+    2076: bipush        28
+    2078: iadd
+    2079: iload         4
+    2081: bipush        96
+    2083: iadd
+    2084: bipush        16
+    2086: iadd
+    2087: iconst_0
+    2088: aload_2
+    2089: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    2092: iconst_0
+    2093: aload_2
+    2094: invokestatic  #73                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryWriteInt:(IIILcom/dylibso/chicory/runtime/Memory;)V
+    2097: iload         6
+    2099: iconst_4
+    2100: iadd
+    2101: iload         4
+    2103: bipush        80
+    2105: iadd
+    2106: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2109: aload_2
+    2110: aload_3
+    2111: invokestatic  #9686               // Method func_1249:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    2114: pop
+    2115: iload         5
+    2117: bipush        36
+    2119: aload_2
+    2120: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    2123: bipush        16
+    2125: iadd
+    2126: iload         4
+    2128: bipush        64
+    2130: iadd
+    2131: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2134: aload_2
+    2135: aload_3
+    2136: invokestatic  #9686               // Method func_1249:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    2139: pop
+    2140: iload_1
+    2141: iload         5
+    2143: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2146: aload_2
+    2147: aload_3
+    2148: invokestatic  #1069               // Method func_145:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    2151: iload_0
+    2152: bipush        44
+    2154: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2157: aload_2
+    2158: aload_3
+    2159: invokestatic  #9200               // Method func_1160:(IILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)I
+    2162: iconst_1
+    2163: invokestatic  #181                // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_EQ:(II)I
+    2166: istore        5
+    2168: iload         4
+    2170: bipush        59
+    2172: aload_2
+    2173: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    2176: iconst_m1
+    2177: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+    2180: ifne          2199
+    2183: iload         4
+    2185: bipush        48
+    2187: aload_2
+    2188: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    2191: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2194: aload_2
+    2195: aload_3
+    2196: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    2199: iload         4
+    2201: bipush        75
+    2203: aload_2
+    2204: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    2207: iconst_m1
+    2208: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+    2211: ifne          2230
+    2214: iload         4
+    2216: bipush        64
+    2218: aload_2
+    2219: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    2222: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2225: aload_2
+    2226: aload_3
+    2227: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    2230: iload         4
+    2232: bipush        91
+    2234: aload_2
+    2235: invokestatic  #92                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadByte:(IILcom/dylibso/chicory/runtime/Memory;)B
+    2238: iconst_m1
+    2239: invokestatic  #98                 // Method com/dylibso/chicory/runtime/OpcodeImpl.I32_GT_S:(II)I
+    2242: ifne          2261
+    2245: iload         4
+    2247: bipush        80
+    2249: aload_2
+    2250: invokestatic  #69                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.memoryReadInt:(IILcom/dylibso/chicory/runtime/Memory;)I
+    2253: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2256: aload_2
+    2257: aload_3
+    2258: invokestatic  #102                // Method func_1777:(ILcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    2261: iload         4
+    2263: sipush        160
+    2266: iadd
+    2267: i2l
+    2268: iconst_0
+    2269: aload_3
+    2270: invokestatic  #129                // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.writeGlobal:(JILcom/dylibso/chicory/runtime/Instance;)V
+    2273: iload         5
+    2275: ireturn
+    2276: invokestatic  #39                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.checkInterruption:()V
+    2279: aload_2
+    2280: aload_3
+    2281: invokestatic  #9166               // Method func_1152:(Lcom/dylibso/chicory/runtime/Memory;Lcom/dylibso/chicory/runtime/Instance;)V
+    2284: invokestatic  #54                 // Method com/dylibso/chicory/wabt/Wat2WasmModuleMachineShaded.throwTrapException:()Ljava/lang/RuntimeException;
+    2287: athrow
+    2288: athrow
+
+  public static long[] call_1226(com.dylibso.chicory.runtime.Instance, com.dylibso.chicory.runtime.Memory, long[]);

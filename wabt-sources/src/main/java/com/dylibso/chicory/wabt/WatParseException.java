@@ -3,10 +3,8 @@
  */
 package com.dylibso.chicory.wabt;
 
-public class WatParseException
-extends RuntimeException {
-    public WatParseException() {
-    }
+public class WatParseException extends RuntimeException {
+    public WatParseException() {}
 
     public WatParseException(String message) {
         super(message);
@@ -16,4 +14,3 @@ extends RuntimeException {
         super(message, cause);
     }
 }
-
