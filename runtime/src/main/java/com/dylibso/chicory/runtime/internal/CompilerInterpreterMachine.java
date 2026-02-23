@@ -55,6 +55,24 @@ public class CompilerInterpreterMachine extends InterpreterMachine {
     }
 
     @Override
+    protected long[] call(
+            MStack stack,
+            Instance instance,
+            Deque<StackFrame> callStack,
+            int funcId,
+            long[] args,
+            Object[] argRefs,
+            FunctionType callType,
+            boolean popResults)
+            throws ChicoryException {
+        if (usedInterpretedFunctions != null && !usedInterpretedFunctions.contains(funcId)) {
+            usedInterpretedFunctions.add(funcId);
+            System.err.println("Chicory: calling interpreted function " + funcId);
+        }
+        return super.call(stack, instance, callStack, funcId, args, argRefs, callType, popResults);
+    }
+
+    @Override
     protected void CALL(Operands operands) {
         var instance = instance();
         var funcId = (int) operands.get(0);

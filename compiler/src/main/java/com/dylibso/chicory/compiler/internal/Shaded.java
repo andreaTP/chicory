@@ -63,11 +63,13 @@ public final class Shaded {
     }
 
     public static void tableSet(int index, int value, int tableIndex, Instance instance) {
-        instance.table(tableIndex).setRef(index, value, instance);
+        Object gcRef = instance.gcRef(value);
+        instance.table(tableIndex).setRef(index, value, instance, gcRef);
     }
 
     public static int tableGrow(int value, int size, int tableIndex, Instance instance) {
-        return instance.table(tableIndex).grow(size, value, instance);
+        Object gcRef = instance.gcRef(value);
+        return instance.table(tableIndex).grow(size, value, instance, gcRef);
     }
 
     public static int tableSize(int tableIndex, Instance instance) {
@@ -332,7 +334,11 @@ public final class Shaded {
     }
 
     public static void writeGlobal(long value, int index, Instance instance) {
-        instance.global(index).setValue(value);
+        var global = instance.global(index);
+        global.setValue(value);
+        if (global.getType().isReference()) {
+            global.setGcRef(instance.gcRef((int) value));
+        }
     }
 
     public static int readGlobalRef(int index, Instance instance) {
@@ -768,7 +774,15 @@ public final class Shaded {
     // ========= GC Operations =========
 
     public static int structNew(long[] fields, int typeIdx, Instance instance) {
-        var struct = new WasmStruct(typeIdx, fields);
+        var st = instance.module().typeSection().getSubType(typeIdx).compType().structType();
+        var refFields = new Object[fields.length];
+        for (int i = 0; i < fields.length; i++) {
+            var ft = st.fieldTypes()[i];
+            if (ft.storageType().valType() != null && ft.storageType().valType().isReference()) {
+                refFields[i] = instance.gcRef((int) fields[i]);
+            }
+        }
+        var struct = new WasmStruct(typeIdx, fields, refFields);
         return instance.registerGcRef(struct);
     }
 
@@ -831,13 +845,24 @@ public final class Shaded {
         if (ft.storageType().packedType() != null) {
             val = val & ft.storageType().packedType().mask();
         }
-        struct.setField(fieldIdx, val);
+        if (ft.storageType().valType() != null && ft.storageType().valType().isReference()) {
+            struct.setField(fieldIdx, val, instance.gcRef((int) val));
+        } else {
+            struct.setField(fieldIdx, val);
+        }
     }
 
     public static int arrayNew(long initVal, int len, int typeIdx, Instance instance) {
         var elems = new long[len];
         Arrays.fill(elems, initVal);
-        var arr = new WasmArray(typeIdx, elems);
+        var refElems = new Object[len];
+        var at = instance.module().typeSection().getSubType(typeIdx).compType().arrayType();
+        if (at.fieldType().storageType().valType() != null
+                && at.fieldType().storageType().valType().isReference()) {
+            Object initRef = instance.gcRef((int) initVal);
+            Arrays.fill(refElems, initRef);
+        }
+        var arr = new WasmArray(typeIdx, elems, refElems);
         return instance.registerGcRef(arr);
     }
 
@@ -853,7 +878,15 @@ public final class Shaded {
     }
 
     public static int arrayNewFixed(long[] vals, int typeIdx, Instance instance) {
-        var arr = new WasmArray(typeIdx, vals);
+        var refElems = new Object[vals.length];
+        var at = instance.module().typeSection().getSubType(typeIdx).compType().arrayType();
+        if (at.fieldType().storageType().valType() != null
+                && at.fieldType().storageType().valType().isReference()) {
+            for (int i = 0; i < vals.length; i++) {
+                refElems[i] = instance.gcRef((int) vals[i]);
+            }
+        }
+        var arr = new WasmArray(typeIdx, vals, refElems);
         return instance.registerGcRef(arr);
     }
 
@@ -881,11 +914,13 @@ public final class Shaded {
             throw new TrapException("out of bounds table access");
         }
         var elems = new long[len];
+        var refElems = new Object[len];
         for (int i = 0; i < len; i++) {
             elems[i] =
                     elementValueToRef(computeElementValue(instance, elemIdx, offset + i), instance);
+            refElems[i] = instance.gcRef((int) elems[i]);
         }
-        var arr = new WasmArray(typeIdx, elems);
+        var arr = new WasmArray(typeIdx, elems, refElems);
         return instance.registerGcRef(arr);
     }
 
@@ -944,7 +979,12 @@ public final class Shaded {
         if (at.fieldType().storageType().packedType() != null) {
             val = val & at.fieldType().storageType().packedType().mask();
         }
-        arr.set(idx, val);
+        if (at.fieldType().storageType().valType() != null
+                && at.fieldType().storageType().valType().isReference()) {
+            arr.set(idx, val, instance.gcRef((int) val));
+        } else {
+            arr.set(idx, val);
+        }
     }
 
     public static int arrayLen(int ref, Instance instance) {
@@ -968,8 +1008,16 @@ public final class Shaded {
         if (at.fieldType().storageType().packedType() != null) {
             val = val & at.fieldType().storageType().packedType().mask();
         }
-        for (int i = 0; i < len; i++) {
-            arr.set(offset + i, val);
+        if (at.fieldType().storageType().valType() != null
+                && at.fieldType().storageType().valType().isReference()) {
+            Object valRef = instance.gcRef((int) val);
+            for (int i = 0; i < len; i++) {
+                arr.set(offset + i, val, valRef);
+            }
+        } else {
+            for (int i = 0; i < len; i++) {
+                arr.set(offset + i, val);
+            }
         }
     }
 
@@ -985,11 +1033,11 @@ public final class Shaded {
         }
         if (dstOff <= srcOff) {
             for (int i = 0; i < len; i++) {
-                dst.set(dstOff + i, src.get(srcOff + i));
+                dst.set(dstOff + i, src.get(srcOff + i), src.getRef(srcOff + i));
             }
         } else {
             for (int i = len - 1; i >= 0; i--) {
-                dst.set(dstOff + i, src.get(srcOff + i));
+                dst.set(dstOff + i, src.get(srcOff + i), src.getRef(srcOff + i));
             }
         }
     }
@@ -1033,10 +1081,9 @@ public final class Shaded {
             return;
         }
         for (int i = 0; i < len; i++) {
-            arr.set(
-                    dstOff + i,
-                    elementValueToRef(
-                            computeElementValue(instance, elemIdx, srcOff + i), instance));
+            long val =
+                    elementValueToRef(computeElementValue(instance, elemIdx, srcOff + i), instance);
+            arr.set(dstOff + i, val, instance.gcRef((int) val));
         }
     }
 
