@@ -147,6 +147,9 @@ public class Instance {
                             g.valueType(),
                             g.mutabilityType());
             globals[i].setInstance(this);
+            if (g.valueType().isReference()) {
+                globals[i].setGcRef(gcRef((int) values[0]));
+            }
         }
 
         for (var el : elements) {

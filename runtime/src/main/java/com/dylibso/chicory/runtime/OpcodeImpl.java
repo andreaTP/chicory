@@ -805,8 +805,9 @@ public final class OpcodeImpl {
             throw new WasmRuntimeException("out of bounds table access");
         }
 
+        Object gcRef = instance.gcRef(value);
         for (int i = offset; i < end; i++) {
-            table.setRef(i, value, instance);
+            table.setRef(i, value, instance, gcRef);
         }
     }
 
@@ -821,13 +822,16 @@ public final class OpcodeImpl {
 
         for (int i = size - 1; i >= 0; i--) {
             if (d <= s) {
-                var val = src.ref(s++);
-                var inst = src.instance(d);
-                dest.setRef(d++, (int) val, inst);
+                var val = src.ref(s);
+                var inst = src.instance(s);
+                var gcRef = src.gcRef(s);
+                dest.setRef(d++, val, inst, gcRef);
+                s++;
             } else {
                 var val = src.ref(s + i);
-                var inst = src.instance(d + i);
-                dest.setRef(d + i, (int) val, inst);
+                var inst = src.instance(s + i);
+                var gcRef = src.gcRef(s + i);
+                dest.setRef(d + i, val, inst, gcRef);
             }
         }
     }
@@ -867,7 +871,8 @@ public final class OpcodeImpl {
                 }
                 table.setRef(i, val, instance);
             } else {
-                table.setRef(i, val, instance);
+                Object gcRef = instance.gcRef(val);
+                table.setRef(i, val, instance, gcRef);
             }
         }
     }

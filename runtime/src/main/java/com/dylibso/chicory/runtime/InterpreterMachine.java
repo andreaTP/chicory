@@ -62,7 +62,7 @@ public class InterpreterMachine implements Machine {
 
     @Override
     public long[] call(int funcId, long[] args) throws ChicoryException {
-        return call(stack, instance, callStack, funcId, args, null, true);
+        return call(stack, instance, callStack, funcId, args, null, null, true);
     }
 
     protected long[] call(
@@ -71,6 +71,19 @@ public class InterpreterMachine implements Machine {
             Deque<StackFrame> callStack,
             int funcId,
             long[] args,
+            FunctionType callType,
+            boolean popResults)
+            throws ChicoryException {
+        return call(stack, instance, callStack, funcId, args, null, callType, popResults);
+    }
+
+    protected long[] call(
+            MStack stack,
+            Instance instance,
+            Deque<StackFrame> callStack,
+            int funcId,
+            long[] args,
+            Object[] argRefs,
             FunctionType callType,
             boolean popResults)
             throws ChicoryException {
@@ -93,6 +106,7 @@ public class InterpreterMachine implements Machine {
                             type.params(),
                             func.localTypes(),
                             func.instructions());
+            stackFrame.setArgRefs(argRefs);
             stackFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(stackFrame);
 
@@ -1812,8 +1826,9 @@ public class InterpreterMachine implements Machine {
 
         var size = (int) stack.pop();
         var val = OpcodeImpl.boxForTable(stack.pop(), instance);
+        Object gcRef = instance.gcRef(val);
 
-        var res = table.grow(size, val, instance);
+        var res = table.grow(size, val, instance, gcRef);
         stack.push(res);
     }
 
@@ -1968,8 +1983,9 @@ public class InterpreterMachine implements Machine {
         var type = instance.type(typeId);
         // given a list of param types, let's pop those params off the stack
         // and pass as args to the function call
-        var args = extractArgsForParams(stack, type.params());
-        call(stack, instance, callStack, funcId, args, type, false);
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
+        call(stack, instance, callStack, funcId, args, argRefs, type, false);
     }
 
     private void CALL_REF() {
@@ -1981,8 +1997,9 @@ public class InterpreterMachine implements Machine {
         var type = instance.type(typeId);
         // given a list of param types, let's pop those params off the stack
         // and pass as args to the function call
-        var args = extractArgsForParams(stack, type.params());
-        call(stack, instance, callStack, funcId, args, type, false);
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
+        call(stack, instance, callStack, funcId, args, argRefs, type, false);
     }
 
     private static void F64_NEG(MStack stack) {
@@ -2137,9 +2154,10 @@ public class InterpreterMachine implements Machine {
         var idx = (int) operands.get(0);
         var table = instance.table(idx);
 
+        var gcRef = stack.peekRef();
         var value = OpcodeImpl.boxForTable(stack.pop(), instance);
         var i = (int) stack.pop();
-        table.setRef(i, value, instance);
+        table.setRef(i, value, instance, gcRef);
     }
 
     private static void TABLE_GET(MStack stack, Instance instance, Operands operands) {
@@ -2147,14 +2165,17 @@ public class InterpreterMachine implements Machine {
         var table = instance.table(idx);
         var i = (int) stack.pop();
         var ref = OpcodeImpl.TABLE_GET(instance, idx, i);
-        stack.push(OpcodeImpl.unboxFromTable(ref, instance, table.elementType()));
+        stack.pushRef(
+                OpcodeImpl.unboxFromTable(ref, instance, table.elementType()), table.gcRef(i));
     }
 
     private static void GLOBAL_SET(MStack stack, Instance instance, Operands operands) {
         var id = (int) operands.get(0);
         if (!instance.global(id).getType().equals(ValType.V128)) {
+            var ref = stack.peekRef();
             var val = stack.pop();
             instance.global(id).setValue(val);
+            instance.global(id).setGcRef(ref);
         } else {
             var high = stack.pop();
             var low = stack.pop();
@@ -2166,9 +2187,11 @@ public class InterpreterMachine implements Machine {
     private static void GLOBAL_GET(MStack stack, Instance instance, Operands operands) {
         int idx = (int) operands.get(0);
 
-        stack.push(instance.global(idx).getValueLow());
         if (instance.global(idx).getType().equals(ValType.V128)) {
+            stack.push(instance.global(idx).getValueLow());
             stack.push(instance.global(idx).getValueHigh());
+        } else {
+            stack.pushRef(instance.global(idx).getValueLow(), instance.global(idx).getGcRef());
         }
     }
 
@@ -2194,12 +2217,14 @@ public class InterpreterMachine implements Machine {
                 stack.push(a1);
             }
         } else {
+            var bRef = stack.peekRef();
             var b = stack.pop();
+            var aRef = stack.peekRef();
             var a = stack.pop();
             if (pred == 0) {
-                stack.push(b);
+                stack.pushRef(b, bRef);
             } else {
-                stack.push(a);
+                stack.pushRef(a, aRef);
             }
         }
     }
@@ -2221,12 +2246,14 @@ public class InterpreterMachine implements Machine {
                 stack.push(a1);
             }
         } else {
+            var bRef = stack.peekRef();
             var b = stack.pop();
+            var aRef = stack.peekRef();
             var a = stack.pop();
             if (pred == 0) {
-                stack.push(b);
+                stack.pushRef(b, bRef);
             } else {
-                stack.push(a);
+                stack.pushRef(a, aRef);
             }
         }
     }
@@ -2238,7 +2265,7 @@ public class InterpreterMachine implements Machine {
             stack.push(currentStackFrame.local(i));
             stack.push(currentStackFrame.local(i + 1));
         } else {
-            stack.push(currentStackFrame.local(i));
+            stack.pushRef(currentStackFrame.local(i), currentStackFrame.localRef(i));
         }
     }
 
@@ -2249,7 +2276,8 @@ public class InterpreterMachine implements Machine {
             currentStackFrame.setLocal(i, stack.pop());
             currentStackFrame.setLocal(i + 1, stack.pop());
         } else {
-            currentStackFrame.setLocal(i, stack.pop());
+            var ref = stack.peekRef();
+            currentStackFrame.setLocalRef(i, stack.pop(), ref);
         }
     }
 
@@ -2263,7 +2291,7 @@ public class InterpreterMachine implements Machine {
             currentStackFrame.setLocal(i + 1, stack.peek());
             stack.push(tmp);
         } else {
-            currentStackFrame.setLocal(i, stack.peek());
+            currentStackFrame.setLocalRef(i, stack.peek(), stack.peekRef());
         }
     }
 
@@ -2626,13 +2654,15 @@ public class InterpreterMachine implements Machine {
         var typeId = instance.functionType(funcId);
         var type = instance.type(typeId);
         var func = instance.function(funcId);
-        var args = extractArgsForParams(stack, type.params());
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
 
         // optimizing when the tail call happens in the same function
         if (currentStackFrame.funcId() == funcId) {
             var ctrlFrame = currentStackFrame.popCtrlTillCall();
             StackFrame.doControlTransfer(ctrlFrame, stack);
             currentStackFrame.reset(args);
+            currentStackFrame.setArgRefs(argRefs);
             currentStackFrame.pushCtrl(ctrlFrame);
             return currentStackFrame;
         } else {
@@ -2652,6 +2682,7 @@ public class InterpreterMachine implements Machine {
                                 type.params(),
                                 func.localTypes(),
                                 func.instructions());
+                newFrame.setArgRefs(argRefs);
                 newFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
                 if (fromCallStack) {
                     callStack.push(newFrame);
@@ -2711,13 +2742,15 @@ public class InterpreterMachine implements Machine {
                             + refMachine.getName());
         }
 
-        var args = extractArgsForParams(stack, type.params());
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
 
         // optimizing when the tail call happens in the same function
         if (currentStackFrame.funcId() == funcId) {
             var ctrlFrame = currentStackFrame.popCtrlTillCall();
             StackFrame.doControlTransfer(ctrlFrame, stack);
             currentStackFrame.reset(args);
+            currentStackFrame.setArgRefs(argRefs);
             currentStackFrame.pushCtrl(ctrlFrame);
             return currentStackFrame;
         } else {
@@ -2738,6 +2771,7 @@ public class InterpreterMachine implements Machine {
                                 type.params(),
                                 func.localTypes(),
                                 func.instructions());
+                newFrame.setArgRefs(argRefs);
                 newFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
                 if (fromCallStack) {
                     callStack.push(newFrame);
@@ -2784,13 +2818,15 @@ public class InterpreterMachine implements Machine {
         var func = instance.function(funcId);
         // given a list of param types, let's pop those params off the stack
         // and pass as args to the function call
-        var args = extractArgsForParams(stack, type.params());
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
 
         // optimizing when the tail call happens in the same function
         if (currentStackFrame.funcId() == funcId) {
             var ctrlFrame = currentStackFrame.popCtrlTillCall();
             StackFrame.doControlTransfer(ctrlFrame, stack);
             currentStackFrame.reset(args);
+            currentStackFrame.setArgRefs(argRefs);
             currentStackFrame.pushCtrl(ctrlFrame);
             return currentStackFrame;
         } else {
@@ -2804,6 +2840,7 @@ public class InterpreterMachine implements Machine {
                             type.params(),
                             func.localTypes(),
                             func.instructions());
+            newFrame.setArgRefs(argRefs);
             newFrame.pushCtrl(OpCode.CALL, 0, sizeOf(type.returns()), stack.size());
             callStack.push(newFrame);
             return newFrame;
@@ -2828,9 +2865,10 @@ public class InterpreterMachine implements Machine {
 
         // given a list of param types, let's pop those params off the stack
         // and pass as args to the function call
-        var args = extractArgsForParams(stack, type.params());
+        var argRefs = new Object[sizeOf(type.params())];
+        var args = extractArgsForParams(stack, type.params(), argRefs);
         if (useCurrentInstanceInterpreter(instance, refInstance, funcId)) {
-            call(stack, instance, callStack, funcId, args, null, false);
+            call(stack, instance, callStack, funcId, args, argRefs, null, false);
         } else {
             checkInterruption();
             var results = refInstance.getMachine().call(funcId, args);
@@ -3033,32 +3071,43 @@ public class InterpreterMachine implements Machine {
 
     private static void BR_ON_NULL(
             StackFrame frame, MStack stack, AnnotatedInstruction instruction) {
+        var refObj = stack.peekRef();
         var ref = (int) stack.pop();
         if (ref == REF_NULL_VALUE) {
             BR(frame, stack, instruction);
         } else {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
         }
     }
 
     private static void BR_ON_NON_NULL(
             StackFrame frame, MStack stack, AnnotatedInstruction instruction) {
+        var refObj = stack.peekRef();
         var ref = (int) stack.pop();
         if (ref == REF_NULL_VALUE) {
             // do nothing
         } else {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
             BR(frame, stack, instruction);
         }
     }
 
     protected static long[] extractArgsForParams(MStack stack, List<ValType> params) {
+        return extractArgsForParams(stack, params, null);
+    }
+
+    protected static long[] extractArgsForParams(
+            MStack stack, List<ValType> params, Object[] outRefs) {
         if (params == null) {
             return Value.EMPTY_VALUES;
         }
         var args = new long[sizeOf(params)];
         for (var i = 0; i < args.length; i++) {
-            args[args.length - i - 1] = stack.pop();
+            int idx = args.length - i - 1;
+            if (outRefs != null) {
+                outRefs[idx] = stack.peekRef();
+            }
+            args[idx] = stack.pop();
         }
         return args;
     }
@@ -3153,12 +3202,14 @@ public class InterpreterMachine implements Machine {
         var typeIdx = (int) operands.get(0);
         var st = instance.module().typeSection().getSubType(typeIdx).compType().structType();
         var fields = new long[st.fieldTypes().length];
+        var refFields = new Object[fields.length];
         // Pop fields in reverse order (last field on top)
         for (int i = fields.length - 1; i >= 0; i--) {
+            refFields[i] = stack.peekRef();
             fields[i] = stack.pop();
         }
-        var struct = new WasmStruct(typeIdx, fields);
-        stack.push(instance.registerGcRef(struct));
+        var struct = new WasmStruct(typeIdx, fields, refFields);
+        stack.pushRef(instance.registerGcRef(struct), struct);
     }
 
     private static void STRUCT_NEW_DEFAULT(MStack stack, Instance instance, Operands operands) {
@@ -3174,7 +3225,7 @@ public class InterpreterMachine implements Machine {
             // numeric types default to 0 (already zero-initialized)
         }
         var struct = new WasmStruct(typeIdx, fields);
-        stack.push(instance.registerGcRef(struct));
+        stack.pushRef(instance.registerGcRef(struct), struct);
     }
 
     private static void STRUCT_GET(
@@ -3196,12 +3247,13 @@ public class InterpreterMachine implements Machine {
                 val = val & ft.storageType().packedType().mask();
             }
         }
-        stack.push(val);
+        stack.pushRef(val, struct.fieldRef(fieldIdx));
     }
 
     private static void STRUCT_SET(MStack stack, Instance instance, Operands operands) {
         var typeIdx = (int) operands.get(0);
         var fieldIdx = (int) operands.get(1);
+        var valRef = stack.peekRef();
         var val = stack.pop();
         var ref = (int) stack.pop();
         if (ref == REF_NULL_VALUE) {
@@ -3213,17 +3265,20 @@ public class InterpreterMachine implements Machine {
         if (ft.storageType().packedType() != null) {
             val = val & ft.storageType().packedType().mask();
         }
-        struct.setField(fieldIdx, val);
+        struct.setField(fieldIdx, val, valRef);
     }
 
     private static void ARRAY_NEW(MStack stack, Instance instance, Operands operands) {
         var typeIdx = (int) operands.get(0);
         var len = (int) stack.pop();
+        var initRef = stack.peekRef();
         var initVal = stack.pop();
         var elems = new long[len];
+        var refElems = new Object[len];
         java.util.Arrays.fill(elems, initVal);
-        var arr = new WasmArray(typeIdx, elems);
-        stack.push(instance.registerGcRef(arr));
+        java.util.Arrays.fill(refElems, initRef);
+        var arr = new WasmArray(typeIdx, elems, refElems);
+        stack.pushRef(instance.registerGcRef(arr), arr);
     }
 
     private static void ARRAY_NEW_DEFAULT(MStack stack, Instance instance, Operands operands) {
@@ -3236,18 +3291,20 @@ public class InterpreterMachine implements Machine {
             java.util.Arrays.fill(elems, REF_NULL_VALUE);
         }
         var arr = new WasmArray(typeIdx, elems);
-        stack.push(instance.registerGcRef(arr));
+        stack.pushRef(instance.registerGcRef(arr), arr);
     }
 
     private static void ARRAY_NEW_FIXED(MStack stack, Instance instance, Operands operands) {
         var typeIdx = (int) operands.get(0);
         var len = (int) operands.get(1);
         var elems = new long[len];
+        var refElems = new Object[len];
         for (int i = len - 1; i >= 0; i--) {
+            refElems[i] = stack.peekRef();
             elems[i] = stack.pop();
         }
-        var arr = new WasmArray(typeIdx, elems);
-        stack.push(instance.registerGcRef(arr));
+        var arr = new WasmArray(typeIdx, elems, refElems);
+        stack.pushRef(instance.registerGcRef(arr), arr);
     }
 
     private static void ARRAY_NEW_DATA(MStack stack, Instance instance, Operands operands) {
@@ -3267,7 +3324,7 @@ public class InterpreterMachine implements Machine {
             elems[i] = readFromData(data, byteOff, elemSize);
         }
         var arr = new WasmArray(typeIdx, elems);
-        stack.push(instance.registerGcRef(arr));
+        stack.pushRef(instance.registerGcRef(arr), arr);
     }
 
     private static void ARRAY_NEW_ELEM(MStack stack, Instance instance, Operands operands) {
@@ -3285,7 +3342,7 @@ public class InterpreterMachine implements Machine {
             elems[i] = ConstantEvaluators.computeConstantValue(instance, init)[0];
         }
         var arr = new WasmArray(typeIdx, elems);
-        stack.push(instance.registerGcRef(arr));
+        stack.pushRef(instance.registerGcRef(arr), arr);
     }
 
     private static void ARRAY_GET(
@@ -3301,6 +3358,7 @@ public class InterpreterMachine implements Machine {
             throw new TrapException("out of bounds array access");
         }
         var val = arr.get(idx);
+        var elemRef = arr.getRef(idx);
         var at = instance.module().typeSection().getSubType(typeIdx).compType().arrayType();
         if (at.fieldType().storageType().packedType() != null) {
             if (opcode == OpCode.ARRAY_GET_S) {
@@ -3309,11 +3367,12 @@ public class InterpreterMachine implements Machine {
                 val = val & at.fieldType().storageType().packedType().mask();
             }
         }
-        stack.push(val);
+        stack.pushRef(val, elemRef);
     }
 
     private static void ARRAY_SET(MStack stack, Instance instance, Operands operands) {
         var typeIdx = (int) operands.get(0);
+        var valRef = stack.peekRef();
         var val = stack.pop();
         var idx = (int) stack.pop();
         var ref = (int) stack.pop();
@@ -3328,7 +3387,7 @@ public class InterpreterMachine implements Machine {
         if (at.fieldType().storageType().packedType() != null) {
             val = val & at.fieldType().storageType().packedType().mask();
         }
-        arr.set(idx, val);
+        arr.set(idx, val, valRef);
     }
 
     private static void ARRAY_LEN(MStack stack, Instance instance) {
@@ -3343,6 +3402,7 @@ public class InterpreterMachine implements Machine {
     private static void ARRAY_FILL(MStack stack, Instance instance, Operands operands) {
         var typeIdx = (int) operands.get(0);
         var len = (int) stack.pop();
+        var valRef = stack.peekRef();
         var val = stack.pop();
         var offset = (int) stack.pop();
         var ref = (int) stack.pop();
@@ -3358,7 +3418,7 @@ public class InterpreterMachine implements Machine {
             val = val & at.fieldType().storageType().packedType().mask();
         }
         for (int i = 0; i < len; i++) {
-            arr.set(offset + i, val);
+            arr.set(offset + i, val, valRef);
         }
     }
 
@@ -3380,11 +3440,11 @@ public class InterpreterMachine implements Machine {
         // Handle overlapping copies
         if (dstOffset <= srcOffset) {
             for (int i = 0; i < len; i++) {
-                dst.set(dstOffset + i, src.get(srcOffset + i));
+                dst.set(dstOffset + i, src.get(srcOffset + i), src.getRef(srcOffset + i));
             }
         } else {
             for (int i = len - 1; i >= 0; i--) {
-                dst.set(dstOffset + i, src.get(srcOffset + i));
+                dst.set(dstOffset + i, src.get(srcOffset + i), src.getRef(srcOffset + i));
             }
         }
     }
@@ -3460,12 +3520,13 @@ public class InterpreterMachine implements Machine {
             MStack stack, Instance instance, Operands operands, OpCode opcode) {
         var heapType = (int) operands.get(0);
         var sourceHeapType = (int) operands.get(1);
+        var refObj = stack.peekRef();
         var ref = stack.pop();
         boolean nullable = (opcode == OpCode.CAST_TEST_NULL);
         if (!instance.heapTypeMatch(ref, nullable, heapType, sourceHeapType)) {
             throw new TrapException("cast failure");
         }
-        stack.push(ref);
+        stack.pushRef(ref, refObj);
     }
 
     private static void BR_ON_CAST(
@@ -3478,13 +3539,14 @@ public class InterpreterMachine implements Machine {
         var ht2 = (int) operands.get(3);
         var sourceHeapType = (int) operands.get(4);
         boolean null2 = (flags & 2) != 0;
+        var refObj = stack.peekRef();
         var ref = stack.pop();
         if (instance.heapTypeMatch(ref, null2, ht2, sourceHeapType)) {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
             ctrlJump(frame, stack, (int) operands.get(1));
             frame.jumpTo(instruction.labelTrue());
         } else {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
         }
     }
 
@@ -3498,13 +3560,14 @@ public class InterpreterMachine implements Machine {
         var ht2 = (int) operands.get(3);
         var sourceHeapType = (int) operands.get(4);
         boolean null2 = (flags & 2) != 0;
+        var refObj = stack.peekRef();
         var ref = stack.pop();
         if (!instance.heapTypeMatch(ref, null2, ht2, sourceHeapType)) {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
             ctrlJump(frame, stack, (int) operands.get(1));
             frame.jumpTo(instruction.labelTrue());
         } else {
-            stack.push(ref);
+            stack.pushRef(ref, refObj);
         }
     }
 

@@ -115,10 +115,18 @@ public final class ConstantEvaluators {
                                         .structType();
                         var fieldCount = structType.fieldTypes().length;
                         var fields = new long[fieldCount];
+                        var refFields = new Object[fieldCount];
                         for (int i = fieldCount - 1; i >= 0; i--) {
                             fields[i] = stack.pop()[0];
                         }
-                        var struct = new WasmStruct(typeIdx, fields);
+                        for (int i = 0; i < fieldCount; i++) {
+                            var ft = structType.fieldTypes()[i];
+                            if (ft.storageType().valType() != null
+                                    && ft.storageType().valType().isReference()) {
+                                refFields[i] = instance.gcRef((int) fields[i]);
+                            }
+                        }
+                        var struct = new WasmStruct(typeIdx, fields, refFields);
                         var refId = instance.registerGcRef(struct);
                         stack.push(new long[] {refId});
                         break;
@@ -153,7 +161,19 @@ public final class ConstantEvaluators {
                         var fillVal = stack.pop()[0];
                         var elements = new long[len];
                         Arrays.fill(elements, fillVal);
-                        var array = new WasmArray(typeIdx, elements);
+                        var refElements = new Object[len];
+                        var at =
+                                instance.module()
+                                        .typeSection()
+                                        .getSubType(typeIdx)
+                                        .compType()
+                                        .arrayType();
+                        if (at.fieldType().storageType().valType() != null
+                                && at.fieldType().storageType().valType().isReference()) {
+                            Object fillRef = instance.gcRef((int) fillVal);
+                            Arrays.fill(refElements, fillRef);
+                        }
+                        var array = new WasmArray(typeIdx, elements, refElements);
                         var refId = instance.registerGcRef(array);
                         stack.push(new long[] {refId});
                         break;
@@ -186,7 +206,20 @@ public final class ConstantEvaluators {
                         for (int i = len - 1; i >= 0; i--) {
                             elements[i] = stack.pop()[0];
                         }
-                        var array = new WasmArray(typeIdx, elements);
+                        var refElements = new Object[len];
+                        var at =
+                                instance.module()
+                                        .typeSection()
+                                        .getSubType(typeIdx)
+                                        .compType()
+                                        .arrayType();
+                        if (at.fieldType().storageType().valType() != null
+                                && at.fieldType().storageType().valType().isReference()) {
+                            for (int i = 0; i < len; i++) {
+                                refElements[i] = instance.gcRef((int) elements[i]);
+                            }
+                        }
+                        var array = new WasmArray(typeIdx, elements, refElements);
                         var refId = instance.registerGcRef(array);
                         stack.push(new long[] {refId});
                         break;

@@ -9,6 +9,7 @@ public class GlobalInstance {
     private long valueLow;
     private long valueHigh;
     private final ValType valType;
+    private Object gcRef;
     private Instance instance;
     private final MutabilityType mutabilityType;
 
@@ -75,6 +76,14 @@ public class GlobalInstance {
 
     public void setValueHigh(long value) {
         this.valueHigh = value;
+    }
+
+    public void setGcRef(Object ref) {
+        this.gcRef = ref;
+    }
+
+    public Object getGcRef() {
+        return gcRef;
     }
 
     public Instance getInstance() {

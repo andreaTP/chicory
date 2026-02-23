@@ -27,6 +27,7 @@ public class StackFrame {
     private final int funcId;
     private int pc;
     private final long[] locals;
+    private final Object[] refLocals;
     private final ValType[] localTypes;
     private final int[] localIdx;
     private final Instance instance;
@@ -54,6 +55,7 @@ public class StackFrame {
         this.instance = instance;
         this.funcId = funcId;
         this.locals = Arrays.copyOf(args, sizeOf(argsTypes) + sizeOf(localTypes));
+        this.refLocals = new Object[this.locals.length];
         int localsSize = argsTypes.size() + localTypes.size();
         this.localTypes = new ValType[localsSize];
         for (int i = 0; i < argsTypes.size(); i++) {
@@ -112,10 +114,26 @@ public class StackFrame {
 
     void setLocal(int i, long v) {
         this.locals[i] = v;
+        this.refLocals[i] = null;
+    }
+
+    void setLocalRef(int i, long v, Object ref) {
+        this.locals[i] = v;
+        this.refLocals[i] = ref;
     }
 
     long local(int i) {
         return locals[i];
+    }
+
+    Object localRef(int i) {
+        return refLocals[i];
+    }
+
+    void setArgRefs(Object[] argRefs) {
+        if (argRefs != null) {
+            System.arraycopy(argRefs, 0, refLocals, 0, Math.min(argRefs.length, refLocals.length));
+        }
     }
 
     @Override
@@ -200,8 +218,10 @@ public class StackFrame {
     static void doControlTransfer(CtrlFrame ctrlFrame, MStack stack) {
         var endResults = ctrlFrame.startValues + ctrlFrame.endValues; // unwind stack
         long[] returns = new long[endResults];
+        Object[] returnRefs = new Object[endResults];
         for (int i = 0; i < returns.length; i++) {
             if (stack.size() > 0) {
+                returnRefs[i] = stack.peekRef();
                 returns[i] = stack.pop();
             }
         }
@@ -211,8 +231,8 @@ public class StackFrame {
         }
 
         for (int i = 0; i < returns.length; i++) {
-            long value = returns[returns.length - 1 - i];
-            stack.push(value);
+            int idx = returns.length - 1 - i;
+            stack.pushRef(returns[idx], returnRefs[idx]);
         }
     }
 }
