@@ -965,6 +965,7 @@
         <module>jmh</module>
         <module>log</module>
         <module>machine-tests</module>
+        <module>native-poc</module>
         <module>runtime</module>
         <module>runtime-tests</module>
         <module>test-gen-lib</module>
