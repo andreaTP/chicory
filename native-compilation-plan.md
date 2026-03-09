@@ -76,8 +76,13 @@ native-poc/                             Original PoC (kept for reference)
 4. **Explicit value IDs** — Java tracks all value/block/var IDs, Rust side is a pure
    handle-to-object mapping layer
 5. **Module infrastructure** — `cranelift-bridge` and `cranelift-compiler` as proper
-   Maven modules with test-gen-plugin wired to `i32.wast`
-6. **Spec tests running** — 460 tests from i32.wast, ~110 passing with current opcodes
+   Maven modules with test-gen-plugin, `@WasmModuleInterface` annotation for bridge
+6. **NativeMemory** — off-heap contiguous memory via Panama `MemorySegment`, integrated
+   with Instance via `withMemoryFactory(NativeMemory::new)`
+7. **i32 arithmetic opcodes** — all i32 math, bitwise, shift, rotate, comparison opcodes
+8. **const.wast fully green** — 778/778 spec tests pass (i32/i64/f32/f64 const + drop)
+9. **AddTest + AddAndStoreTest** — hand-written tests pass (pure arithmetic + memory store)
+10. **Build with Java 25** — modules target `maven.compiler.release=25`
 
 ### Not yet done
 
@@ -88,6 +93,10 @@ native-poc/                             Original PoC (kept for reference)
   - Multiple NativeMemory instances in the same JVM may interfere if the Arena is shared
   - No lifecycle management (needs `close()` or tie to Instance lifecycle)
   - No bounds checking in native code (out-of-bounds writes will corrupt memory silently)
+- **Native traps crash the JVM** — Cranelift emits `ud2` for division-by-zero and other
+  Wasm traps. The JVM catches SIGILL and crashes the entire process. Needs a signal
+  handler or pre-check approach (check divisor before div instruction). This blocks
+  `i32.wast` spec tests that include `assert_trap` for div-by-zero.
 - **No control flow** — `block`, `loop`, `br`, `if/else` not implemented
 - **No function calls** — `call`, `call_indirect` not implemented
 - **No inter-function dispatch** — each function is compiled independently, no way for
@@ -98,13 +107,23 @@ native-poc/                             Original PoC (kept for reference)
 | Opcode | Status |
 |--------|--------|
 | `i32.const` | Working |
-| `i32.add` | Working |
-| `i32.sub` | Working |
-| `i32.mul` | Working |
-| `local.get` | Working |
-| `local.set` | Working |
-| `local.tee` | Working |
+| `i64.const` | Working |
+| `f32.const` | Working |
+| `f64.const` | Working |
+| `i32.add/sub/mul` | Working |
+| `i32.div_s/div_u` | Working (but ud2 trap on div-by-zero crashes JVM) |
+| `i32.rem_s/rem_u` | Working (same trap issue) |
+| `i32.and/or/xor` | Working |
+| `i32.shl/shr_s/shr_u` | Working |
+| `i32.rotl/rotr` | Working |
+| `i32.clz/ctz/popcnt` | Working |
+| `i32.eqz` | Working |
+| `i32.eq/ne/lt_s/lt_u/gt_s/gt_u/le_s/le_u/ge_s/ge_u` | Working |
+| `i32.extend8_s/extend16_s` | Working |
+| `i32.store/load` | Working (with NativeMemory) |
+| `local.get/set/tee` | Working |
 | `drop` | Working |
+| `nop` | Working |
 | `end` / return | Working |
 
 ### Calling convention (our design)
@@ -114,23 +133,24 @@ native-poc/                             Original PoC (kept for reference)
 - Return: Wasm return value in rax/eax
 - Uses System V ABI
 
-## Next steps
+## Next steps (pick up here next session)
 
-### Immediate: more i32 opcodes
+### Immediate: trap handling
 
-Add remaining i32 arithmetic and comparison opcodes to pass more i32.wast tests:
-- `i32.div_s`, `i32.div_u`, `i32.rem_s`, `i32.rem_u`
-- `i32.and`, `i32.or`, `i32.xor`
-- `i32.shl`, `i32.shr_s`, `i32.shr_u`
-- `i32.clz`, `i32.ctz`, `i32.popcnt`
-- `i32.eqz`, `i32.eq`, `i32.ne`, `i32.lt_s`, `i32.gt_s`, etc.
-
-Each requires: add Rust bridge export + Java bridge method + NativeCompiler case.
+The #1 blocker for i32.wast. Cranelift emits `ud2` for Wasm traps (div-by-zero,
+integer overflow). Options:
+- **Pre-check in generated code**: emit a branch before div/rem to check for zero
+  divisor, call back to Java to throw the appropriate WasmRuntimeException
+- **Signal handler**: install a SIGILL/SIGFPE handler that converts to Java exception
+  (complex, platform-specific, may conflict with JVM's own signal handling)
+- **Cranelift trap configuration**: investigate if Cranelift can be configured to
+  not emit traps and instead generate branching code
 
 ### Then: control flow
 
 - `block`, `loop`, `br`, `br_if`, `br_table`, `if/else`
 - Requires Cranelift block management with proper sealing
+- This unlocks most wast files (nop.wast, local_get.wast, etc.)
 
 ### Then: function calls
 
@@ -138,15 +158,36 @@ Each requires: add Rust bridge export + Java bridge method + NativeCompiler case
 - `call_indirect` — table-based dispatch
 - Host function callbacks (imports) — Panama upcall stubs
 
-### Then: memory access
+### Then: more types
 
-- `i32.load`, `i32.store` and variants
-- Off-heap `NativeMemory` implementation
-- Memory base pointer passed as first argument to every native function
+- i64 arithmetic opcodes (same pattern as i32, bridge already has i64 support)
+- f32/f64 arithmetic, comparison, conversion opcodes
+- Memory load/store variants (i64.load, f32.load, etc.)
 
 ### Future
 
-- i64, f32, f64 opcodes
 - Benchmark on real workloads (SQLite, Prism)
 - Wrap Cranelift bridge with Chicory build-time compiler (wabt/wasm-tools pattern)
 - `Machine` implementation with hybrid dispatch (native + interpreter fallback)
+- NativeMemory lifecycle management (Arena cleanup)
+
+## How to build and test
+
+```bash
+# Switch to Java 25
+sdk use java 25-tem
+
+# Rebuild Rust bridge (only when lib.rs changes)
+cd cranelift-bridge/src/main/rust && cargo build --release --target wasm32-wasip1
+
+# Rebuild cranelift-bridge Java (only when Rust or bridge Java changes)
+mvn install -f cranelift-bridge/pom.xml -q
+
+# Build and run cranelift-compiler tests
+mvn install -f cranelift-compiler/pom.xml
+
+# Run specific tests
+mvn install -f cranelift-compiler/pom.xml -Dtest=AddTest
+mvn install -f cranelift-compiler/pom.xml -Dtest=AddAndStoreTest
+mvn install -f cranelift-compiler/pom.xml -Dtest=SpecV1ConstTest
+```

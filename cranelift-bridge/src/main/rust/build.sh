@@ -15,4 +15,4 @@ rustup target add wasm32-wasip1 2>/dev/null || true
 # Build
 cargo build --release --target wasm32-wasip1
 
-echo "Built cranelift-bridge.wasm ($(du -h ../src/main/resources/cranelift-bridge.wasm | cut -f1))"
+echo "Built cranelift-bridge.wasm"

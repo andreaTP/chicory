@@ -121,6 +121,24 @@ final class NativeCompiler {
                 valueStack.push(bridge.exports().emitIconst32((int) ins.operands()[0]));
                 break;
 
+            case I64_CONST:
+                {
+                    long val = ins.operands()[0];
+                    valueStack.push(bridge.exports().emitIconst64((int) val, (int) (val >>> 32)));
+                    break;
+                }
+
+            case F32_CONST:
+                valueStack.push(bridge.exports().emitF32const((int) ins.operands()[0]));
+                break;
+
+            case F64_CONST:
+                {
+                    long bits = ins.operands()[0];
+                    valueStack.push(bridge.exports().emitF64const((int) bits, (int) (bits >>> 32)));
+                    break;
+                }
+
             case I32_ADD:
                 {
                     int b = valueStack.pop();
@@ -163,6 +181,191 @@ final class NativeCompiler {
                     break;
                 }
 
+            case I32_DIV_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSdiv(a, bb));
+                    break;
+                }
+            case I32_DIV_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUdiv(a, bb));
+                    break;
+                }
+            case I32_REM_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSrem(a, bb));
+                    break;
+                }
+            case I32_REM_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUrem(a, bb));
+                    break;
+                }
+            case I32_AND:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBand(a, bb));
+                    break;
+                }
+            case I32_OR:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBor(a, bb));
+                    break;
+                }
+            case I32_XOR:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBxor(a, bb));
+                    break;
+                }
+            case I32_SHL:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIshl(a, bb));
+                    break;
+                }
+            case I32_SHR_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSshr(a, bb));
+                    break;
+                }
+            case I32_SHR_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUshr(a, bb));
+                    break;
+                }
+            case I32_ROTL:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitRotl(a, bb));
+                    break;
+                }
+            case I32_ROTR:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitRotr(a, bb));
+                    break;
+                }
+            case I32_CLZ:
+                {
+                    valueStack.push(bridge.exports().emitClz(valueStack.pop()));
+                    break;
+                }
+            case I32_CTZ:
+                {
+                    valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
+                    break;
+                }
+            case I32_POPCNT:
+                {
+                    valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
+                    break;
+                }
+            case I32_EQZ:
+                {
+                    valueStack.push(bridge.exports().emitEqz(valueStack.pop()));
+                    break;
+                }
+            case I32_EQ:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(0, a, bb));
+                    break;
+                }
+            case I32_NE:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(1, a, bb));
+                    break;
+                }
+            case I32_LT_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(2, a, bb));
+                    break;
+                }
+            case I32_LT_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(3, a, bb));
+                    break;
+                }
+            case I32_GT_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(4, a, bb));
+                    break;
+                }
+            case I32_GT_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(5, a, bb));
+                    break;
+                }
+            case I32_LE_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(6, a, bb));
+                    break;
+                }
+            case I32_LE_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(7, a, bb));
+                    break;
+                }
+            case I32_GE_S:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(8, a, bb));
+                    break;
+                }
+            case I32_GE_U:
+                {
+                    int bb = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(9, a, bb));
+                    break;
+                }
+            case I32_EXTEND_8_S:
+                {
+                    valueStack.push(bridge.exports().emitSextend832(valueStack.pop()));
+                    break;
+                }
+            case I32_EXTEND_16_S:
+                {
+                    valueStack.push(bridge.exports().emitSextend1632(valueStack.pop()));
+                    break;
+                }
+
             case I32_STORE:
                 {
                     int value = valueStack.pop();
@@ -179,6 +382,9 @@ final class NativeCompiler {
                     valueStack.push(bridge.exports().emitLoadI32(memBase, addr, offset));
                     break;
                 }
+
+            case NOP:
+                break;
 
             case DROP:
                 valueStack.pop();

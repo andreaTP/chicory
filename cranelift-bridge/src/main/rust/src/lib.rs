@@ -4,6 +4,7 @@
 //! The Java side tracks them explicitly and passes them to subsequent calls.
 //! Each export immediately calls the corresponding Cranelift API — no accumulation.
 
+use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::types;
 use cranelift_codegen::ir::{AbiParam, BlockArg, Function, InstBuilder, MemFlags, Signature, UserFuncName};
 use cranelift_codegen::isa::{self, CallConv, TargetIsa};
@@ -220,6 +221,25 @@ pub extern "C" fn emit_iconst_64(val_lo: u32, val_hi: u32) -> u32 {
     id
 }
 
+#[no_mangle]
+pub extern "C" fn emit_f32const(bits: u32) -> u32 {
+    let v = b().ins().f32const(f32::from_bits(bits));
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(v);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_f64const(bits_lo: u32, bits_hi: u32) -> u32 {
+    let bits = (bits_lo as u64) | ((bits_hi as u64) << 32);
+    let v = b().ins().f64const(f64::from_bits(bits));
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(v);
+    id
+}
+
 // --- Arithmetic ---
 
 #[no_mangle]
@@ -249,6 +269,233 @@ pub extern "C" fn emit_imul(a: u32, b_id: u32) -> u32 {
     let va = s().values[a as usize];
     let vb = s().values[b_id as usize];
     let r = b().ins().imul(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_sdiv(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().sdiv(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_udiv(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().udiv(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_srem(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().srem(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_urem(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().urem(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_band(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().band(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_bor(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().bor(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_bxor(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().bxor(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_ishl(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().ishl(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_ushr(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().ushr(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_sshr(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().sshr(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_rotl(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().rotl(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_rotr(a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let r = b().ins().rotr(va, vb);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_clz(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().clz(va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_ctz(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().ctz(va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_popcnt(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().popcnt(va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_eqz(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = b().func.dfg.value_type(va);
+    let zero = b().ins().iconst(ty, 0);
+    let cmp = b().ins().icmp(IntCC::Equal, va, zero);
+    // icmp returns I8, extend to I32 for Wasm compatibility
+    let r = b().ins().uextend(types::I32, cmp);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// cc: 0=eq, 1=ne, 2=lt_s, 3=lt_u, 4=gt_s, 5=gt_u, 6=le_s, 7=le_u, 8=ge_s, 9=ge_u
+#[no_mangle]
+pub extern "C" fn emit_icmp(cc: u32, a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let cond = match cc {
+        0 => IntCC::Equal,
+        1 => IntCC::NotEqual,
+        2 => IntCC::SignedLessThan,
+        3 => IntCC::UnsignedLessThan,
+        4 => IntCC::SignedGreaterThan,
+        5 => IntCC::UnsignedGreaterThan,
+        6 => IntCC::SignedLessThanOrEqual,
+        7 => IntCC::UnsignedLessThanOrEqual,
+        8 => IntCC::SignedGreaterThanOrEqual,
+        9 => IntCC::UnsignedGreaterThanOrEqual,
+        _ => panic!("Unknown icmp condition code: {}", cc),
+    };
+    let cmp = b().ins().icmp(cond, va, vb);
+    // icmp returns I8, extend to I32 for Wasm compatibility
+    let r = b().ins().uextend(types::I32, cmp);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Sign-extend i8 to i32
+#[no_mangle]
+pub extern "C" fn emit_sextend_8_32(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let truncated = b().ins().ireduce(types::I8, va);
+    let r = b().ins().sextend(types::I32, truncated);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Sign-extend i16 to i32
+#[no_mangle]
+pub extern "C" fn emit_sextend_16_32(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let truncated = b().ins().ireduce(types::I16, va);
+    let r = b().ins().sextend(types::I32, truncated);
     let session = s();
     let id = session.values.len() as u32;
     session.values.push(r);
