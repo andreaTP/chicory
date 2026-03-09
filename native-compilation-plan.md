@@ -81,10 +81,13 @@ native-poc/                             Original PoC (kept for reference)
 
 ### Not yet done
 
-- **Memory not hooked up** — `NativeMachine.call()` passes `MemorySegment.NULL` as the
-  memory base pointer. No off-heap `NativeMemory` implementation exists yet. Functions
-  that access linear memory will crash. Needs: contiguous off-heap allocation (Panama
-  `MemorySegment`), passed as the first argument to every native function.
+- **NativeMemory shortcomings** — `NativeMemory` exists and works for basic store/load,
+  but has issues:
+  - `Arena.ofShared()` is never closed — leaks off-heap memory when instances are GC'd
+  - `grow()` allocates a new segment without freeing the old one (leaks)
+  - Multiple NativeMemory instances in the same JVM may interfere if the Arena is shared
+  - No lifecycle management (needs `close()` or tie to Instance lifecycle)
+  - No bounds checking in native code (out-of-bounds writes will corrupt memory silently)
 - **No control flow** — `block`, `loop`, `br`, `if/else` not implemented
 - **No function calls** — `call`, `call_indirect` not implemented
 - **No inter-function dispatch** — each function is compiled independently, no way for

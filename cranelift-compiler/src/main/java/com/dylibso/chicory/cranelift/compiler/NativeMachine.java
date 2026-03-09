@@ -145,9 +145,16 @@ final class NativeMachine implements Machine {
         try {
             var funcType = (FunctionType) instance.type(instance.functionType(funcId));
             // Build arguments: memBase + wasm params
-            // For now, pass NULL as memory base (no memory access)
             var callArgs = new Object[1 + args.length];
-            callArgs[0] = MemorySegment.NULL; // TODO: real memory pointer
+            var mem = instance.memory();
+            if (mem instanceof NativeMemory) {
+                callArgs[0] = ((NativeMemory) mem).nativeAddress();
+            } else if (mem != null) {
+                throw new ChicoryException(
+                        "NativeMachine requires NativeMemory, got: " + mem.getClass().getName());
+            } else {
+                callArgs[0] = MemorySegment.NULL;
+            }
 
             for (int i = 0; i < args.length; i++) {
                 var paramType = funcType.params().get(i);

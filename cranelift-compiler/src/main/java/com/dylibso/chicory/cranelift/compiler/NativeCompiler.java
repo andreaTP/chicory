@@ -163,6 +163,23 @@ final class NativeCompiler {
                     break;
                 }
 
+            case I32_STORE:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports().emitStoreI32(memBase, addr, value, offset);
+                    break;
+                }
+
+            case I32_LOAD:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(bridge.exports().emitLoadI32(memBase, addr, offset));
+                    break;
+                }
+
             case DROP:
                 valueStack.pop();
                 break;
