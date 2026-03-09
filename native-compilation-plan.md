@@ -8,194 +8,163 @@ This creates a performance ceiling for compute-heavy Wasm modules.
 
 ## Idea
 
-Compile a native Wasm-to-machine-code compiler (Cranelift) to Wasm itself, run it inside Chicory, get native x86_64/aarch64 machine code bytes out, then execute them via Panama/FFM — all with zero shipped native libraries.
+Use Cranelift (compiled to Wasm, running inside Chicory) as a thin code generation bridge.
+The compilation logic stays in Java — reusing the existing `WasmAnalyzer`/`Emitters` pattern —
+and calls into Cranelift's `FunctionBuilder` API via Wasm exports. The native code is
+executed through Panama/FFM. Zero shipped native libraries.
 
 ## Architecture
 
 ```
-Wasm module
-    |
-    +-- Most functions ------> Chicory AOT ------> JVM bytecode (current path)
-    |
-    +-- Large/hot functions --> Cranelift-in-Wasm -> native x86_64/aarch64 bytes
-                                                         |
-                                                    Panama mmap
-                                                         |
-                                                    executable memory
-                                                         |
-                                                    Panama downcall
+Java (compilation logic)                 Rust/Wasm (thin Cranelift bridge)
+========================                 =================================
+WasmAnalyzer
+  → CompilerInstruction[]
+
+NativeEmitters                           cranelift-bridge.wasm exports:
+  I32_ADD:
+    a = pop()               ──────────►  emit_iadd(func_id, a, b) -> value_id
+    b = pop()
+    result = bridge.iadd(a,b)            internally:
+    push(result)                           builder.ins().iadd(a, b)
+
+  I32_LOAD:
+    addr = pop()            ──────────►  emit_load_i32(func_id, addr, offset) -> value_id
+    result = bridge.load(..)
+    push(result)                           builder.ins().load(I32, ...)
+
+  compile()                 ──────────►  compile(func_id) -> writes code to linear memory
+    read native bytes from bridge memory
+    mmap + Panama downcall
 ```
 
-This creates a tiered compilation system:
-- **Tier 1**: Interpreter (fallback, always available)
-- **Tier 2**: JVM bytecode via Chicory AOT (current compiler, works everywhere)
-- **Tier 3**: Native machine code via Cranelift + Panama (optional, best performance)
+This mirrors the existing compiler:
 
-## Step 1: Build Cranelift as a Wasm Module
+| Chicory JVM Compiler | Cranelift Native Compiler |
+|---|---|
+| `WasmAnalyzer` walks opcodes | `WasmAnalyzer` walks opcodes (same, reused) |
+| `CompilerInstruction` IR | `CompilerInstruction` IR (same, reused) |
+| `Emitters` → `asm.visitInsn(IADD)` | `NativeEmitters` → `bridge.iadd(a, b)` |
+| ASM `InstructionAdapter` | Cranelift `FunctionBuilder` (in Wasm) |
+| Output: JVM `.class` files | Output: native x86_64/aarch64 bytes |
 
-Cranelift is Wasmtime's code generator, written in Rust. Wasmtime officially documents that `cranelift` compiled to `wasm32-wasip1` can **compile** Wasm but cannot **execute** it (Tier 3: "supported but not tested"). This is exactly what we need — a pure code generator.
+## PoC results so far
 
-**Tasks:**
-- Compile `cranelift-codegen` targeting `wasm32-wasip1`, stripping the runtime/execution parts
-- Expose a minimal API: `compile(wasm_func_bytes, target_arch) -> native_code_bytes`
-- The resulting `.wasm` file ships as a resource in a Chicory module
-- Cranelift supports x86_64, aarch64, s390x, and riscv64 backends
+### Done: Panama mmap + execute
 
-**Alternative:** WARP (github.com/wasm-ecosystem/wasm-compiler) — a tiny C++14 Wasm-to-native compiler with zero dependencies (187KB binary). Could be compiled to Wasm via wasi-sdk. Simpler but less mature than Cranelift.
+Validated that Panama can mmap+execute Cranelift-compiled native code (see `native-poc/`):
+- `add(17, 25) = 42` works across interpreter, AOT, and Panama native paths
+- Cranelift compiled to wasm32-wasip1 (6.8MB) runs inside Chicory and produces native ELF
+- Zero native libraries shipped
 
-**Key question:** How large is the compiled Cranelift Wasm module? Needs experimentation.
+## Next steps
 
-## Step 2: Run Cranelift Inside Chicory
+### Step 1: Cranelift bridge (thin Rust/Wasm layer)
 
-- At startup (or lazily on first use), instantiate the Cranelift Wasm module using Chicory's existing interpreter or AOT-to-bytecode compiler
-- Feed individual Wasm function bodies to Cranelift, get back native machine code bytes
-- This is a **one-time cost per function** — cache the compiled output
-- Compilation can happen in a background thread while the function runs via JVM bytecode
+Create `native-poc/cranelift-bridge/` — a ~200-line Rust module that exposes Cranelift's
+`FunctionBuilder` API as flat Wasm exports. All handles (func_id, block_id, value_id,
+var_id) are opaque `u32`.
 
-## Step 3: Make Native Code Executable via Panama
+**Wasm exports:**
+```
+// Setup
+init(target_ptr, target_len)
+create_function() -> func_id
+add_param_type(func_id, wasm_type)
+add_return_type(func_id, wasm_type)
+build_function(func_id)                     // finalize signature, create entry block
 
-No native libraries needed — call libc directly via `Linker.nativeLinker()`:
+// Variables (Wasm locals)
+declare_var(func_id, wasm_type) -> var_id
+def_var(func_id, var_id, value_id)
+use_var(func_id, var_id) -> value_id
+
+// Function params
+func_param(func_id, index) -> value_id
+
+// Constants
+emit_iconst_32(func_id, val) -> value_id
+emit_iconst_64(func_id, val_lo, val_hi) -> value_id
+
+// Arithmetic
+emit_iadd(func_id, a, b) -> value_id
+emit_isub(func_id, a, b) -> value_id
+emit_imul(func_id, a, b) -> value_id
+// ... extend as needed
+
+// Memory access
+emit_load_i32(func_id, base, wasm_addr, offset) -> value_id
+emit_store_i32(func_id, base, wasm_addr, value, offset)
+
+// Control flow
+create_block(func_id) -> block_id
+switch_to_block(func_id, block_id)
+seal_block(func_id, block_id)
+emit_jump(func_id, block_id)
+emit_brif(func_id, cond, then_block, else_block)
+emit_return(func_id, value_id)
+emit_return_void(func_id)
+
+// Compile
+compile(func_id) -> code_length            // writes native bytes to linear memory
+get_code_ptr(func_id) -> ptr               // pointer to code bytes in linear memory
+```
+
+**Deps:** `cranelift-codegen 0.129`, `cranelift-frontend 0.129`, `cranelift-control`,
+`target-lexicon`. No wasmparser, no wasmtime.
+
+**Calling convention (our design):**
+- First param: memory base pointer (i64, raw pointer to linear memory)
+- Remaining params: Wasm function parameters
+- Return: Wasm return value
+- Uses System V ABI
+
+### Step 2: Java bridge wrapper (`CraneliftBridge.java`)
+
+Loads the bridge Wasm module, provides typed Java methods:
 
 ```java
-// 1. Allocate writable memory
-var addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-// 2. Copy native code bytes
-memcpy(addr, codeBytes, size);
-
-// 3. Make executable (W^X safe)
-mprotect(addr, size, PROT_READ | PROT_EXEC);
-
-// 4. Create a callable handle to the native function
-var funcHandle = Linker.nativeLinker().downcallHandle(addr, functionDescriptor);
-```
-
-**Convention:** Pass linear memory base pointer + Wasm function args as parameters, get result back.
-
-**Windows:** Uses `VirtualAlloc` / `VirtualProtect` instead of `mmap` / `mprotect`. Panama can call `kernel32.dll` — needs platform-specific dispatch.
-
-## Step 4: Integrate with Chicory's Function Dispatch
-
-Chicory already supports mixing execution backends per-function via `CompilerInterpreterMachine`. Extend this to a three-tier `HybridMachine`:
-
-```
-Machine.call(funcId, args)
-    |
-    +-- native-compiled?  --> Panama downcall to mmapped code
-    +-- AOT-compiled?     --> INVOKESTATIC to FuncGroup (current)
-    +-- fallback          --> interpreter
-```
-
-- Inter-function calls between tiers go through `Machine.call(funcId, args)` — already works
-- Direct calls within the JVM bytecode tier stay fast (INVOKESTATIC)
-- The `Machine` interface (`call(int funcId, long[] args) -> long[]`) is the universal dispatch point
-
-## Step 5: Memory Layout Changes
-
-Wasm linear memory must be a **single contiguous off-heap allocation** for native code to access via raw pointers (the current `ByteBuffer[]` page array breaks contiguity).
-
-**Options:**
-- Panama `MemorySegment` backed by a single `mmap` (preferred)
-- Single large `DirectByteBuffer`
-- `Unsafe.allocateMemory` (less safe)
-
-**Bounds checking in native code:**
-- Option A: Cranelift emits explicit bounds checks (safest)
-- Option B: Guard pages — `mmap` extra pages as `PROT_NONE` after valid memory, out-of-bounds access triggers SIGSEGV caught by a signal handler
-
-**The base address** is passed to native functions at call time so they can access linear memory.
-
-## Step 6: Handle Host Function Callbacks (Imports)
-
-When native code calls a Wasm import (host function), it needs to call back into Java. This is the hardest part.
-
-**Option A: Panama upcall stubs (preferred)**
-- Pre-register a Panama upcall stub for each import function
-- Pass a table of function pointers to native code
-- Native code calls the stub, which transitions back into Java via Panama upcall
-- Adds some overhead per callback but is clean and correct
-
-**Option B: Shared call buffer**
-- Native code writes import funcId + args to a known memory location
-- Returns control to Java with a special return code
-- Java dispatches the import, writes the result back, re-enters native code
-- Simpler but slower and more complex control flow
-
-## Constraints and Trade-offs
-
-### What you get
-- **Zero native dependencies** in the distribution — Cranelift ships as `.wasm`, Panama uses system libc
-- **Near-native execution speed** for large functions that C2 can't optimize
-- **Graceful fallback** — if Panama isn't available (old JDK, restricted env), everything works via JVM bytecode
-- **Per-function opt-in** — only compile to native what actually benefits from it
-
-### What you give up
-- **Minimum Java version**: Panama/FFM is stable from Java 22. This tier would be optional and only available on 22+
-- **GC interaction**: Long-running native functions block JVM safepoints (and thus GC). Cranelift could potentially emit periodic yield points, but this needs investigation
-- **Platform coverage**: Need separate code paths for mmap (Unix) vs VirtualAlloc (Windows)
-- **Complexity**: Three execution tiers + memory layout changes + host callbacks is significant engineering
-
-### Risks
-- Cranelift-to-wasm32 is Tier 3 ("supported but not tested") — may require upstream fixes
-- Cranelift Wasm module size could be large — impacts startup and memory
-- Host function callbacks via Panama upcalls add latency — matters for import-heavy modules
-- W^X enforcement on some platforms (macOS hardened runtime, SELinux) may block mmap+mprotect
-
-## Open Questions
-
-1. How big is Cranelift compiled to Wasm? Is the startup cost acceptable?
-2. Can Cranelift emit safepoint-equivalent yield points for long-running functions?
-3. What's the performance delta between Panama downcall overhead (~50ns) and the native execution speedup for realistic Wasm workloads?
-4. Should this be build-time only (compile Wasm to native at build time, ship the machine code) or also runtime?
-5. Is WARP a better starting point than Cranelift for a proof of concept due to its simplicity?
-
-## PoC Progress
-
-### Done: Panama mmap + execute (native-poc/)
-
-Validated that Panama can mmap Cranelift-compiled native code and execute it:
-
-1. Wrote `add(i32, i32) -> i32` in WAT
-2. Compiled to native x86_64 via `wasmtime compile` (Cranelift)
-3. Extracted raw function bytes from the ELF .text section
-4. Used Panama to mmap, mprotect(READ|EXEC), and downcall the native code
-5. All three paths (interpreter, AOT, Panama native) produce correct results
-
-See `native-poc/README.md` for details.
-
-### Next: Panama-based Machine implementation
-
-Write a `Machine` implementation that uses Panama to execute native code. This is the
-integration point with Chicory's runtime:
-
-```java
-public class NativeMachine implements Machine {
-    // Pre-loaded native code (mmapped, executable)
-    // Panama downcall handles per function
-    // VMContext struct with linear memory base pointer
-
-    @Override
-    public long[] call(int funcId, long[] args) {
-        // Dispatch to Panama downcall for this function
-    }
+class CraneliftBridge {
+    int createFunction() { ... }
+    void addParamType(int funcId, ValType type) { ... }
+    int iadd(int funcId, int a, int b) { ... }
+    byte[] compile(int funcId) { ... }  // reads native bytes from bridge memory
 }
 ```
 
-This plugs into Chicory's existing API:
-```java
-Instance.builder(module)
-    .withMachineFactory(NativeMachine::new)
-    .build();
+### Step 3: NativeEmitters (minimal, for `add_and_store` example)
+
+Mirrors `Emitters.java`. Uses `WasmAnalyzer` output unchanged. Maintains an explicit
+`Deque<Integer>` value stack (Cranelift uses SSA values, not an implicit stack).
+
+Initially handles: `LOCAL_GET`, `LOCAL_SET`, `I32_ADD`, `I32_STORE`, `I32_CONST`, `END`.
+
+### Step 4: Off-heap NativeMemory
+
+Based on old `ByteArrayMemory` — uses Panama `MemorySegment` for contiguous off-heap
+buffer. Exposes `address()` for passing to native code as the memory base pointer.
+
+### Step 5: End-to-end test with `add_and_store.wat`
+
+```wat
+(module
+  (memory (export "memory") 1)
+  (func (export "add_and_store") (param $a i32) (param $b i32) (param $addr i32) (result i32)
+    (local $sum i32)
+    (local.set $sum (i32.add (local.get $a) (local.get $b)))
+    (i32.store (local.get $addr) (local.get $sum))
+    (local.get $sum)
+  )
+)
 ```
 
-### Then: Native code production
+Verify: interpreter result = AOT result = Panama native result, and memory write is correct.
 
-Two options for producing native code from Wasm:
+### Future steps (not in this PoC)
 
-**Option A: wasmtime at build time** — Use `wasmtime compile` to produce native code at
-build time, ship the compiled code as resources. Simpler, requires wasmtime on the build
-machine but not at runtime.
-
-**Option B: Cranelift-in-Wasm** — Compile Cranelift itself to wasm32-wasip1, wrap it using
-Chicory's build-time compiler (following the wabt/wasm-tools pattern). This enables runtime
-compilation entirely within the JVM. More complex but fully self-contained.
+- Add more opcodes incrementally (i64, f32, f64, comparisons, control flow)
+- CALL / CALL_INDIRECT support
+- Host function callbacks via Panama upcall stubs
+- `Machine` implementation plugging into `withMachineFactory()`
+- Benchmark on real workloads (SQLite, Prism)
+- Wrap Cranelift bridge with Chicory build-time compiler (wabt/wasm-tools pattern)

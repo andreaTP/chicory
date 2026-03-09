@@ -1,45 +1,47 @@
 package com.dylibso.chicory.nativepoc;
 
 import com.dylibso.chicory.compiler.MachineFactoryCompiler;
-import com.dylibso.chicory.log.SystemLogger;
-import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
-import com.dylibso.chicory.wasi.WasiOptions;
-import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.Parser;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.util.List;
 
 /**
- * PoC: Full pipeline — Cranelift (running inside Chicory) compiles Wasm to native x86_64,
- * then Panama executes the native code. Zero native libraries shipped.
+ * PoC: Java drives Cranelift (running inside Chicory) via explicit value IDs
+ * to compile a Wasm function to native x86_64, then executes it via Panama.
+ *
+ * Tests add_and_store(a, b, addr) which adds two i32s, stores the result
+ * to linear memory, and returns the sum.
  */
 public class NativePoc {
 
     public static void main(String[] args) throws Throwable {
         int a = 17;
         int b = 25;
+        int addr = 0; // memory offset to store result
         int expected = a + b;
 
-        System.out.println("=== Chicory Native PoC ===");
-        System.out.println("Testing: add(" + a + ", " + b + ") = " + expected);
+        System.out.println("=== Chicory Native PoC (Cranelift Bridge) ===");
+        System.out.println(
+                "Testing: add_and_store(" + a + ", " + b + ", " + addr + ") = " + expected);
         System.out.println();
 
         // --- 1. Chicory Interpreter ---
         System.out.println("--- Chicory Interpreter ---");
-        var wasmBytes = NativePoc.class.getResourceAsStream("/add.wasm").readAllBytes();
+        var wasmBytes = NativePoc.class.getResourceAsStream("/add_and_store.wasm").readAllBytes();
         var module = Parser.parse(wasmBytes);
         var interpInstance = Instance.builder(module).build();
-        var interpAdd = interpInstance.export("add");
-        long[] interpResult = interpAdd.apply(a, b);
+        var interpFunc = interpInstance.export("add_and_store");
+        long[] interpResult = interpFunc.apply(a, b, addr);
         System.out.println("Result: " + interpResult[0]);
+        // Check memory was written
+        int storedVal = interpInstance.memory().readInt(addr);
+        System.out.println("Memory[" + addr + "] = " + storedVal);
         assert interpResult[0] == expected : "Interpreter result mismatch!";
+        assert storedVal == expected : "Interpreter memory mismatch!";
         System.out.println("OK!");
         System.out.println();
 
@@ -49,137 +51,89 @@ public class NativePoc {
                 Instance.builder(module)
                         .withMachineFactory(MachineFactoryCompiler::compile)
                         .build();
-        var aotAdd = aotInstance.export("add");
-        long[] aotResult = aotAdd.apply(a, b);
+        var aotFunc = aotInstance.export("add_and_store");
+        long[] aotResult = aotFunc.apply(a, b, addr);
         System.out.println("Result: " + aotResult[0]);
+        int aotStored = aotInstance.memory().readInt(addr);
+        System.out.println("Memory[" + addr + "] = " + aotStored);
         assert aotResult[0] == expected : "AOT result mismatch!";
+        assert aotStored == expected : "AOT memory mismatch!";
         System.out.println("OK!");
         System.out.println();
 
-        // --- 3. Compile add.wasm to native using Cranelift (running inside Chicory!) ---
-        System.out.println("--- Cranelift-in-Chicory compilation ---");
-        byte[] nativeElf = compilWithCraneliftInChicory(wasmBytes, "x86_64-unknown-linux-gnu");
-        System.out.println("  Cranelift produced " + nativeElf.length + " bytes of ELF");
-
-        // Extract function[0] from the .text section
-        byte[] funcBytes = extractTextSection(nativeElf);
-        System.out.println("  Extracted " + funcBytes.length + " bytes from .text section");
+        // --- 3. Compile using Cranelift bridge (Java drives, Cranelift in Chicory) ---
+        System.out.println("--- Cranelift Bridge Compilation ---");
+        byte[] nativeCode = compileAddAndStoreWithBridge();
+        System.out.println("  Cranelift produced " + nativeCode.length + " bytes of native code");
         System.out.println();
 
-        // --- 4. Execute native code via Panama ---
-        System.out.println("--- Panama Native (Cranelift-in-Chicory compiled) ---");
-        int nativeResult = callNativeAdd(funcBytes, a, b);
+        // --- 4. Execute via Panama ---
+        System.out.println("--- Panama Native Execution ---");
+        int nativeResult = executeNative(nativeCode, a, b, addr);
         System.out.println("Result: " + nativeResult);
         assert nativeResult == expected : "Native result mismatch!";
         System.out.println("OK!");
         System.out.println();
 
-        System.out.println("=== All four paths produced correct results! ===");
-        System.out.println("  Cranelift compiled Wasm to native x86_64 INSIDE Chicory,");
-        System.out.println("  then Panama executed the native code. Zero native libs.");
+        System.out.println("=== All paths produced correct results! ===");
     }
 
     /**
-     * Run the Cranelift compiler (itself a Wasm module) inside Chicory
-     * to compile a Wasm module to native code.
+     * Use the CraneliftBridge to compile add_and_store to native code.
+     * This is what NativeEmitters would do — here done inline for clarity.
+     *
+     * The function signature is:
+     *   add_and_store(memBase: i64, a: i32, b: i32, addr: i32) -> i32
+     *
+     * We prepend memBase (i64 pointer to linear memory) as the first param.
+     * The Wasm params (a, b, addr) follow.
      */
-    static byte[] compilWithCraneliftInChicory(byte[] wasmToCompile, String target)
-            throws Exception {
-        var craneliftWasm =
-                NativePoc.class.getResourceAsStream("/cranelift-compiler.wasm").readAllBytes();
-        var craneliftModule = Parser.parse(craneliftWasm);
+    static byte[] compileAddAndStoreWithBridge() {
+        var bridge = new CraneliftBridge();
+        bridge.init("x86_64-unknown-linux-gnu");
 
-        var stdin = new ByteArrayInputStream(wasmToCompile);
-        var stdout = new ByteArrayOutputStream();
-        var stderr = new ByteArrayOutputStream();
+        bridge.createFunction();
 
-        var wasiOpts =
-                WasiOptions.builder()
-                        .withStdin(stdin)
-                        .withStdout(stdout)
-                        .withStderr(stderr)
-                        .withArguments(List.of("cranelift-compiler", target))
-                        .build();
+        // Signature: (memBase: i64, a: i32, b: i32, addr: i32) -> i32
+        bridge.addParamType(CraneliftBridge.TYPE_I64); // memBase
+        bridge.addParamType(CraneliftBridge.TYPE_I32); // a
+        bridge.addParamType(CraneliftBridge.TYPE_I32); // b
+        bridge.addParamType(CraneliftBridge.TYPE_I32); // addr
+        bridge.addReturnType(CraneliftBridge.TYPE_I32); // result
+        bridge.buildFunction();
 
-        try (var wasi =
-                WasiPreview1.builder()
-                        .withLogger(new SystemLogger())
-                        .withOptions(wasiOpts)
-                        .build()) {
-            var imports = ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
-            Instance.builder(craneliftModule).withImportValues(imports).build();
-        }
+        // Create entry block
+        int entry = bridge.createBlock();
+        bridge.appendBlockParamsForFuncParams(entry);
+        bridge.switchToBlock(entry);
+        bridge.sealBlock(entry);
 
-        var stderrStr = stderr.toString();
-        if (!stderrStr.isEmpty()) {
-            System.out.println("  Cranelift stderr: " + stderrStr.trim());
-        }
+        // Get function params
+        int memBase = bridge.funcParam(entry, 0); // i64 pointer
+        int paramA = bridge.funcParam(entry, 1); // i32
+        int paramB = bridge.funcParam(entry, 2); // i32
+        int paramAddr = bridge.funcParam(entry, 3); // i32
 
-        return stdout.toByteArray();
+        // sum = a + b
+        int sum = bridge.emitIadd(paramA, paramB);
+
+        // memory[addr] = sum (i32.store with offset 0)
+        bridge.emitStoreI32(memBase, paramAddr, sum, 0);
+
+        // return sum
+        bridge.emitReturn(sum);
+
+        System.out.println("  Built Cranelift IR via bridge");
+
+        // Compile to native code
+        return bridge.compile();
     }
 
     /**
-     * Extract just the first function's code from the .text section of the ELF.
-     * Minimal ELF parser — finds .text section header and reads its contents.
-     * Only extracts the first function (up to the second symbol).
+     * mmap + mprotect + Panama downcall to execute native code.
+     * Allocates off-heap memory for the Wasm linear memory.
      */
-    static byte[] extractTextSection(byte[] elf) {
-        // Find .text section by scanning section headers
-        // ELF64 header: e_shoff at offset 0x28 (8 bytes), e_shentsize at 0x3A (2 bytes),
-        // e_shnum at 0x3C (2 bytes), e_shstrndx at 0x3E (2 bytes)
-        long shOff = readLong(elf, 0x28);
-        int shEntSize = readShort(elf, 0x3A);
-        int shNum = readShort(elf, 0x3C);
-        int shStrNdx = readShort(elf, 0x3E);
-
-        // Get the section name string table
-        long strTabOff = readLong(elf, (int) (shOff + shStrNdx * shEntSize + 0x18));
-
-        // Find .text section
-        for (int i = 0; i < shNum; i++) {
-            int shStart = (int) (shOff + i * shEntSize);
-            int nameIdx = readInt(elf, shStart);
-            String name = readString(elf, (int) (strTabOff + nameIdx));
-            if (".text".equals(name)) {
-                long offset = readLong(elf, shStart + 0x18);
-                long size = readLong(elf, shStart + 0x20);
-                // Find the first function size by looking at the second symbol
-                // For now, just return enough bytes for the add function (12 bytes)
-                // A proper implementation would parse the symbol table
-                byte[] text = new byte[(int) size];
-                System.arraycopy(elf, (int) offset, text, 0, (int) size);
-                return text;
-            }
-        }
-        throw new RuntimeException("No .text section found in ELF");
-    }
-
-    static long readLong(byte[] data, int offset) {
-        long val = 0;
-        for (int i = 7; i >= 0; i--) {
-            val = (val << 8) | (data[offset + i] & 0xFF);
-        }
-        return val;
-    }
-
-    static int readInt(byte[] data, int offset) {
-        return (data[offset] & 0xFF)
-                | ((data[offset + 1] & 0xFF) << 8)
-                | ((data[offset + 2] & 0xFF) << 16)
-                | ((data[offset + 3] & 0xFF) << 24);
-    }
-
-    static int readShort(byte[] data, int offset) {
-        return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8);
-    }
-
-    static String readString(byte[] data, int offset) {
-        int end = offset;
-        while (end < data.length && data[end] != 0) end++;
-        return new String(data, offset, end - offset);
-    }
-
-    static int callNativeAdd(byte[] codeBytes, int a, int b) throws Throwable {
+    static int executeNative(byte[] codeBytes, int a, int b, int addr) throws Throwable {
         var linker = Linker.nativeLinker();
         var lookup = linker.defaultLookup();
 
@@ -217,6 +171,7 @@ public class NativePoc {
         int MAP_ANONYMOUS = 0x20;
         long pageSize = 4096;
 
+        // --- Allocate executable code region ---
         MemorySegment codeAddr =
                 (MemorySegment)
                         mmap.invoke(
@@ -227,25 +182,51 @@ public class NativePoc {
                                 -1,
                                 0L);
 
-        var writableCode = codeAddr.reinterpret(pageSize);
-        MemorySegment.copy(MemorySegment.ofArray(codeBytes), 0, writableCode, 0, codeBytes.length);
-
+        var codeRegion = codeAddr.reinterpret(pageSize);
+        MemorySegment.copy(MemorySegment.ofArray(codeBytes), 0, codeRegion, 0, codeBytes.length);
         mprotect.invoke(codeAddr, pageSize, PROT_READ | PROT_EXEC);
 
-        // Cranelift calling convention: rdi=vmctx, rsi=caller_vmctx, rdx=a, rcx=b
+        // --- Allocate linear memory (off-heap, contiguous) ---
+        long memSize = 65536; // 1 Wasm page
+        MemorySegment memAddr =
+                (MemorySegment)
+                        mmap.invoke(
+                                MemorySegment.NULL,
+                                memSize,
+                                PROT_READ | PROT_WRITE,
+                                MAP_PRIVATE | MAP_ANONYMOUS,
+                                -1,
+                                0L);
+        var linearMemory = memAddr.reinterpret(memSize);
+
+        System.out.println(
+                "  Code at: 0x"
+                        + Long.toHexString(codeAddr.address())
+                        + ", Memory at: 0x"
+                        + Long.toHexString(memAddr.address()));
+
+        // --- Call the native function ---
+        // Signature: (memBase: ptr, a: i32, b: i32, addr: i32) -> i32
+        // System V ABI: rdi=memBase, rsi=a, rdx=b, rcx=addr, return in eax
         var funcDescriptor =
                 FunctionDescriptor.of(
-                        ValueLayout.JAVA_INT,
-                        ValueLayout.ADDRESS,
-                        ValueLayout.JAVA_LONG,
-                        ValueLayout.JAVA_INT,
-                        ValueLayout.JAVA_INT);
+                        ValueLayout.JAVA_INT, // return i32
+                        ValueLayout.ADDRESS, // memBase (i64 ptr)
+                        ValueLayout.JAVA_INT, // a
+                        ValueLayout.JAVA_INT, // b
+                        ValueLayout.JAVA_INT); // addr
 
-        MethodHandle nativeAdd = linker.downcallHandle(writableCode, funcDescriptor);
+        MethodHandle nativeFunc = linker.downcallHandle(codeRegion, funcDescriptor);
+        int result = (int) nativeFunc.invoke(linearMemory, a, b, addr);
 
-        int result = (int) nativeAdd.invoke(MemorySegment.NULL, 0L, a, b);
+        // Verify memory was written
+        int storedVal = linearMemory.get(ValueLayout.JAVA_INT, addr);
+        System.out.println("Memory[" + addr + "] = " + storedVal);
+        assert storedVal == result : "Native memory mismatch!";
 
+        // Cleanup
         munmap.invoke(codeAddr, pageSize);
+        munmap.invoke(memAddr, memSize);
 
         return result;
     }
