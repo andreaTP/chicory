@@ -16,6 +16,7 @@
 
   <!-- TODO: remove me — skip strict checks while cranelift modules are experimental -->
   <properties>
+    <maven.compiler.release>25</maven.compiler.release>
     <spotless.check.skip>true</spotless.check.skip>
     <checkstyle.skip>true</checkstyle.skip>
     <enforcer.skip>true</enforcer.skip>

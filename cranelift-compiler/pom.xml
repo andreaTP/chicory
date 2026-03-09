@@ -16,6 +16,7 @@
 
   <!-- TODO: remove me — skip strict checks while cranelift modules are experimental -->
   <properties>
+    <maven.compiler.release>25</maven.compiler.release>
     <spotless.check.skip>true</spotless.check.skip>
     <checkstyle.skip>true</checkstyle.skip>
     <enforcer.skip>true</enforcer.skip>
@@ -226,16 +227,6 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <release>21</release>
-          <compilerArgs>
-            <arg>--enable-preview</arg>
-          </compilerArgs>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

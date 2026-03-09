@@ -48,34 +48,34 @@ final class NativeCompiler {
         int typeIdx = module.functionSection().getFunctionType(bodyIndex);
         var funcType = (FunctionType) module.typeSection().getType(typeIdx);
 
-        bridge.createFunction();
+        bridge.exports().createFunction();
 
         // Our calling convention: first param is always memBase (i64 pointer)
-        bridge.addParamType(CraneliftBridge.TYPE_I64);
+        bridge.exports().addParamType(CraneliftBridge.TYPE_I64);
 
         // Then Wasm function params
         for (ValType param : funcType.params()) {
-            bridge.addParamType(valTypeToBridgeType(param));
+            bridge.exports().addParamType(valTypeToBridgeType(param));
         }
 
         // Return types
         for (ValType ret : funcType.returns()) {
-            bridge.addReturnType(valTypeToBridgeType(ret));
+            bridge.exports().addReturnType(valTypeToBridgeType(ret));
         }
 
-        bridge.buildFunction();
+        bridge.exports().buildFunction();
 
         // Create entry block
-        int entry = bridge.createBlock();
-        bridge.appendBlockParamsForFuncParams(entry);
-        bridge.switchToBlock(entry);
-        bridge.sealBlock(entry);
+        int entry = bridge.exports().createBlock();
+        bridge.exports().appendBlockParamsForFuncParams(entry);
+        bridge.exports().switchToBlock(entry);
+        bridge.exports().sealBlock(entry);
 
         // Get params as value IDs
-        int memBase = bridge.funcParam(entry, 0);
+        int memBase = bridge.exports().funcParam(entry, 0);
         int[] paramVals = new int[funcType.params().size()];
         for (int i = 0; i < paramVals.length; i++) {
-            paramVals[i] = bridge.funcParam(entry, i + 1);
+            paramVals[i] = bridge.exports().funcParam(entry, i + 1);
         }
 
         // Declare variables for all locals (params + body locals)
@@ -86,16 +86,17 @@ final class NativeCompiler {
 
         // Declare param locals
         for (int i = 0; i < numParams; i++) {
-            localVars[i] = bridge.declareVar(valTypeToBridgeType(funcType.params().get(i)));
-            bridge.defVar(localVars[i], paramVals[i]);
+            localVars[i] =
+                    bridge.exports().declareVar(valTypeToBridgeType(funcType.params().get(i)));
+            bridge.exports().defVar(localVars[i], paramVals[i]);
         }
 
         // Declare body locals (initialized to zero)
         for (int i = 0; i < numBodyLocals; i++) {
             ValType localType = body.localTypes().get(i);
-            localVars[numParams + i] = bridge.declareVar(valTypeToBridgeType(localType));
-            int zero = bridge.emitIconst32(0);
-            bridge.defVar(localVars[numParams + i], zero);
+            localVars[numParams + i] = bridge.exports().declareVar(valTypeToBridgeType(localType));
+            int zero = bridge.exports().emitIconst32(0);
+            bridge.exports().defVar(localVars[numParams + i], zero);
         }
 
         // Walk instructions
@@ -117,14 +118,14 @@ final class NativeCompiler {
 
         switch (ins.opcode()) {
             case I32_CONST:
-                valueStack.push(bridge.emitIconst32((int) ins.operands()[0]));
+                valueStack.push(bridge.exports().emitIconst32((int) ins.operands()[0]));
                 break;
 
             case I32_ADD:
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.emitIadd(a, b));
+                    valueStack.push(bridge.exports().emitIadd(a, b));
                     break;
                 }
 
@@ -132,7 +133,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.emitIsub(a, b));
+                    valueStack.push(bridge.exports().emitIsub(a, b));
                     break;
                 }
 
@@ -140,25 +141,25 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.emitImul(a, b));
+                    valueStack.push(bridge.exports().emitImul(a, b));
                     break;
                 }
 
             case LOCAL_GET:
-                valueStack.push(bridge.useVar(localVars[(int) ins.operands()[0]]));
+                valueStack.push(bridge.exports().useVar(localVars[(int) ins.operands()[0]]));
                 break;
 
             case LOCAL_SET:
                 {
                     int val = valueStack.pop();
-                    bridge.defVar(localVars[(int) ins.operands()[0]], val);
+                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
                     break;
                 }
 
             case LOCAL_TEE:
                 {
                     int val = valueStack.peek();
-                    bridge.defVar(localVars[(int) ins.operands()[0]], val);
+                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
                     break;
                 }
 
@@ -169,9 +170,9 @@ final class NativeCompiler {
             case END:
                 // End of function — if there's a return value on the stack, return it
                 if (!funcType.returns().isEmpty() && !valueStack.isEmpty()) {
-                    bridge.emitReturn(valueStack.pop());
+                    bridge.exports().emitReturn(valueStack.pop());
                 } else if (funcType.returns().isEmpty()) {
-                    bridge.emitReturnVoid();
+                    bridge.exports().emitReturnVoid();
                 }
                 break;
 
