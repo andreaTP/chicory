@@ -160,37 +160,110 @@ cp add_func.bin ../src/main/resources/add_func.bin
 
 Use `objdump -d add.cwasm` to see the disassembly and determine the function size for the `dd count=` parameter.
 
+## Results
+
+### What we proved
+
+The full end-to-end pipeline works:
+
+1. A 30-line Rust wrapper around wasmtime's `Engine::precompile_module()` compiles
+   to a **6.8MB Wasm binary** (`cranelift-compiler.wasm`)
+2. Chicory runs it as a WASI module — Cranelift compiles `add.wasm` (41 bytes)
+   into a **13KB native x86_64 ELF**
+3. A minimal ELF parser extracts the `.text` section
+4. Panama `mmap` + `mprotect` makes the code executable
+5. Panama `downcallHandle` calls into the native code — **result: 42**
+
+All with zero shipped native libraries. The only "native" dependency is libc
+(always available), accessed through Panama's `Linker.nativeLinker()`.
+
+### Key numbers
+
+| What | Size |
+|------|------|
+| cranelift-compiler.wasm | 6.8 MB |
+| Input: add.wasm | 41 bytes |
+| Output: native ELF | 13,472 bytes |
+| Function machine code | 12 bytes |
+
+### Cranelift calling convention
+
+Cranelift (wasmtime) uses a specific register layout:
+- `rdi` = VMContext pointer (holds linear memory base at +0x40)
+- `rsi` = caller VMContext (unused for simple calls)
+- `rdx`, `rcx`, `r8`, `r9` = Wasm function parameters
+- Return value in `rax`/`eax`
+
+For the `add` function, Panama bridges this by passing:
+`(NULL vmctx, 0L dummy, a, b)` → maps to `rdi, rsi, rdx, rcx` via System V ABI.
+
 ## Next steps
 
-### Step 1: Panama-based Machine implementation
+### Step 1: Test with a real program using linear memory
 
-Write a `Machine` implementation that uses Panama to execute Cranelift-compiled native code.
-This plugs into Chicory's existing dispatch via `Instance.builder(module).withMachineFactory(...)`.
+The `add` function is trivial — it doesn't use linear memory. The next test
+should use a function that reads/writes memory (e.g., sieve of Eratosthenes,
+string processing, or a real-world module like SQLite or Prism).
 
-The Machine would:
-- At construction time, load pre-compiled native code bytes (from wasmtime compile)
-- mmap + mprotect the code
-- Create Panama downcall handles for each compiled function
-- Set up a VMContext struct with the linear memory base pointer
-- On `call(funcId, args)`: dispatch to the Panama downcall handle for that function
+This requires:
+- Allocating contiguous off-heap memory for the Wasm linear memory
+- Setting up a VMContext struct with the memory base pointer at offset +0x40
+- Passing the VMContext pointer to the native function via `rdi`
 
-This follows the same `Machine` interface as the interpreter and AOT compiler,
-so it integrates with the existing `CompilerInterpreterMachine` hybrid dispatch pattern.
+### Step 2: Panama-based Machine implementation
 
-### Step 2: Test with linear memory
+Write a `Machine` implementation that uses Panama to execute native code.
+This plugs into Chicory's existing `withMachineFactory()` API:
 
-Test with a function that uses linear memory (sieve, etc.) to validate
-VMContext/memory-base-pointer passing via Panama.
+```java
+public class NativeMachine implements Machine {
+    @Override
+    public long[] call(int funcId, long[] args) {
+        // Dispatch to Panama downcall for this function
+    }
+}
+```
 
-### Step 3: Benchmark
+Key challenges:
 
-Benchmark Panama downcall overhead vs Chicory AOT for compute-heavy functions.
+**VMContext**: Native code accesses linear memory via a VMContext struct pointer
+(memory base at offset +0x40). Need to allocate this off-heap and keep it in sync
+with Chicory's Memory object.
 
-### Step 4: Cranelift-in-Wasm
+**CALL**: When a native function calls another Wasm function, Cranelift emits a
+direct `call` to a known address. In wasmtime's ELF, these are relocations. We'd
+need to either:
+- Resolve relocations when loading (patch call targets in the native code)
+- Or use a function pointer table: native code calls through a table, and we
+  populate the table with addresses of other mmapped functions
 
-Compile Cranelift itself to wasm32-wasip1 (Tier 3 supported by wasmtime), wrap it
-using Chicory's build-time compiler (following the wabt/wasm-tools pattern), and use
-it to compile Wasm functions to native code at runtime — all within the JVM.
+**CALL_INDIRECT**: Table-based dispatch. The native code looks up a function
+reference from a table and calls it. We'd need to provide the table data in the
+VMContext. For functions that are native-compiled, the table entry is the native
+address. For functions that are JVM-compiled or interpreted, we'd need a trampoline
+that transitions back to Java via Panama upcall.
 
-Alternatively, wasmtime can be used directly as the native code producer at build time,
-with the compiled native code shipped as resources alongside the Wasm module.
+**Host function callbacks (imports)**: When native code calls a Wasm import
+(e.g., WASI fd_write), it needs to call back into Java. This requires Panama
+upcall stubs registered in a function pointer table accessible from the VMContext.
+
+**Mixed execution**: Some functions may be native, others JVM bytecode (AOT), others
+interpreted. The dispatch in `Machine.call()` already handles this, but direct calls
+between native functions need to handle cross-tier transitions.
+
+### Step 3: Benchmark on a real workload
+
+Compare execution time for a compute-heavy module (SQLite, Prism, or a crypto hash)
+across all three tiers:
+- Chicory interpreter
+- Chicory AOT (JVM bytecode)
+- Cranelift native via Panama
+
+### Step 4: Wrap Cranelift with Chicory build-time compiler
+
+Follow the wabt/wasm-tools pattern:
+- Use `chicory-compiler-maven-plugin` to compile `cranelift-compiler.wasm` to
+  Java bytecode at build time
+- This makes the Cranelift compilation step itself run as fast as Chicory AOT
+  instead of being interpreted
+- Ship as a Maven artifact with zero native dependencies
