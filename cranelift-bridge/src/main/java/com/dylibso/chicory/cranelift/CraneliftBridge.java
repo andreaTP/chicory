@@ -7,8 +7,6 @@ import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
-import com.dylibso.chicory.wasm.Parser;
-import java.io.IOException;
 
 /**
  * Java wrapper around the cranelift-bridge.wasm module.
@@ -50,19 +48,16 @@ public final class CraneliftBridge {
     private final ExportFunction fnGetCodeLen;
 
     public CraneliftBridge() {
-        byte[] wasmBytes;
-        try (var is = CraneliftBridge.class.getResourceAsStream("/cranelift-bridge.wasm")) {
-            wasmBytes = is.readAllBytes();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load cranelift-bridge.wasm", e);
-        }
-
-        var module = Parser.parse(wasmBytes);
+        var module = Cranelift.load();
         var wasiOpts = WasiOptions.builder().inheritSystem().build();
         var wasi = WasiPreview1.builder().withOptions(wasiOpts).build();
         var imports = ImportValues.builder().addFunction(wasi.toHostFunctions()).build();
 
-        instance = Instance.builder(module).withImportValues(imports).build();
+        instance =
+                Instance.builder(module)
+                        .withImportValues(imports)
+                        .withMachineFactory(Cranelift::create)
+                        .build();
         memory = instance.memory();
 
         fnInit = instance.export("init");
