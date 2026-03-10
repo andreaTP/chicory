@@ -82,23 +82,22 @@ cranelift-compiler/                     Native compiler + spec tests
 8. **const.wast fully green** — 778/778 spec tests pass (i32/i64/f32/f64 const + drop)
 9. **AddTest + AddAndStoreTest** — hand-written tests pass (pure arithmetic + memory store)
 10. **Build with Java 25** — modules target `maven.compiler.release=25`
+11. **Control flow** — `block`, `loop`, `if/else`, `br`, `br_if`, `return`, `end` all working
+    with proper dead code handling for dummy frames after unconditional transfers
+12. **CALL (direct)** — native-to-native via function pointer table, import calls via
+    Panama upcall stubs with ctxBuffer. CallTest verifies both native and import calls.
+13. **CALL_INDIRECT** — dispatches through Java trampoline (table lookup + type check)
+14. **6 spec test files green** — 1672/1764 tests pass (92 skipped):
+    const.wast 778/778, i32.wast 450/460, block.wast 171/223,
+    br.wast 94/97, br_if.wast 91/118, return.wast 84/84
 
 ### Not yet done
 
-- **NativeMemory shortcomings** — `NativeMemory` exists and works for basic store/load,
-  but has issues:
-  - `Arena.ofShared()` is never closed — leaks off-heap memory when instances are GC'd
-  - `grow()` allocates a new segment without freeing the old one (leaks)
-  - Multiple NativeMemory instances in the same JVM may interfere if the Arena is shared
-  - No lifecycle management (needs `close()` or tie to Instance lifecycle)
-  - No bounds checking in native code (out-of-bounds writes will corrupt memory silently)
-- **Native traps crash the JVM** — Cranelift emits `ud2` for division-by-zero and other
-  Wasm traps. The JVM catches SIGILL and crashes the entire process. See "Trap handling
-  analysis" section below. Decision: skip trap-asserting tests for now, revisit later.
-- **No control flow** — `block`, `loop`, `br`, `if/else` not implemented
-- **No function calls** — `call`, `call_indirect` not implemented
-- **No inter-function dispatch** — each function is compiled independently, no way for
-  native code to call other native functions
+- **NativeMemory shortcomings** — leaks, no bounds checking (see earlier notes)
+- **Native traps crash the JVM** — ud2 on div-by-zero. See trap handling analysis below.
+- **if.wast/loop.wast crash** — JVM crashes from call_indirect assert_trap tests.
+  Need to investigate and exclude specific crashing tests.
+- **Multi-value blocks** — block type index not yet supported (throws UnsupportedOperationException)
 
 ### Current opcode support
 
@@ -122,7 +121,11 @@ cranelift-compiler/                     Native compiler + spec tests
 | `local.get/set/tee` | Working |
 | `drop` | Working |
 | `nop` | Working |
-| `end` / return | Working |
+| `block/loop/if/else/end` | Working |
+| `br/br_if` | Working |
+| `return` | Working |
+| `call` | Working (direct native-to-native + import via ctxBuffer) |
+| `call_indirect` | Working (via Java trampoline) |
 
 ### Calling convention (our design)
 
@@ -214,17 +217,19 @@ is implemented in NativeCompiler.
 
 ## Next steps (pick up here next session)
 
-### Immediate: control flow
+### Immediate: enable if.wast and loop.wast
 
-- `block`, `loop`, `br`, `br_if`, `br_table`, `if/else`
-- Requires Cranelift block management with proper sealing
-- This unlocks most wast files (nop.wast, local_get.wast, etc.)
+- These crash the JVM due to assert_trap tests with call_indirect
+- Need to identify and exclude specific crashing tests
+- Should unlock many more passing tests
 
-### Then: function calls
+### Then: more opcodes
 
-- `call` (direct) — requires function pointer table or relocation
-- `call_indirect` — table-based dispatch
-- Host function callbacks (imports) — Panama upcall stubs
+- `br_table` — branch table (switch dispatch)
+- `select` — conditional value selection
+- `unreachable` — explicit trap (mark dead code)
+- `global.get/set` — global variable access
+- `memory.grow/size` — memory operations
 
 ### Then: more types
 
