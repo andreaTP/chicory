@@ -3,12 +3,16 @@ package com.dylibso.chicory.cranelift.compiler;
 import com.dylibso.chicory.cranelift.CraneliftBridge;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
+import com.dylibso.chicory.wasm.types.ExternalType;
+import com.dylibso.chicory.wasm.types.FunctionImport;
 import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Walks Wasm function bodies and emits Cranelift IR via the bridge.
@@ -19,10 +23,16 @@ final class NativeCompiler {
 
     private final CraneliftBridge bridge;
     private final WasmModule module;
+    private final int numImports;
 
     NativeCompiler(CraneliftBridge bridge, WasmModule module) {
         this.bridge = bridge;
         this.module = module;
+        this.numImports =
+                (int)
+                        module.importSection().stream()
+                                .filter(i -> i.importType() == ExternalType.FUNCTION)
+                                .count();
     }
 
     // --- Control frame ---
@@ -103,8 +113,9 @@ final class NativeCompiler {
 
         bridge.exports().createFunction();
 
-        // Our calling convention: first param is always memBase (i64 pointer)
-        bridge.exports().addParamType(CraneliftBridge.TYPE_I64);
+        // Our calling convention: memBase (i64), ctxPtr (i64), then Wasm params
+        bridge.exports().addParamType(CraneliftBridge.TYPE_I64); // memBase
+        bridge.exports().addParamType(CraneliftBridge.TYPE_I64); // ctxPtr
 
         // Then Wasm function params
         for (ValType param : funcType.params()) {
@@ -125,10 +136,14 @@ final class NativeCompiler {
 
         // Get params as value IDs
         int memBase = bridge.exports().funcParam(entry, 0);
+        int ctxPtr = bridge.exports().funcParam(entry, 1);
         int[] paramVals = new int[funcType.params().size()];
         for (int i = 0; i < paramVals.length; i++) {
-            paramVals[i] = bridge.exports().funcParam(entry, i + 1);
+            paramVals[i] = bridge.exports().funcParam(entry, i + 2);
         }
+
+        // Cache for SigRef IDs per unique function type (for call_indirect)
+        Map<String, Integer> sigRefCache = new HashMap<>();
 
         // Declare variables for all locals (params + body locals)
         int numParams = funcType.params().size();
@@ -161,7 +176,15 @@ final class NativeCompiler {
                 new ControlFrame(ControlFrame.Kind.FUNCTION, -1, -1, -1, -1, funcResultType, 0));
 
         for (AnnotatedInstruction ins : body.instructions()) {
-            emitInstruction(ins, valueStack, controlStack, localVars, memBase, funcType);
+            emitInstruction(
+                    ins,
+                    valueStack,
+                    controlStack,
+                    localVars,
+                    memBase,
+                    ctxPtr,
+                    sigRefCache,
+                    funcType);
         }
 
         // Seal all blocks at the end (deferred sealing)
@@ -217,6 +240,8 @@ final class NativeCompiler {
             Deque<ControlFrame> controlStack,
             int[] localVars,
             int memBase,
+            int ctxPtr,
+            Map<String, Integer> sigRefCache,
             FunctionType funcType) {
 
         // Skip dead code after unconditional transfers
@@ -749,10 +774,191 @@ final class NativeCompiler {
                     break;
                 }
 
+            // --- Function calls ---
+            case CALL:
+                {
+                    int targetFuncId = (int) ins.operands()[0];
+                    FunctionType targetType = resolveCallTargetType(targetFuncId);
+
+                    // Get or create SigRef for the target's calling convention
+                    int sigRef = getOrCreateSigRef(targetType, sigRefCache);
+
+                    // Pop Wasm args from value stack (reverse order)
+                    int argCount = targetType.params().size();
+                    int[] argVals = new int[argCount];
+                    for (int i = argCount - 1; i >= 0; i--) {
+                        argVals[i] = valueStack.pop();
+                    }
+
+                    // Write args to ctxBuffer for imports (they read from buffer)
+                    int zero = bridge.exports().emitIconst32(0);
+                    bridge.exports()
+                            .emitStoreI32(
+                                    ctxPtr, zero, bridge.exports().emitIconst32(argCount), 32);
+                    for (int i = 0; i < argCount; i++) {
+                        int widened = widenToI64(argVals[i], targetType.params().get(i));
+                        bridge.exports().emitStoreI64(ctxPtr, zero, widened, 40 + 8 * i);
+                    }
+
+                    // Load function pointer from funcTable[funcId]
+                    int funcTablePtr = bridge.exports().emitLoadI64(ctxPtr, zero, 0);
+                    int funcIdOffset =
+                            bridge.exports().emitIconst32(targetFuncId * 8); // byte offset
+                    int funcPtr = bridge.exports().emitLoadI64(funcTablePtr, funcIdOffset, 0);
+
+                    // Push call args: memBase, ctxPtr, then wasm args
+                    bridge.exports().pushCallArg(memBase);
+                    bridge.exports().pushCallArg(ctxPtr);
+                    for (int i = 0; i < argCount; i++) {
+                        bridge.exports().pushCallArg(argVals[i]);
+                    }
+
+                    // Emit call_indirect
+                    int rawResult = bridge.exports().emitCallIndirect(sigRef, funcPtr);
+
+                    // Push result if function returns a value
+                    if (!targetType.returns().isEmpty()) {
+                        valueStack.push(rawResult);
+                    }
+                    break;
+                }
+
+            case CALL_INDIRECT:
+                {
+                    int typeId = (int) ins.operands()[0];
+                    int tableIdx = (int) ins.operands()[1];
+                    FunctionType targetType = (FunctionType) module.typeSection().getType(typeId);
+
+                    // Pop table element index from Wasm stack
+                    int tableElemIdx = valueStack.pop();
+
+                    // Pop Wasm args
+                    int argCount = targetType.params().size();
+                    int[] argVals = new int[argCount];
+                    for (int i = argCount - 1; i >= 0; i--) {
+                        argVals[i] = valueStack.pop();
+                    }
+
+                    int zero = bridge.exports().emitIconst32(0);
+
+                    // Write CALL_INDIRECT metadata to ctxBuffer
+                    bridge.exports()
+                            .emitStoreI32(ctxPtr, zero, bridge.exports().emitIconst32(typeId), 20);
+                    bridge.exports()
+                            .emitStoreI32(
+                                    ctxPtr, zero, bridge.exports().emitIconst32(tableIdx), 24);
+                    bridge.exports().emitStoreI32(ctxPtr, zero, tableElemIdx, 28);
+                    bridge.exports()
+                            .emitStoreI32(
+                                    ctxPtr, zero, bridge.exports().emitIconst32(argCount), 32);
+
+                    // Write args to ctxBuffer (widened to i64)
+                    for (int i = 0; i < argCount; i++) {
+                        int widened = widenToI64(argVals[i], targetType.params().get(i));
+                        bridge.exports().emitStoreI64(ctxPtr, zero, widened, 40 + 8 * i);
+                    }
+
+                    // Load trampoline ptr from ctxBuffer[8]
+                    int trampolinePtr = bridge.exports().emitLoadI64(ctxPtr, zero, 8);
+
+                    // Create SigRef for trampoline: (i64) -> i64
+                    int trampolineSig = getOrCreateTrampolineSigRef(sigRefCache);
+
+                    // Call trampoline with ctxPtr
+                    bridge.exports().pushCallArg(ctxPtr);
+                    int rawResult = bridge.exports().emitCallIndirect(trampolineSig, trampolinePtr);
+
+                    // Narrow result and push
+                    if (!targetType.returns().isEmpty()) {
+                        int narrowed = narrowFromI64(rawResult, targetType.returns().get(0));
+                        valueStack.push(narrowed);
+                    }
+                    break;
+                }
+
             default:
                 throw new UnsupportedOperationException(
                         "Opcode not yet supported by native compiler: " + ins.opcode());
         }
+    }
+
+    // --- Call helpers ---
+
+    private FunctionType resolveCallTargetType(int funcId) {
+        if (funcId < numImports) {
+            int idx = 0;
+            for (var imp : module.importSection().stream().toList()) {
+                if (imp.importType() == ExternalType.FUNCTION) {
+                    if (idx == funcId) {
+                        int typeIdx = ((FunctionImport) imp).typeIndex();
+                        return (FunctionType) module.typeSection().getType(typeIdx);
+                    }
+                    idx++;
+                }
+            }
+            throw new IllegalArgumentException("Import function not found: " + funcId);
+        }
+        int bodyIdx = funcId - numImports;
+        int typeIdx = module.functionSection().getFunctionType(bodyIdx);
+        return (FunctionType) module.typeSection().getType(typeIdx);
+    }
+
+    /**
+     * Get or create a SigRef matching the native calling convention for a function type:
+     * (memBase: i64, ctxPtr: i64, wasm_params...) -> wasm_return
+     */
+    private int getOrCreateSigRef(FunctionType funcType, Map<String, Integer> cache) {
+        String key = funcType.toString();
+        Integer cached = cache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        bridge.exports().beginSig();
+        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // memBase
+        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // ctxPtr
+        for (ValType param : funcType.params()) {
+            bridge.exports().sigAddParam(valTypeToBridgeType(param));
+        }
+        for (ValType ret : funcType.returns()) {
+            bridge.exports().sigAddReturn(valTypeToBridgeType(ret));
+        }
+        int sigRef = bridge.exports().endSig();
+        cache.put(key, sigRef);
+        return sigRef;
+    }
+
+    /**
+     * Get or create a SigRef for the CALL_INDIRECT trampoline: (i64) -> i64
+     */
+    private int getOrCreateTrampolineSigRef(Map<String, Integer> cache) {
+        String key = "__trampoline__";
+        Integer cached = cache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        bridge.exports().beginSig();
+        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64);
+        bridge.exports().sigAddReturn(CraneliftBridge.TYPE_I64);
+        int sigRef = bridge.exports().endSig();
+        cache.put(key, sigRef);
+        return sigRef;
+    }
+
+    private int widenToI64(int valId, ValType type) {
+        if (type.equals(ValType.I32)) {
+            return bridge.exports().emitUextendI64(valId);
+        }
+        // I64 is already 64-bit
+        return valId;
+    }
+
+    private int narrowFromI64(int valId, ValType type) {
+        if (type.equals(ValType.I32)) {
+            return bridge.exports().emitIreduceI32(valId);
+        }
+        return valId;
     }
 
     private static int valTypeToBridgeType(ValType type) {

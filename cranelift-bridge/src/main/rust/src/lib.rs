@@ -34,6 +34,10 @@ struct Session {
     blocks: Vec<cranelift_codegen::ir::Block>,
     variables: Vec<Variable>,
     values: Vec<cranelift_codegen::ir::Value>,
+    sig_refs: Vec<cranelift_codegen::ir::SigRef>,
+    call_args: Vec<cranelift_codegen::ir::Value>,
+    // Temp signature builder
+    sig_builder: Option<Signature>,
 }
 
 static mut SESSION: Option<Session> = None;
@@ -95,6 +99,9 @@ pub extern "C" fn create_function() {
             blocks: Vec::new(),
             variables: Vec::new(),
             values: Vec::new(),
+            sig_refs: Vec::new(),
+            call_args: Vec::new(),
+            sig_builder: None,
         });
     }
 }
@@ -593,6 +600,118 @@ pub extern "C" fn emit_brif_with_args(
 
     b().ins().brif(vcond, bt, &then_args, be, &else_args);
 }
+
+// --- i64 memory operations ---
+
+#[no_mangle]
+pub extern "C" fn emit_load_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I64, MemFlags::new(), effective, offset);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(val);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_store_i64(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    b().ins().store(MemFlags::new(), vvalue, effective, offset);
+}
+
+// --- Type widening/narrowing ---
+
+/// Zero-extend i32 to i64
+#[no_mangle]
+pub extern "C" fn emit_uextend_i64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().uextend(types::I64, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Truncate i64 to i32
+#[no_mangle]
+pub extern "C" fn emit_ireduce_i32(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().ireduce(types::I32, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- SigRef builder (for call_indirect) ---
+
+/// Start building a new signature. Call sig_add_param/sig_add_return, then end_sig.
+#[no_mangle]
+pub extern "C" fn begin_sig() {
+    s().sig_builder = Some(Signature::new(CallConv::SystemV));
+}
+
+/// Add a parameter type to the current signature being built.
+#[no_mangle]
+pub extern "C" fn sig_add_param(wasm_type: u32) {
+    s().sig_builder.as_mut().unwrap()
+        .params.push(AbiParam::new(wasm_type_to_clif(wasm_type)));
+}
+
+/// Add a return type to the current signature being built.
+#[no_mangle]
+pub extern "C" fn sig_add_return(wasm_type: u32) {
+    s().sig_builder.as_mut().unwrap()
+        .returns.push(AbiParam::new(wasm_type_to_clif(wasm_type)));
+}
+
+/// Finalize the signature and import it. Returns a sig_ref_id.
+#[no_mangle]
+pub extern "C" fn end_sig() -> u32 {
+    let sig = s().sig_builder.take().unwrap();
+    let sig_ref = s().func.import_signature(sig);
+    let session = s();
+    let id = session.sig_refs.len() as u32;
+    session.sig_refs.push(sig_ref);
+    id
+}
+
+// --- Indirect call (accumulator pattern) ---
+
+/// Push a value as an argument for the next call_indirect.
+#[no_mangle]
+pub extern "C" fn push_call_arg(val_id: u32) {
+    let val = s().values[val_id as usize];
+    s().call_args.push(val);
+}
+
+/// Emit call_indirect with accumulated args. Returns the first result value ID.
+/// Use -1 (0xFFFFFFFF) as return if the call has no return value.
+#[no_mangle]
+pub extern "C" fn emit_call_indirect(sig_ref_id: u32, callee: u32) -> u32 {
+    let sig_ref = s().sig_refs[sig_ref_id as usize];
+    let vcallee = s().values[callee as usize];
+    let args: Vec<cranelift_codegen::ir::Value> = s().call_args.drain(..).collect();
+    let inst = b().ins().call_indirect(sig_ref, vcallee, &args);
+    let results = b().inst_results(inst);
+    if results.is_empty() {
+        return 0xFFFFFFFF;
+    }
+    let result = results[0];
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(result);
+    id
+}
+
+// --- Return ---
 
 #[no_mangle]
 pub extern "C" fn emit_return(val_id: u32) {
