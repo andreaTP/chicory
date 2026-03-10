@@ -73,6 +73,7 @@
             <wast>br_if.wast</wast>
             <wast>const.wast</wast>
             <wast>i32.wast</wast>
+            <wast>return.wast</wast>
           </includedWasts>
           <!-- assert_trap tests excluded: Cranelift emits ud2 for div-by-zero and
                integer overflow traps, which crashes the JVM (SIGILL). This is UNSAFE
@@ -176,7 +177,6 @@
             <wast>ref_func.wast</wast>
             <wast>ref_is_null.wast</wast>
             <wast>ref_null.wast</wast>
-            <wast>return.wast</wast>
             <wast>select.wast</wast>
             <wast>simd_address.wast</wast>
             <wast>simd_align.wast</wast>

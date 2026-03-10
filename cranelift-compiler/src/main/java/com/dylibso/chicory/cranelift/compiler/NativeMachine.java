@@ -184,30 +184,8 @@ final class NativeMachine implements Machine {
 
     private MemorySegment createImportStub(int funcId, FunctionType funcType) {
         try {
-            // Create a method handle: importDispatch(int funcId, MemorySegment memBase,
-            //     MemorySegment ctxPtr, ...) -> result
-            // We bind funcId so the stub has the right signature for native calling convention.
-            MethodHandle dispatcher =
-                    MethodHandles.lookup()
-                            .bind(
-                                    this,
-                                    "importDispatch",
-                                    MethodType.methodType(
-                                            long.class,
-                                            int.class,
-                                            MemorySegment.class,
-                                            MemorySegment.class,
-                                            long[].class));
-
-            // Bind the funcId
-            dispatcher = MethodHandles.insertArguments(dispatcher, 0, funcId);
-            // Now: (MemorySegment memBase, MemorySegment ctxPtr, long[] rawArgs) -> long
-
-            // Create a spreader that collects wasm params into a long[]
-            int paramCount = funcType.params().size();
-
-            // Build the native descriptor: (ADDRESS memBase, ADDRESS ctxPtr, typed_params...) ->
-            // typed_return
+            // Build the native descriptor matching compiled function convention:
+            // (ADDRESS memBase, ADDRESS ctxPtr, typed_params...) -> typed_return
             var layouts = new ArrayList<ValueLayout>();
             layouts.add(ValueLayout.ADDRESS); // memBase
             layouts.add(ValueLayout.ADDRESS); // ctxPtr
@@ -220,86 +198,6 @@ final class NativeMachine implements Machine {
                 returnLayout = valTypeToLayout(funcType.returns().get(0));
             }
 
-            // For imports, we use a simpler approach: create a generic handler
-            // that receives (memBase, ctxPtr) and reads args from ctxBuffer.
-            // The CALL handler in native code writes args to ctxBuffer before calling.
-            MethodHandle genericHandler =
-                    MethodHandles.lookup()
-                            .bind(
-                                    this,
-                                    "importDispatchGeneric",
-                                    MethodType.methodType(
-                                            long.class,
-                                            int.class,
-                                            MemorySegment.class,
-                                            MemorySegment.class));
-            genericHandler = MethodHandles.insertArguments(genericHandler, 0, funcId);
-            // Now: (MemorySegment memBase, MemorySegment ctxPtr) -> long
-
-            // The native calling convention is (memBase, ctxPtr, wasm_params...) -> result
-            // But our generic handler ignores wasm_params and reads from ctxBuffer.
-            // We need to drop the extra params. Use a MethodHandle that ignores trailing args.
-            // Actually, for simplicity: create a stub with the full typed signature that
-            // reads args from the actual native parameters.
-
-            // Simpler approach: typed stub per import
-            MethodHandle typedHandler =
-                    MethodHandles.lookup()
-                            .bind(
-                                    this,
-                                    "importDispatchTyped",
-                                    MethodType.methodType(
-                                            long.class,
-                                            int.class,
-                                            MemorySegment.class,
-                                            MemorySegment.class,
-                                            long[].class));
-            typedHandler = MethodHandles.insertArguments(typedHandler, 0, funcId);
-            // (MemorySegment, MemorySegment, long[]) -> long
-
-            // Collect wasm params into long[]
-            // Native params are typed (int, long, float, double) — we need to convert to long[]
-            // Build the target type: (MemorySegment, MemorySegment, p0, p1, ...) -> long
-            var targetParamTypes = new ArrayList<Class<?>>();
-            targetParamTypes.add(MemorySegment.class);
-            targetParamTypes.add(MemorySegment.class);
-            for (ValType param : funcType.params()) {
-                targetParamTypes.add(valTypeToJavaClass(param));
-            }
-
-            // Use a wrapper that boxes params to long[]
-            MethodHandle wrapper =
-                    MethodHandles.lookup()
-                            .bind(
-                                    this,
-                                    "importStub_" + paramCount,
-                                    MethodType.methodType(
-                                            long.class, targetParamTypes.toArray(new Class[0])));
-
-            // Actually this approach of creating per-arity stubs doesn't scale well.
-            // Let me use a simpler approach: the import stub always has the same signature
-            // as the compiled function. For imports called via function pointer table,
-            // the CALL handler in NativeCompiler passes memBase, ctxPtr, and the wasm args
-            // as typed params. We need to match that signature.
-
-            // Simplest viable: create a minimal stub per import.
-            // For now, use the ctxBuffer-based approach for imports too.
-            // The CALL handler writes funcId + args to ctxBuffer, then calls the import
-            // stub, which reads from ctxBuffer.
-
-            // Stub signature: (memBase: ADDRESS, ctxPtr: ADDRESS) -> JAVA_LONG
-            // We drop any additional params since native CALL passes them but we read from buffer.
-            var stubDesc =
-                    FunctionDescriptor.of(
-                            ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS);
-
-            // But wait — the caller uses call_indirect with the FULL typed signature
-            // (memBase, ctxPtr, wasm_params...) -> result
-            // So the stub must accept those params even if it ignores them.
-            // We need to match the exact signature.
-
-            // For now, create stubs with the full signature.
-            // Create a MethodHandle that accepts the right types but ignores wasm params.
             FunctionDescriptor desc;
             if (returnLayout != null) {
                 desc = FunctionDescriptor.of(returnLayout, layouts.toArray(new ValueLayout[0]));
@@ -307,7 +205,15 @@ final class NativeMachine implements Machine {
                 desc = FunctionDescriptor.ofVoid(layouts.toArray(new ValueLayout[0]));
             }
 
-            // Build MethodHandle: drop wasm params, call importDispatchDirect
+            // Build Java param types for the MethodHandle
+            var targetParamTypes = new ArrayList<Class<?>>();
+            targetParamTypes.add(MemorySegment.class); // memBase
+            targetParamTypes.add(MemorySegment.class); // ctxPtr
+            for (ValType param : funcType.params()) {
+                targetParamTypes.add(valTypeToJavaClass(param));
+            }
+
+            // importDispatchDirect reads args from ctxBuffer (written by CALL handler)
             MethodHandle directHandler =
                     MethodHandles.lookup()
                             .bind(
@@ -317,15 +223,20 @@ final class NativeMachine implements Machine {
             directHandler = MethodHandles.insertArguments(directHandler, 0, funcId);
             // Now: () -> long
 
-            // We need a handle that matches (MemorySegment, MemorySegment, params...) -> retType
-            // but only calls importDispatchDirect(funcId)
-            // Use dropArguments to ignore all params
+            // Drop all native params (the stub ignores them, reads from ctxBuffer)
             MethodHandle dropper =
                     MethodHandles.dropArguments(
                             directHandler, 0, targetParamTypes.toArray(new Class[0]));
 
-            // Convert return type if needed
-            if (returnLayout != null && !funcType.returns().isEmpty()) {
+            // Cast return type to match native descriptor
+            if (returnLayout == null) {
+                // Void function: drop the long return value
+                dropper =
+                        MethodHandles.explicitCastArguments(
+                                dropper,
+                                MethodType.methodType(
+                                        void.class, targetParamTypes.toArray(new Class[0])));
+            } else if (!funcType.returns().isEmpty()) {
                 var retType = funcType.returns().get(0);
                 if (retType.equals(ValType.I32)) {
                     dropper =

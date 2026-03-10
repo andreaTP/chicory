@@ -628,6 +628,11 @@ final class NativeCompiler {
             case ELSE:
                 {
                     ControlFrame frame = controlStack.peek();
+                    if (frame.mergeBlock < 0) {
+                        // Dummy frame from dead code — just mark hasElse
+                        frame.hasElse = true;
+                        break;
+                    }
                     // End of then-branch: jump to merge block
                     if (!frame.unreachable) {
                         if (frame.resultType != null) {
@@ -646,6 +651,11 @@ final class NativeCompiler {
             case END:
                 {
                     ControlFrame frame = controlStack.pop();
+
+                    // Dummy frames from dead code have mergeBlock=-1; skip all IR
+                    boolean isDummy =
+                            frame.mergeBlock < 0 && frame.kind != ControlFrame.Kind.FUNCTION;
+
                     switch (frame.kind) {
                         case FUNCTION:
                             if (!frame.unreachable) {
@@ -659,6 +669,7 @@ final class NativeCompiler {
 
                         case BLOCK:
                         case LOOP:
+                            if (isDummy) break;
                             if (!frame.unreachable) {
                                 if (frame.resultType != null) {
                                     bridge.exports()
@@ -675,8 +686,8 @@ final class NativeCompiler {
                             break;
 
                         case IF:
+                            if (isDummy) break;
                             if (!frame.hasElse) {
-                                // IF without ELSE: then-arm falls through
                                 if (!frame.unreachable) {
                                     if (frame.resultType != null) {
                                         bridge.exports()
@@ -686,11 +697,9 @@ final class NativeCompiler {
                                         bridge.exports().emitJump(frame.mergeBlock);
                                     }
                                 }
-                                // Empty else block must also jump to merge
                                 bridge.exports().switchToBlock(frame.elseBlock);
                                 bridge.exports().emitJump(frame.mergeBlock);
                             } else {
-                                // IF with ELSE: else-arm falls through
                                 if (!frame.unreachable) {
                                     if (frame.resultType != null) {
                                         bridge.exports()
@@ -708,9 +717,9 @@ final class NativeCompiler {
                             }
                             break;
                     }
-                    // Propagate unreachable from popped frame to new top
-                    // (END resets unreachable for the enclosing scope)
-                    if (!controlStack.isEmpty()) {
+                    // Only reset unreachable if this was a real frame with real blocks.
+                    // Dummy frames from dead code don't create blocks, so code stays dead.
+                    if (!controlStack.isEmpty() && !isDummy) {
                         controlStack.peek().unreachable = false;
                     }
                     break;
