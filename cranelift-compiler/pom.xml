@@ -69,6 +69,8 @@
         <configuration>
           <includedWasts>
             <wast>block.wast</wast>
+            <wast>br.wast</wast>
+            <wast>br_if.wast</wast>
             <wast>const.wast</wast>
             <wast>i32.wast</wast>
           </includedWasts>
@@ -93,6 +95,18 @@
             SpecV1BlockTest.test46, SpecV1BlockTest.test47, SpecV1BlockTest.test48,
             SpecV1BlockTest.test49, SpecV1BlockTest.test50, SpecV1BlockTest.test51,
             SpecV1BlockTest.test52,
+            SpecV1BrTest.test13, SpecV1BrTest.test29, SpecV1BrTest.test30,
+            SpecV1BrIfTest.test2, SpecV1BrIfTest.test3, SpecV1BrIfTest.test4,
+            SpecV1BrIfTest.test6, SpecV1BrIfTest.test7, SpecV1BrIfTest.test8,
+            SpecV1BrIfTest.test25, SpecV1BrIfTest.test26,
+            SpecV1BrIfTest.test32, SpecV1BrIfTest.test33, SpecV1BrIfTest.test34,
+            SpecV1BrIfTest.test46, SpecV1BrIfTest.test47, SpecV1BrIfTest.test48,
+            SpecV1BrIfTest.test49, SpecV1BrIfTest.test50,
+            SpecV1BrIfTest.test62, SpecV1BrIfTest.test63, SpecV1BrIfTest.test65,
+            SpecV1BrIfTest.test68, SpecV1BrIfTest.test69, SpecV1BrIfTest.test70,
+            SpecV1BrIfTest.test76,
+            SpecV1BrIfTest.test85, SpecV1BrIfTest.test86, SpecV1BrIfTest.test87,
+            SpecV1BrIfTest.test88,
             SpecV1I32Test.test25,
             SpecV1I32Test.test26,
             SpecV1I32Test.test27,
@@ -108,8 +122,6 @@
             <wast>align.wast</wast>
             <wast>binary-leb128.wast</wast>
             <wast>binary.wast</wast>
-            <wast>br.wast</wast>
-            <wast>br_if.wast</wast>
             <wast>br_table.wast</wast>
             <wast>bulk.wast</wast>
             <wast>call.wast</wast>
