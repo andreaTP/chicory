@@ -2,16 +2,18 @@ package com.dylibso.chicory.cranelift.compiler;
 
 import com.dylibso.chicory.cranelift.CraneliftBridge;
 import com.dylibso.chicory.wasm.WasmModule;
+import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
 import com.dylibso.chicory.wasm.types.FunctionType;
-import com.dylibso.chicory.wasm.types.Instruction;
+import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.ValType;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 
 /**
  * Walks Wasm function bodies and emits Cranelift IR via the bridge.
  * Maintains an explicit value stack mapping Wasm stack semantics to
- * Cranelift's SSA value IDs.
+ * Cranelift's SSA value IDs, and a control stack for structured control flow.
  */
 final class NativeCompiler {
 
@@ -22,6 +24,57 @@ final class NativeCompiler {
         this.bridge = bridge;
         this.module = module;
     }
+
+    // --- Control frame ---
+
+    private static final class ControlFrame {
+        enum Kind {
+            BLOCK,
+            LOOP,
+            IF,
+            FUNCTION
+        }
+
+        final Kind kind;
+        final int mergeBlock; // after-END block (forward target)
+        final int loopBlock; // LOOP only: loop header (backward target), -1 otherwise
+        int elseBlock; // IF only: else block, -1 otherwise
+        final int mergeParamId; // value ID of merge block's param, -1 if void
+        final ValType resultType; // null if void
+        final int stackHeight; // value stack height at block entry
+        boolean unreachable; // after br/return, code is dead
+        boolean hasElse; // IF: have we seen ELSE?
+
+        ControlFrame(
+                Kind kind,
+                int mergeBlock,
+                int loopBlock,
+                int elseBlock,
+                int mergeParamId,
+                ValType resultType,
+                int stackHeight) {
+            this.kind = kind;
+            this.mergeBlock = mergeBlock;
+            this.loopBlock = loopBlock;
+            this.elseBlock = elseBlock;
+            this.mergeParamId = mergeParamId;
+            this.resultType = resultType;
+            this.stackHeight = stackHeight;
+        }
+
+        int branchTarget() {
+            return kind == Kind.LOOP ? loopBlock : mergeBlock;
+        }
+
+        boolean branchHasArg() {
+            if (kind == Kind.LOOP) {
+                return false; // backward br passes no values in MVP
+            }
+            return resultType != null;
+        }
+    }
+
+    // --- Compilation ---
 
     /**
      * Compile all module-defined functions. Returns array indexed by
@@ -65,11 +118,10 @@ final class NativeCompiler {
 
         bridge.exports().buildFunction();
 
-        // Create entry block
+        // Create entry block — do NOT seal (deferred sealing)
         int entry = bridge.exports().createBlock();
         bridge.exports().appendBlockParamsForFuncParams(entry);
         bridge.exports().switchToBlock(entry);
-        bridge.exports().sealBlock(entry);
 
         // Get params as value IDs
         int memBase = bridge.exports().funcParam(entry, 0);
@@ -95,28 +147,111 @@ final class NativeCompiler {
         for (int i = 0; i < numBodyLocals; i++) {
             ValType localType = body.localTypes().get(i);
             localVars[numParams + i] = bridge.exports().declareVar(valTypeToBridgeType(localType));
-            int zero = bridge.exports().emitIconst32(0);
+            int zero = emitZero(localType);
             bridge.exports().defVar(localVars[numParams + i], zero);
         }
 
-        // Walk instructions
+        // Walk instructions with control stack
         Deque<Integer> valueStack = new ArrayDeque<>();
+        Deque<ControlFrame> controlStack = new ArrayDeque<>();
 
-        for (Instruction ins : body.instructions()) {
-            emitInstruction(ins, valueStack, localVars, memBase, funcType);
+        // Push implicit function-level frame
+        ValType funcResultType = funcType.returns().isEmpty() ? null : funcType.returns().get(0);
+        controlStack.push(
+                new ControlFrame(ControlFrame.Kind.FUNCTION, -1, -1, -1, -1, funcResultType, 0));
+
+        for (AnnotatedInstruction ins : body.instructions()) {
+            emitInstruction(ins, valueStack, controlStack, localVars, memBase, funcType);
         }
+
+        // Seal all blocks at the end (deferred sealing)
+        bridge.exports().sealAllBlocks();
 
         return bridge.compile();
     }
 
+    private int emitZero(ValType type) {
+        if (type.equals(ValType.I32)) return bridge.exports().emitIconst32(0);
+        if (type.equals(ValType.I64)) return bridge.exports().emitIconst64(0, 0);
+        if (type.equals(ValType.F32)) return bridge.exports().emitF32const(0);
+        if (type.equals(ValType.F64)) return bridge.exports().emitF64const(0, 0);
+        throw new UnsupportedOperationException("Unsupported local type: " + type);
+    }
+
+    // --- Block type decoding ---
+
+    private ValType decodeBlockResultType(AnnotatedInstruction ins) {
+        long typeId = ins.operands()[0];
+        if (typeId == 0x40) {
+            return null; // void block
+        }
+        if (ValType.isValid(typeId)) {
+            return ValType.builder().fromId(typeId).build();
+        }
+        // Type index — multi-value blocks, defer
+        throw new UnsupportedOperationException(
+                "Block type index " + typeId + " not yet supported (multi-value blocks)");
+    }
+
+    // --- Control stack helpers ---
+
+    private static ControlFrame getControlFrame(Deque<ControlFrame> controlStack, int depth) {
+        Iterator<ControlFrame> it = controlStack.iterator();
+        for (int i = 0; i < depth; i++) {
+            it.next();
+        }
+        return it.next();
+    }
+
+    private static void trimValueStack(Deque<Integer> valueStack, int targetHeight) {
+        while (valueStack.size() > targetHeight) {
+            valueStack.pop();
+        }
+    }
+
+    // --- Instruction emission ---
+
     private void emitInstruction(
-            Instruction ins,
+            AnnotatedInstruction ins,
             Deque<Integer> valueStack,
+            Deque<ControlFrame> controlStack,
             int[] localVars,
             int memBase,
             FunctionType funcType) {
 
+        // Skip dead code after unconditional transfers
+        if (!controlStack.isEmpty() && controlStack.peek().unreachable) {
+            switch (ins.opcode()) {
+                case END:
+                case ELSE:
+                    // These reset unreachable — process normally below
+                    break;
+                case BLOCK:
+                case LOOP:
+                case IF:
+                    // Push dummy frame to keep control stack balanced
+                    controlStack.push(
+                            new ControlFrame(
+                                    ins.opcode() == OpCode.IF
+                                            ? ControlFrame.Kind.IF
+                                            : ins.opcode() == OpCode.LOOP
+                                                    ? ControlFrame.Kind.LOOP
+                                                    : ControlFrame.Kind.BLOCK,
+                                    -1,
+                                    -1,
+                                    -1,
+                                    -1,
+                                    null,
+                                    valueStack.size()));
+                    controlStack.peek().unreachable = true;
+                    return;
+                default:
+                    return; // skip all other instructions
+            }
+        }
+
         switch (ins.opcode()) {
+            // --- Constants ---
             case I32_CONST:
                 valueStack.push(bridge.exports().emitIconst32((int) ins.operands()[0]));
                 break;
@@ -139,6 +274,7 @@ final class NativeCompiler {
                     break;
                 }
 
+            // --- Arithmetic ---
             case I32_ADD:
                 {
                     int b = valueStack.pop();
@@ -160,24 +296,6 @@ final class NativeCompiler {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
                     valueStack.push(bridge.exports().emitImul(a, b));
-                    break;
-                }
-
-            case LOCAL_GET:
-                valueStack.push(bridge.exports().useVar(localVars[(int) ins.operands()[0]]));
-                break;
-
-            case LOCAL_SET:
-                {
-                    int val = valueStack.pop();
-                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
-                    break;
-                }
-
-            case LOCAL_TEE:
-                {
-                    int val = valueStack.peek();
-                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
                     break;
                 }
 
@@ -266,25 +384,19 @@ final class NativeCompiler {
                     break;
                 }
             case I32_CLZ:
-                {
-                    valueStack.push(bridge.exports().emitClz(valueStack.pop()));
-                    break;
-                }
+                valueStack.push(bridge.exports().emitClz(valueStack.pop()));
+                break;
             case I32_CTZ:
-                {
-                    valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
-                    break;
-                }
+                valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
+                break;
             case I32_POPCNT:
-                {
-                    valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
-                    break;
-                }
+                valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
+                break;
+
+            // --- Comparisons ---
             case I32_EQZ:
-                {
-                    valueStack.push(bridge.exports().emitEqz(valueStack.pop()));
-                    break;
-                }
+                valueStack.push(bridge.exports().emitEqz(valueStack.pop()));
+                break;
             case I32_EQ:
                 {
                     int bb = valueStack.pop();
@@ -355,17 +467,16 @@ final class NativeCompiler {
                     valueStack.push(bridge.exports().emitIcmp(9, a, bb));
                     break;
                 }
-            case I32_EXTEND_8_S:
-                {
-                    valueStack.push(bridge.exports().emitSextend832(valueStack.pop()));
-                    break;
-                }
-            case I32_EXTEND_16_S:
-                {
-                    valueStack.push(bridge.exports().emitSextend1632(valueStack.pop()));
-                    break;
-                }
 
+            // --- Extensions ---
+            case I32_EXTEND_8_S:
+                valueStack.push(bridge.exports().emitSextend832(valueStack.pop()));
+                break;
+            case I32_EXTEND_16_S:
+                valueStack.push(bridge.exports().emitSextend1632(valueStack.pop()));
+                break;
+
+            // --- Memory ---
             case I32_STORE:
                 {
                     int value = valueStack.pop();
@@ -383,6 +494,26 @@ final class NativeCompiler {
                     break;
                 }
 
+            // --- Locals ---
+            case LOCAL_GET:
+                valueStack.push(bridge.exports().useVar(localVars[(int) ins.operands()[0]]));
+                break;
+
+            case LOCAL_SET:
+                {
+                    int val = valueStack.pop();
+                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
+                    break;
+                }
+
+            case LOCAL_TEE:
+                {
+                    int val = valueStack.peek();
+                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
+                    break;
+                }
+
+            // --- Misc ---
             case NOP:
                 break;
 
@@ -390,14 +521,233 @@ final class NativeCompiler {
                 valueStack.pop();
                 break;
 
-            case END:
-                // End of function — if there's a return value on the stack, return it
-                if (!funcType.returns().isEmpty() && !valueStack.isEmpty()) {
-                    bridge.exports().emitReturn(valueStack.pop());
-                } else if (funcType.returns().isEmpty()) {
-                    bridge.exports().emitReturnVoid();
+            // --- Control flow ---
+            case BLOCK:
+                {
+                    ValType resultType = decodeBlockResultType(ins);
+                    int mergeBlock = bridge.exports().createBlock();
+                    int mergeParamId = -1;
+                    if (resultType != null) {
+                        mergeParamId =
+                                bridge.exports()
+                                        .appendBlockParam(
+                                                mergeBlock, valTypeToBridgeType(resultType));
+                    }
+                    controlStack.push(
+                            new ControlFrame(
+                                    ControlFrame.Kind.BLOCK,
+                                    mergeBlock,
+                                    -1,
+                                    -1,
+                                    mergeParamId,
+                                    resultType,
+                                    valueStack.size()));
+                    break;
                 }
-                break;
+
+            case LOOP:
+                {
+                    ValType resultType = decodeBlockResultType(ins);
+                    int loopHeader = bridge.exports().createBlock();
+                    int mergeBlock = bridge.exports().createBlock();
+                    int mergeParamId = -1;
+                    if (resultType != null) {
+                        mergeParamId =
+                                bridge.exports()
+                                        .appendBlockParam(
+                                                mergeBlock, valTypeToBridgeType(resultType));
+                    }
+                    // Jump from current block to loop header
+                    bridge.exports().emitJump(loopHeader);
+                    bridge.exports().switchToBlock(loopHeader);
+                    controlStack.push(
+                            new ControlFrame(
+                                    ControlFrame.Kind.LOOP,
+                                    mergeBlock,
+                                    loopHeader,
+                                    -1,
+                                    mergeParamId,
+                                    resultType,
+                                    valueStack.size()));
+                    break;
+                }
+
+            case IF:
+                {
+                    ValType resultType = decodeBlockResultType(ins);
+                    int condition = valueStack.pop();
+                    int thenBlock = bridge.exports().createBlock();
+                    int elseBlock = bridge.exports().createBlock();
+                    int mergeBlock = bridge.exports().createBlock();
+                    int mergeParamId = -1;
+                    if (resultType != null) {
+                        mergeParamId =
+                                bridge.exports()
+                                        .appendBlockParam(
+                                                mergeBlock, valTypeToBridgeType(resultType));
+                    }
+                    bridge.exports().emitBrif(condition, thenBlock, elseBlock);
+                    bridge.exports().switchToBlock(thenBlock);
+                    controlStack.push(
+                            new ControlFrame(
+                                    ControlFrame.Kind.IF,
+                                    mergeBlock,
+                                    -1,
+                                    elseBlock,
+                                    mergeParamId,
+                                    resultType,
+                                    valueStack.size()));
+                    break;
+                }
+
+            case ELSE:
+                {
+                    ControlFrame frame = controlStack.peek();
+                    // End of then-branch: jump to merge block
+                    if (!frame.unreachable) {
+                        if (frame.resultType != null) {
+                            bridge.exports().emitJumpWithArg(frame.mergeBlock, valueStack.pop());
+                        } else {
+                            bridge.exports().emitJump(frame.mergeBlock);
+                        }
+                    }
+                    trimValueStack(valueStack, frame.stackHeight);
+                    bridge.exports().switchToBlock(frame.elseBlock);
+                    frame.hasElse = true;
+                    frame.unreachable = false;
+                    break;
+                }
+
+            case END:
+                {
+                    ControlFrame frame = controlStack.pop();
+                    switch (frame.kind) {
+                        case FUNCTION:
+                            if (!frame.unreachable) {
+                                if (frame.resultType != null && !valueStack.isEmpty()) {
+                                    bridge.exports().emitReturn(valueStack.pop());
+                                } else {
+                                    bridge.exports().emitReturnVoid();
+                                }
+                            }
+                            break;
+
+                        case BLOCK:
+                        case LOOP:
+                            if (!frame.unreachable) {
+                                if (frame.resultType != null) {
+                                    bridge.exports()
+                                            .emitJumpWithArg(frame.mergeBlock, valueStack.pop());
+                                } else {
+                                    bridge.exports().emitJump(frame.mergeBlock);
+                                }
+                            }
+                            bridge.exports().switchToBlock(frame.mergeBlock);
+                            trimValueStack(valueStack, frame.stackHeight);
+                            if (frame.resultType != null) {
+                                valueStack.push(frame.mergeParamId);
+                            }
+                            break;
+
+                        case IF:
+                            if (!frame.hasElse) {
+                                // IF without ELSE: then-arm falls through
+                                if (!frame.unreachable) {
+                                    if (frame.resultType != null) {
+                                        bridge.exports()
+                                                .emitJumpWithArg(
+                                                        frame.mergeBlock, valueStack.pop());
+                                    } else {
+                                        bridge.exports().emitJump(frame.mergeBlock);
+                                    }
+                                }
+                                // Empty else block must also jump to merge
+                                bridge.exports().switchToBlock(frame.elseBlock);
+                                bridge.exports().emitJump(frame.mergeBlock);
+                            } else {
+                                // IF with ELSE: else-arm falls through
+                                if (!frame.unreachable) {
+                                    if (frame.resultType != null) {
+                                        bridge.exports()
+                                                .emitJumpWithArg(
+                                                        frame.mergeBlock, valueStack.pop());
+                                    } else {
+                                        bridge.exports().emitJump(frame.mergeBlock);
+                                    }
+                                }
+                            }
+                            bridge.exports().switchToBlock(frame.mergeBlock);
+                            trimValueStack(valueStack, frame.stackHeight);
+                            if (frame.resultType != null) {
+                                valueStack.push(frame.mergeParamId);
+                            }
+                            break;
+                    }
+                    // Propagate unreachable from popped frame to new top
+                    // (END resets unreachable for the enclosing scope)
+                    if (!controlStack.isEmpty()) {
+                        controlStack.peek().unreachable = false;
+                    }
+                    break;
+                }
+
+            case BR:
+                {
+                    int depth = (int) ins.operands()[0];
+                    ControlFrame target = getControlFrame(controlStack, depth);
+                    if (target.kind == ControlFrame.Kind.FUNCTION) {
+                        if (target.resultType != null) {
+                            bridge.exports().emitReturn(valueStack.pop());
+                        } else {
+                            bridge.exports().emitReturnVoid();
+                        }
+                    } else {
+                        int brTarget = target.branchTarget();
+                        if (target.branchHasArg()) {
+                            bridge.exports().emitJumpWithArg(brTarget, valueStack.pop());
+                        } else {
+                            bridge.exports().emitJump(brTarget);
+                        }
+                    }
+                    controlStack.peek().unreachable = true;
+                    break;
+                }
+
+            case BR_IF:
+                {
+                    int depth = (int) ins.operands()[0];
+                    int condition = valueStack.pop();
+                    ControlFrame target = getControlFrame(controlStack, depth);
+                    int brTarget = target.branchTarget();
+                    int fallthroughBlock = bridge.exports().createBlock();
+
+                    if (target.branchHasArg()) {
+                        int result = valueStack.peek();
+                        bridge.exports()
+                                .emitBrifWithArgs(
+                                        condition, brTarget, result, fallthroughBlock, -1);
+                    } else {
+                        bridge.exports().emitBrif(condition, brTarget, fallthroughBlock);
+                    }
+                    bridge.exports().switchToBlock(fallthroughBlock);
+                    break;
+                }
+
+            case RETURN:
+                {
+                    // Find function frame at bottom of control stack
+                    ControlFrame funcFrame = null;
+                    for (ControlFrame f : controlStack) {
+                        funcFrame = f;
+                    }
+                    if (funcFrame != null && funcFrame.resultType != null) {
+                        bridge.exports().emitReturn(valueStack.pop());
+                    } else {
+                        bridge.exports().emitReturnVoid();
+                    }
+                    controlStack.peek().unreachable = true;
+                    break;
+                }
 
             default:
                 throw new UnsupportedOperationException(

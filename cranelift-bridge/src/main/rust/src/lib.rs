@@ -527,6 +527,21 @@ pub extern "C" fn emit_store_i32(base: u32, wasm_addr: u32, value: u32, offset: 
     b().ins().store(MemFlags::new(), vvalue, effective, offset);
 }
 
+// --- Block parameters ---
+
+/// Append a typed parameter to a block. Returns the block parameter Value ID.
+/// Must be called before any instructions are added to the block.
+#[no_mangle]
+pub extern "C" fn append_block_param(block_id: u32, wasm_type: u32) -> u32 {
+    let block = s().blocks[block_id as usize];
+    let ty = wasm_type_to_clif(wasm_type);
+    let val = b().append_block_param(block, ty);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(val);
+    id
+}
+
 // --- Control flow ---
 
 #[no_mangle]
@@ -536,6 +551,14 @@ pub extern "C" fn emit_jump(block_id: u32) {
     b().ins().jump(block, no_args);
 }
 
+/// Jump to block_id, passing one value argument.
+#[no_mangle]
+pub extern "C" fn emit_jump_with_arg(block_id: u32, val_id: u32) {
+    let block = s().blocks[block_id as usize];
+    let val = s().values[val_id as usize];
+    b().ins().jump(block, &[BlockArg::Value(val)]);
+}
+
 #[no_mangle]
 pub extern "C" fn emit_brif(cond: u32, then_block: u32, else_block: u32) {
     let vcond = s().values[cond as usize];
@@ -543,6 +566,32 @@ pub extern "C" fn emit_brif(cond: u32, then_block: u32, else_block: u32) {
     let be = s().blocks[else_block as usize];
     let no_args: &[BlockArg] = &[];
     b().ins().brif(vcond, bt, no_args, be, no_args);
+}
+
+/// Conditional branch with optional args per arm.
+/// Use 0xFFFFFFFF (-1 as i32) for "no argument".
+#[no_mangle]
+pub extern "C" fn emit_brif_with_args(
+    cond: u32,
+    then_block: u32, then_arg: i32,
+    else_block: u32, else_arg: i32,
+) {
+    let vcond = s().values[cond as usize];
+    let bt = s().blocks[then_block as usize];
+    let be = s().blocks[else_block as usize];
+
+    let then_args: Vec<BlockArg> = if then_arg >= 0 {
+        vec![BlockArg::Value(s().values[then_arg as usize])]
+    } else {
+        vec![]
+    };
+    let else_args: Vec<BlockArg> = if else_arg >= 0 {
+        vec![BlockArg::Value(s().values[else_arg as usize])]
+    } else {
+        vec![]
+    };
+
+    b().ins().brif(vcond, bt, &then_args, be, &else_args);
 }
 
 #[no_mangle]
