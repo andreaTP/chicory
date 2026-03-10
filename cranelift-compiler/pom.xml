@@ -73,6 +73,8 @@
             <wast>br_if.wast</wast>
             <wast>const.wast</wast>
             <wast>i32.wast</wast>
+            <wast>if.wast</wast>
+            <wast>loop.wast</wast>
             <wast>return.wast</wast>
           </includedWasts>
           <!-- assert_trap tests excluded: Cranelift emits ud2 for div-by-zero and
@@ -108,6 +110,42 @@
             SpecV1BrIfTest.test76,
             SpecV1BrIfTest.test85, SpecV1BrIfTest.test86, SpecV1BrIfTest.test87,
             SpecV1BrIfTest.test88,
+            SpecV1IfTest.test9, SpecV1IfTest.test10, SpecV1IfTest.test11, SpecV1IfTest.test12,
+            SpecV1IfTest.test21, SpecV1IfTest.test22, SpecV1IfTest.test23, SpecV1IfTest.test24,
+            SpecV1IfTest.test25, SpecV1IfTest.test26,
+            SpecV1IfTest.test39, SpecV1IfTest.test40, SpecV1IfTest.test41, SpecV1IfTest.test42,
+            SpecV1IfTest.test53, SpecV1IfTest.test54,
+            SpecV1IfTest.test67, SpecV1IfTest.test68,
+            SpecV1IfTest.test80, SpecV1IfTest.test81, SpecV1IfTest.test82, SpecV1IfTest.test83,
+            SpecV1IfTest.test84, SpecV1IfTest.test85, SpecV1IfTest.test86, SpecV1IfTest.test87,
+            SpecV1IfTest.test88, SpecV1IfTest.test89, SpecV1IfTest.test90,
+            SpecV1IfTest.test93, SpecV1IfTest.test94, SpecV1IfTest.test95, SpecV1IfTest.test96,
+            SpecV1IfTest.test97, SpecV1IfTest.test98, SpecV1IfTest.test99, SpecV1IfTest.test100,
+            SpecV1IfTest.test101, SpecV1IfTest.test102, SpecV1IfTest.test103, SpecV1IfTest.test104,
+            SpecV1IfTest.test105, SpecV1IfTest.test106,
+            SpecV1IfTest.test109, SpecV1IfTest.test110, SpecV1IfTest.test111, SpecV1IfTest.test112,
+            SpecV1IfTest.test113, SpecV1IfTest.test114, SpecV1IfTest.test115, SpecV1IfTest.test116,
+            SpecV1IfTest.test117, SpecV1IfTest.test118, SpecV1IfTest.test119, SpecV1IfTest.test120,
+            SpecV1IfTest.test121, SpecV1IfTest.test122, SpecV1IfTest.test123,
+            SpecV1LoopTest.test3,
+            SpecV1LoopTest.test6, SpecV1LoopTest.test7, SpecV1LoopTest.test8,
+            SpecV1LoopTest.test14, SpecV1LoopTest.test15,
+            SpecV1LoopTest.test21, SpecV1LoopTest.test28,
+            SpecV1LoopTest.test33, SpecV1LoopTest.test34, SpecV1LoopTest.test35,
+            SpecV1LoopTest.test36, SpecV1LoopTest.test37, SpecV1LoopTest.test38,
+            SpecV1LoopTest.test39,
+            SpecV1LoopTest.test42, SpecV1LoopTest.test43, SpecV1LoopTest.test44,
+            SpecV1LoopTest.test45, SpecV1LoopTest.test46, SpecV1LoopTest.test47,
+            SpecV1LoopTest.test49, SpecV1LoopTest.test50, SpecV1LoopTest.test51,
+            SpecV1LoopTest.test52, SpecV1LoopTest.test53, SpecV1LoopTest.test54,
+            SpecV1LoopTest.test55, SpecV1LoopTest.test56, SpecV1LoopTest.test57,
+            SpecV1LoopTest.test58, SpecV1LoopTest.test59, SpecV1LoopTest.test60,
+            SpecV1LoopTest.test61, SpecV1LoopTest.test62, SpecV1LoopTest.test63,
+            SpecV1LoopTest.test64, SpecV1LoopTest.test65, SpecV1LoopTest.test66,
+            SpecV1LoopTest.test67, SpecV1LoopTest.test68, SpecV1LoopTest.test69,
+            SpecV1LoopTest.test70, SpecV1LoopTest.test71, SpecV1LoopTest.test72,
+            SpecV1LoopTest.test73, SpecV1LoopTest.test74, SpecV1LoopTest.test75,
+            SpecV1LoopTest.test76, SpecV1LoopTest.test77,
             SpecV1I32Test.test25,
             SpecV1I32Test.test26,
             SpecV1I32Test.test27,
@@ -150,7 +188,6 @@
             <wast>func_ptrs.wast</wast>
             <wast>global.wast</wast>
             <wast>i64.wast</wast>
-            <wast>if.wast</wast>
             <wast>imports.wast</wast>
             <wast>inline-module.wast</wast>
             <wast>int_exprs.wast</wast>
@@ -162,7 +199,6 @@
             <wast>local_get.wast</wast>
             <wast>local_set.wast</wast>
             <wast>local_tee.wast</wast>
-            <wast>loop.wast</wast>
             <wast>memory.wast</wast>
             <wast>memory_copy.wast</wast>
             <wast>memory_fill.wast</wast>

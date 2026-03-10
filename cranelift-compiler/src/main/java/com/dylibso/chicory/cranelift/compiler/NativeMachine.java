@@ -53,6 +53,8 @@ final class NativeMachine implements Machine {
     private final MemorySegment ctxBuffer;
     private final MemorySegment funcTable;
     private final int numImports;
+    // Pending exception from upcall stubs (cannot throw through native frames)
+    private volatile Throwable pendingException;
 
     NativeMachine(Instance instance) {
         this.instance = instance;
@@ -259,15 +261,19 @@ final class NativeMachine implements Machine {
      */
     @SuppressWarnings("unused")
     private long importDispatchDirect(int funcId) {
-        var importFunc = instance.imports().function(funcId);
-        // Read args from ctxBuffer
-        int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, 32);
-        long[] args = new long[argCount];
-        for (int i = 0; i < argCount; i++) {
-            args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
+        try {
+            var importFunc = instance.imports().function(funcId);
+            int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, 32);
+            long[] args = new long[argCount];
+            for (int i = 0; i < argCount; i++) {
+                args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
+            }
+            long[] result = importFunc.handle().apply(instance, args);
+            return result.length > 0 ? result[0] : 0L;
+        } catch (Throwable t) {
+            pendingException = t;
+            return 0L;
         }
-        long[] result = importFunc.handle().apply(instance, args);
-        return result.length > 0 ? result[0] : 0L;
     }
 
     // --- CALL_INDIRECT trampoline ---
@@ -289,27 +295,32 @@ final class NativeMachine implements Machine {
 
     @SuppressWarnings("unused")
     private long callIndirectTrampoline(long ctxAddr) {
-        var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
-        int typeId = ctx.get(ValueLayout.JAVA_INT, 20);
-        int tableIdx = ctx.get(ValueLayout.JAVA_INT, 24);
-        int elemIdx = ctx.get(ValueLayout.JAVA_INT, 28);
-        int argCount = ctx.get(ValueLayout.JAVA_INT, 32);
+        try {
+            var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
+            int typeId = ctx.get(ValueLayout.JAVA_INT, 20);
+            int tableIdx = ctx.get(ValueLayout.JAVA_INT, 24);
+            int elemIdx = ctx.get(ValueLayout.JAVA_INT, 28);
+            int argCount = ctx.get(ValueLayout.JAVA_INT, 32);
 
-        int funcId = instance.table(tableIdx).requiredRef(elemIdx);
+            int funcId = instance.table(tableIdx).requiredRef(elemIdx);
 
-        // Type check
-        int actualTypeIdx = instance.functionType(funcId);
-        if (actualTypeIdx != typeId) {
-            throw new ChicoryException("indirect call type mismatch");
+            // Type check
+            int actualTypeIdx = instance.functionType(funcId);
+            if (actualTypeIdx != typeId) {
+                throw new ChicoryException("indirect call type mismatch");
+            }
+
+            long[] args = new long[argCount];
+            for (int i = 0; i < argCount; i++) {
+                args[i] = ctx.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
+            }
+
+            long[] result = this.call(funcId, args);
+            return result.length > 0 ? result[0] : 0L;
+        } catch (Throwable t) {
+            pendingException = t;
+            return 0L;
         }
-
-        long[] args = new long[argCount];
-        for (int i = 0; i < argCount; i++) {
-            args[i] = ctx.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
-        }
-
-        long[] result = this.call(funcId, args);
-        return result.length > 0 ? result[0] : 0L;
     }
 
     // --- Main dispatch ---
@@ -372,6 +383,15 @@ final class NativeMachine implements Machine {
             }
 
             Object result = handle.invokeWithArguments(callArgs);
+
+            // Check for exceptions from upcall stubs (cannot throw through native)
+            if (pendingException != null) {
+                var ex = pendingException;
+                pendingException = null;
+                if (ex instanceof ChicoryException ce) throw ce;
+                if (ex instanceof RuntimeException re) throw re;
+                throw new ChicoryException("Exception in native upcall", ex);
+            }
 
             if (funcType.returns().isEmpty()) {
                 return new long[0];
