@@ -168,12 +168,25 @@ final class NativeMachine implements Machine {
                 downcalls[funcId] = null; // imports dispatch through call() directly
             }
 
-            // For uncompiled functions, store trampoline address as fallback
+            // For uncompiled functions, create per-signature safety stubs
             for (int i = 0; i < compiledCode.length; i++) {
                 if (compiledCode[i] == null) {
                     int funcId = numImports + i;
-                    funcTable.set(
-                            ValueLayout.JAVA_LONG, (long) funcId * 8, trampolineStub.address());
+                    var funcType =
+                            (FunctionType)
+                                    module.typeSection()
+                                            .getType(module.functionSection().getFunctionType(i));
+                    try {
+                        MemorySegment stub = createImportStub(funcId, funcType);
+                        funcTable.set(ValueLayout.JAVA_LONG, (long) funcId * 8, stub.address());
+                    } catch (Exception e) {
+                        System.err.println(
+                                "WARNING: Safety stub failed for func "
+                                        + funcId
+                                        + ": "
+                                        + e.getMessage());
+                        // Leave funcTable entry as 0 — will throw from call() if invoked
+                    }
                 }
             }
         } catch (Throwable e) {
@@ -261,12 +274,10 @@ final class NativeMachine implements Machine {
 
             // Cast return type to match native descriptor
             if (returnLayout == null) {
-                // Void function: drop the long return value
-                dropper =
-                        MethodHandles.explicitCastArguments(
-                                dropper,
-                                MethodType.methodType(
-                                        void.class, targetParamTypes.toArray(new Class[0])));
+                // Void function: discard the long return value
+                var voidType =
+                        MethodType.methodType(void.class, targetParamTypes.toArray(new Class[0]));
+                dropper = dropper.asType(voidType);
             } else if (!funcType.returns().isEmpty()) {
                 var retType = funcType.returns().get(0);
                 if (retType.equals(ValType.I32)) {
@@ -285,20 +296,25 @@ final class NativeMachine implements Machine {
     }
 
     /**
-     * Dispatches an import call. Reads args from ctxBuffer.
-     * Called by import upcall stubs via function pointer table.
+     * Dispatches a function call. Reads args from ctxBuffer.
+     * Called by import upcall stubs and uncompiled function safety stubs.
      */
     @SuppressWarnings("unused")
     private long importDispatchDirect(int funcId) {
         try {
-            var importFunc = instance.imports().function(funcId);
             int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, 32);
             long[] args = new long[argCount];
             for (int i = 0; i < argCount; i++) {
                 args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
             }
-            long[] result = importFunc.handle().apply(instance, args);
-            return result.length > 0 ? result[0] : 0L;
+            if (funcId < numImports) {
+                var importFunc = instance.imports().function(funcId);
+                long[] result = importFunc.handle().apply(instance, args);
+                return result.length > 0 ? result[0] : 0L;
+            } else {
+                // Uncompiled module function — throw
+                throw new ChicoryException("Function " + funcId + " not compiled");
+            }
         } catch (Throwable t) {
             pendingException = t;
             return 0L;
