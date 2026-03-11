@@ -1036,6 +1036,175 @@ pub extern "C" fn emit_store_i64(base: u32, wasm_addr: u32, value: u32, offset: 
     b().ins().store(MemFlags::new(), vvalue, effective, offset);
 }
 
+// --- Float arithmetic (polymorphic: works for both f32 and f64) ---
+
+macro_rules! emit_float_binop {
+    ($name:ident, $op:ident) => {
+        #[no_mangle]
+        pub extern "C" fn $name(a: u32, b_id: u32) -> u32 {
+            let va = s().values[a as usize];
+            let vb = s().values[b_id as usize];
+            let r = b().ins().$op(va, vb);
+            let session = s();
+            let id = session.values.len() as u32;
+            session.values.push(r);
+            id
+        }
+    };
+}
+
+emit_float_binop!(emit_fadd, fadd);
+emit_float_binop!(emit_fsub, fsub);
+emit_float_binop!(emit_fmul, fmul);
+emit_float_binop!(emit_fdiv, fdiv);
+emit_float_binop!(emit_fmin, fmin);
+emit_float_binop!(emit_fmax, fmax);
+emit_float_binop!(emit_fcopysign, fcopysign);
+
+macro_rules! emit_float_unop {
+    ($name:ident, $op:ident) => {
+        #[no_mangle]
+        pub extern "C" fn $name(a: u32) -> u32 {
+            let va = s().values[a as usize];
+            let r = b().ins().$op(va);
+            let session = s();
+            let id = session.values.len() as u32;
+            session.values.push(r);
+            id
+        }
+    };
+}
+
+emit_float_unop!(emit_fabs, fabs);
+emit_float_unop!(emit_fneg, fneg);
+emit_float_unop!(emit_ceil, ceil);
+emit_float_unop!(emit_floor, floor);
+emit_float_unop!(emit_trunc_float, trunc);
+emit_float_unop!(emit_nearest, nearest);
+emit_float_unop!(emit_sqrt, sqrt);
+
+// --- Float comparison ---
+
+use cranelift_codegen::ir::condcodes::FloatCC;
+
+/// cc: 0=eq, 1=ne, 2=lt, 3=gt, 4=le, 5=ge
+#[no_mangle]
+pub extern "C" fn emit_fcmp(cc: u32, a: u32, b_id: u32) -> u32 {
+    let va = s().values[a as usize];
+    let vb = s().values[b_id as usize];
+    let cond = match cc {
+        0 => FloatCC::Equal,
+        1 => FloatCC::NotEqual,
+        2 => FloatCC::LessThan,
+        3 => FloatCC::GreaterThan,
+        4 => FloatCC::LessThanOrEqual,
+        5 => FloatCC::GreaterThanOrEqual,
+        _ => panic!("Unknown fcmp condition code: {}", cc),
+    };
+    let cmp = b().ins().fcmp(cond, va, vb);
+    let r = b().ins().uextend(types::I32, cmp);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- Float conversions ---
+
+/// Convert float to signed int. target_type: 0=I32, 1=I64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_to_sint(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_to_sint(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Convert float to unsigned int. target_type: 0=I32, 1=I64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_to_uint(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_to_uint(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Convert float to signed int (saturating). target_type: 0=I32, 1=I64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_to_sint_sat(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_to_sint_sat(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Convert float to unsigned int (saturating). target_type: 0=I32, 1=I64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_to_uint_sat(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_to_uint_sat(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Convert signed int to float. target_type: 2=F32, 3=F64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_from_sint(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_from_sint(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Convert unsigned int to float. target_type: 2=F32, 3=F64
+#[no_mangle]
+pub extern "C" fn emit_fcvt_from_uint(target_type: u32, a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let ty = wasm_type_to_clif(target_type);
+    let r = b().ins().fcvt_from_uint(ty, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// f32 -> f64
+#[no_mangle]
+pub extern "C" fn emit_fpromote(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().fpromote(types::F64, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// f64 -> f32
+#[no_mangle]
+pub extern "C" fn emit_fdemote(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().fdemote(types::F32, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
 // --- Select ---
 
 /// Wasm select: if cond != 0, return val_true, else val_false.

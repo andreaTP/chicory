@@ -1122,6 +1122,382 @@ final class NativeCompiler {
                 valueStack.push(bridge.exports().emitI32WrapI64(valueStack.pop()));
                 break;
 
+            // --- f32 Arithmetic ---
+            case F32_ADD:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFadd(a, b));
+                    break;
+                }
+            case F32_SUB:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFsub(a, b));
+                    break;
+                }
+            case F32_MUL:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmul(a, b));
+                    break;
+                }
+            case F32_DIV:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFdiv(a, b));
+                    break;
+                }
+            case F32_MIN:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmin(a, b));
+                    break;
+                }
+            case F32_MAX:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmax(a, b));
+                    break;
+                }
+            case F32_COPYSIGN:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcopysign(a, b));
+                    break;
+                }
+            case F32_ABS:
+                valueStack.push(bridge.exports().emitFabs(valueStack.pop()));
+                break;
+            case F32_NEG:
+                valueStack.push(bridge.exports().emitFneg(valueStack.pop()));
+                break;
+            case F32_CEIL:
+                valueStack.push(bridge.exports().emitCeil(valueStack.pop()));
+                break;
+            case F32_FLOOR:
+                valueStack.push(bridge.exports().emitFloor(valueStack.pop()));
+                break;
+            case F32_TRUNC:
+                valueStack.push(bridge.exports().emitTruncFloat(valueStack.pop()));
+                break;
+            case F32_NEAREST:
+                valueStack.push(bridge.exports().emitNearest(valueStack.pop()));
+                break;
+            case F32_SQRT:
+                valueStack.push(bridge.exports().emitSqrt(valueStack.pop()));
+                break;
+
+            // --- f32 Comparisons ---
+            case F32_EQ:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(0, a, b));
+                    break;
+                }
+            case F32_NE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(1, a, b));
+                    break;
+                }
+            case F32_LT:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(2, a, b));
+                    break;
+                }
+            case F32_GT:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(3, a, b));
+                    break;
+                }
+            case F32_LE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(4, a, b));
+                    break;
+                }
+            case F32_GE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(5, a, b));
+                    break;
+                }
+
+            // --- f64 Arithmetic ---
+            case F64_ADD:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFadd(a, b));
+                    break;
+                }
+            case F64_SUB:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFsub(a, b));
+                    break;
+                }
+            case F64_MUL:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmul(a, b));
+                    break;
+                }
+            case F64_DIV:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFdiv(a, b));
+                    break;
+                }
+            case F64_MIN:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmin(a, b));
+                    break;
+                }
+            case F64_MAX:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFmax(a, b));
+                    break;
+                }
+            case F64_COPYSIGN:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcopysign(a, b));
+                    break;
+                }
+            case F64_ABS:
+                valueStack.push(bridge.exports().emitFabs(valueStack.pop()));
+                break;
+            case F64_NEG:
+                valueStack.push(bridge.exports().emitFneg(valueStack.pop()));
+                break;
+            case F64_CEIL:
+                valueStack.push(bridge.exports().emitCeil(valueStack.pop()));
+                break;
+            case F64_FLOOR:
+                valueStack.push(bridge.exports().emitFloor(valueStack.pop()));
+                break;
+            case F64_TRUNC:
+                valueStack.push(bridge.exports().emitTruncFloat(valueStack.pop()));
+                break;
+            case F64_NEAREST:
+                valueStack.push(bridge.exports().emitNearest(valueStack.pop()));
+                break;
+            case F64_SQRT:
+                valueStack.push(bridge.exports().emitSqrt(valueStack.pop()));
+                break;
+
+            // --- f64 Comparisons ---
+            case F64_EQ:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(0, a, b));
+                    break;
+                }
+            case F64_NE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(1, a, b));
+                    break;
+                }
+            case F64_LT:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(2, a, b));
+                    break;
+                }
+            case F64_GT:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(3, a, b));
+                    break;
+                }
+            case F64_LE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(4, a, b));
+                    break;
+                }
+            case F64_GE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitFcmp(5, a, b));
+                    break;
+                }
+
+            // --- Conversions ---
+            case I32_TRUNC_F32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSint(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_F32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUint(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_F64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSint(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_F64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUint(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I64_TRUNC_F32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSint(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_F32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUint(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_F64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSint(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_F64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUint(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+
+            case I32_TRUNC_SAT_F32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_SAT_F32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_SAT_F64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I32_TRUNC_SAT_F64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
+                break;
+            case I64_TRUNC_SAT_F32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_SAT_F32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_SAT_F64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+            case I64_TRUNC_SAT_F64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
+                break;
+
+            case F32_CONVERT_I32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromSint(CraneliftBridge.TYPE_F32, valueStack.pop()));
+                break;
+            case F32_CONVERT_I32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromUint(CraneliftBridge.TYPE_F32, valueStack.pop()));
+                break;
+            case F32_CONVERT_I64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromSint(CraneliftBridge.TYPE_F32, valueStack.pop()));
+                break;
+            case F32_CONVERT_I64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromUint(CraneliftBridge.TYPE_F32, valueStack.pop()));
+                break;
+            case F64_CONVERT_I32_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromSint(CraneliftBridge.TYPE_F64, valueStack.pop()));
+                break;
+            case F64_CONVERT_I32_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromUint(CraneliftBridge.TYPE_F64, valueStack.pop()));
+                break;
+            case F64_CONVERT_I64_S:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromSint(CraneliftBridge.TYPE_F64, valueStack.pop()));
+                break;
+            case F64_CONVERT_I64_U:
+                valueStack.push(
+                        bridge.exports()
+                                .emitFcvtFromUint(CraneliftBridge.TYPE_F64, valueStack.pop()));
+                break;
+
+            case F64_PROMOTE_F32:
+                valueStack.push(bridge.exports().emitFpromote(valueStack.pop()));
+                break;
+            case F32_DEMOTE_F64:
+                valueStack.push(bridge.exports().emitFdemote(valueStack.pop()));
+                break;
+
+            case F32_REINTERPRET_I32:
+                valueStack.push(bridge.exports().emitBitcastI32ToF32(valueStack.pop()));
+                break;
+            case I32_REINTERPRET_F32:
+                valueStack.push(bridge.exports().emitBitcastF32ToI32(valueStack.pop()));
+                break;
+            case F64_REINTERPRET_I64:
+                valueStack.push(bridge.exports().emitBitcastI64ToF64(valueStack.pop()));
+                break;
+            case I64_REINTERPRET_F64:
+                valueStack.push(bridge.exports().emitBitcastF64ToI64(valueStack.pop()));
+                break;
+
             // --- Misc ---
             case NOP:
                 break;
