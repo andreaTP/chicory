@@ -38,6 +38,8 @@ struct Session {
     call_args: Vec<cranelift_codegen::ir::Value>,
     // Temp signature builder
     sig_builder: Option<Signature>,
+    jump_tables: Vec<cranelift_codegen::ir::JumpTable>,
+    br_table_targets: Vec<cranelift_codegen::ir::Block>,
 }
 
 static mut SESSION: Option<Session> = None;
@@ -102,6 +104,8 @@ pub extern "C" fn create_function() {
             sig_refs: Vec::new(),
             call_args: Vec::new(),
             sig_builder: None,
+            jump_tables: Vec::new(),
+            br_table_targets: Vec::new(),
         });
     }
 }
@@ -914,6 +918,34 @@ pub extern "C" fn emit_bitcast_f64_to_i64(a: u32) -> u32 {
     let id = session.values.len() as u32;
     session.values.push(r);
     id
+}
+
+// --- Jump table (for br_table) ---
+
+/// Push a block target for br_table.
+#[no_mangle]
+pub extern "C" fn push_br_table_target(block_id: u32) {
+    let block = s().blocks[block_id as usize];
+    s().br_table_targets.push(block);
+}
+
+/// Emit br_table as if-else chain. Pops accumulated targets, uses default_block for fallback.
+/// Each comparison: if index == i, jump to targets[i], else check next.
+#[no_mangle]
+pub extern "C" fn emit_br_table(index: u32, default_block: u32) {
+    let vindex = s().values[index as usize];
+    let default = s().blocks[default_block as usize];
+    let targets: Vec<cranelift_codegen::ir::Block> = s().br_table_targets.drain(..).collect();
+    let no_args: &[BlockArg] = &[];
+
+    for (i, &target) in targets.iter().enumerate() {
+        let cmp_val = b().ins().iconst(types::I32, i as i64);
+        let cmp = b().ins().icmp(IntCC::Equal, vindex, cmp_val);
+        let next_block = b().create_block();
+        b().ins().brif(cmp, target, no_args, next_block, no_args);
+        b().switch_to_block(next_block);
+    }
+    b().ins().jump(default, no_args);
 }
 
 // --- Trap ---

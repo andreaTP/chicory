@@ -1730,6 +1730,82 @@ final class NativeCompiler {
                     break;
                 }
 
+            case BR_TABLE:
+                {
+                    int index = valueStack.pop();
+                    int defaultIdx = ins.operandCount() - 1;
+                    int defaultDepth = (int) ins.operand(defaultIdx);
+
+                    // Pop branch args (all targets have same arity)
+                    ControlFrame defaultTarget = getControlFrame(controlStack, defaultDepth);
+                    int argCount = defaultTarget.branchArgCount();
+                    int[] brArgs = new int[argCount];
+                    for (int i = argCount - 1; i >= 0; i--) {
+                        brArgs[i] = valueStack.pop();
+                    }
+
+                    // Emit if-else chain: for each target, compare index and branch
+                    for (int i = 0; i < defaultIdx; i++) {
+                        int depth = (int) ins.operand(i);
+                        ControlFrame target = getControlFrame(controlStack, depth);
+                        int brTarget = target.branchTarget();
+
+                        int cmpVal = bridge.exports().emitIconst32(i);
+                        int cmp = bridge.exports().emitIcmp(0, index, cmpVal); // eq
+
+                        int hitBlock = bridge.exports().createBlock();
+                        int nextBlock = bridge.exports().createBlock();
+                        bridge.exports().emitBrif(cmp, hitBlock, nextBlock);
+
+                        // Hit block: jump to actual target with args
+                        bridge.exports().switchToBlock(hitBlock);
+                        if (target.kind == ControlFrame.Kind.FUNCTION) {
+                            if (argCount > 0) {
+                                bridge.exports().emitReturn(brArgs[0]);
+                            } else {
+                                bridge.exports().emitReturnVoid();
+                            }
+                        } else {
+                            if (argCount == 0) {
+                                bridge.exports().emitJump(brTarget);
+                            } else if (argCount == 1) {
+                                bridge.exports().emitJumpWithArg(brTarget, brArgs[0]);
+                            } else {
+                                for (int a : brArgs) {
+                                    bridge.exports().pushCallArg(a);
+                                }
+                                bridge.exports().emitJumpWithArgs(brTarget);
+                            }
+                        }
+
+                        bridge.exports().switchToBlock(nextBlock);
+                    }
+
+                    // Default: jump to default target
+                    int defTarget = defaultTarget.branchTarget();
+                    if (defaultTarget.kind == ControlFrame.Kind.FUNCTION) {
+                        if (argCount > 0) {
+                            bridge.exports().emitReturn(brArgs[0]);
+                        } else {
+                            bridge.exports().emitReturnVoid();
+                        }
+                    } else {
+                        if (argCount == 0) {
+                            bridge.exports().emitJump(defTarget);
+                        } else if (argCount == 1) {
+                            bridge.exports().emitJumpWithArg(defTarget, brArgs[0]);
+                        } else {
+                            for (int a : brArgs) {
+                                bridge.exports().pushCallArg(a);
+                            }
+                            bridge.exports().emitJumpWithArgs(defTarget);
+                        }
+                    }
+
+                    controlStack.peek().unreachable = true;
+                    break;
+                }
+
             // --- Function calls ---
             case CALL:
                 {
