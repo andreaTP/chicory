@@ -290,3 +290,92 @@ mvn install -f cranelift-compiler/pom.xml -Dtest=SpecV1ConstTest
 before building cranelift-compiler. The annotation processor reads the .wasm file at compile
 time — if the .wasm changed but Java sources didn't, incremental compilation may skip
 regeneration. Always use `clean install` to avoid stale state.
+
+## Refactor plan: separate control flow analysis from code emission
+
+### Problem
+
+`NativeCompiler.emitInstruction()` mixes two concerns in one 2300-line method:
+1. **Control flow analysis** — unreachable propagation, value stack management,
+   block type resolution, dead code skipping
+2. **Code emission** — calling bridge exports to emit Cranelift IR
+
+This causes the remaining 45 verifier failures: when a block body is entirely
+unreachable and no `br`/`br_if` targets its merge block, the value stack has
+stale entries with wrong types. The FUNCTION END pops these and emits a return
+with mismatched types, which Cranelift's verifier rejects.
+
+### Root cause
+
+The Wasm spec defines **polymorphic stack behavior** after unreachable code
+(§3.3.8.3): at a merge point, the declared block return types are available
+regardless of whether the path was reachable. Chicory's `compiler/` module
+implements this via `TypeStack.scopeRestore()` — at END, replace the actual
+stack with a pre-computed "normalized" stack (params removed, returns added).
+
+Our `NativeCompiler` doesn't do this. It just pushes merge block params onto
+the value stack at END, but doesn't propagate unreachability to the parent
+frame. Code after a fully-dead block continues to emit IR in a zombie merge
+block with stale values.
+
+### Architecture (follow `compiler/` pattern)
+
+```
+compiler/                           cranelift-compiler/ (proposed)
+=========                           ====================
+
+WasmAnalyzer                        NativeAnalyzer (new)
+  - walks instructions                - pre-pass: annotates each instruction
+  - tracks exitBlockDepth              with reachability info
+  - manages TypeStack                 - resolves block types
+  - produces CompilerInstruction[]    - marks merge blocks as dead/live
+                                      - computes restored stack per scope
+
+TypeStack                           (reuse or adapt TypeStack)
+  - enterScope / exitScope            - scopeRestore at END
+  - pushTypes / popTypes              - polymorphic pop (BOT type)
+  - scopeRestore for unreachable
+
+Emitters (static methods)           NativeEmitters (new, or inline)
+  - one method per opcode             - one method per opcode
+  - no control flow logic             - calls bridge.exports().emitXxx()
+  - takes stack values as args        - takes Cranelift value IDs as args
+
+AotCompiler (orchestrator)          NativeCompiler (simplified)
+  - loops over CompilerInstruction[]  - loops over instructions
+  - switches on opcode                - switches on opcode
+  - calls Emitters                    - calls NativeEmitters
+  - trusts WasmAnalyzer for CF        - trusts NativeAnalyzer for CF
+```
+
+### Implementation steps
+
+1. **Extract `NativeValueStack`** — wrapper around `Deque<Integer>` with:
+   - `enterScope(blockType)` — save current stack state for scopeRestore
+   - `scopeRestore()` — at END after unreachable, replace stack with
+     (savedStack - params + mergeParamIds)
+   - `height()`, `trimTo(height)` — existing trimValueStack logic
+
+2. **Add `mergeReachable` to ControlFrame** — set by br/br_if/br_table when
+   targeting a forward frame, and by live fallthrough at END. Used to decide:
+   - Whether to emit dead predecessor (Cranelift verifier satisfaction)
+   - Whether to propagate unreachable to parent
+
+3. **Fix END handler** — when `!mergeReachable`:
+   - Emit dead predecessor with dummy zeros (already done)
+   - Switch to merge block (always — Cranelift needs it)
+   - Call `scopeRestore()` to replace value stack with correct-typed values
+   - Propagate unreachable to parent
+   - FUNCTION END: always emit return (use `emitReturnForFuncType` when
+     unreachable, use value stack when reachable)
+
+4. **Verify** — remove all 45 excludedTests, run, confirm 0 failures
+
+### What NOT to do
+
+- Don't add a separate pre-pass yet — the control flow logic can stay inline
+  in `emitInstruction` for now. The key fix is `scopeRestore` + `mergeReachable`
+  + always-emit-return-at-FUNCTION-END.
+- Don't extract NativeEmitters yet — the 1:1 opcode emission is already clean
+  enough inline. Extract when we need to share emission logic across modules.
+- Don't refactor the entire compiler — minimal changes to fix the 45 tests.
