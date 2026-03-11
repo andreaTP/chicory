@@ -993,13 +993,13 @@ final class NativeCompiler {
                 {
                     int delta = valueStack.pop();
                     int zero = bridge.exports().emitIconst32(0);
-                    // Write grow delta to ctxBuffer ARG_COUNT slot
+                    // Write grow delta to dedicated MEM_GROW_DELTA field
                     bridge.exports()
                             .emitStoreI32(
                                     bridge.exports().useVar(ctxPtr),
                                     zero,
                                     delta,
-                                    CtxBuffer.ARG_COUNT);
+                                    CtxBuffer.MEM_GROW_DELTA);
                     // Load memGrowStub ptr from ctxBuffer
                     int memGrowPtr =
                             bridge.exports()
@@ -2018,7 +2018,7 @@ final class NativeCompiler {
                         argVals[i] = valueStack.pop();
                     }
 
-                    // Write args to ctxBuffer for imports (they read from buffer)
+                    // Write args to args buffer for imports (they read from buffer)
                     int zero = bridge.exports().emitIconst32(0);
                     bridge.exports()
                             .emitStoreI32(
@@ -2026,14 +2026,16 @@ final class NativeCompiler {
                                     zero,
                                     bridge.exports().emitIconst32(argCount),
                                     CtxBuffer.ARG_COUNT);
+                    int argsPtr =
+                            bridge.exports()
+                                    .emitLoadI64(
+                                            bridge.exports().useVar(ctxPtr),
+                                            zero,
+                                            CtxBuffer.ARGS_PTR);
                     for (int i = 0; i < argCount; i++) {
                         int widened = widenToI64(argVals[i], targetType.params().get(i));
                         bridge.exports()
-                                .emitStoreI64(
-                                        bridge.exports().useVar(ctxPtr),
-                                        zero,
-                                        widened,
-                                        CtxBuffer.argOffset(i));
+                                .emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
                     }
 
                     // Load function pointer from funcTable[funcId]
@@ -2108,15 +2110,17 @@ final class NativeCompiler {
                                     bridge.exports().emitIconst32(argCount),
                                     CtxBuffer.ARG_COUNT);
 
-                    // Write args to ctxBuffer (widened to i64)
+                    // Write args to args buffer (widened to i64)
+                    int argsPtr =
+                            bridge.exports()
+                                    .emitLoadI64(
+                                            bridge.exports().useVar(ctxPtr),
+                                            zero,
+                                            CtxBuffer.ARGS_PTR);
                     for (int i = 0; i < argCount; i++) {
                         int widened = widenToI64(argVals[i], targetType.params().get(i));
                         bridge.exports()
-                                .emitStoreI64(
-                                        bridge.exports().useVar(ctxPtr),
-                                        zero,
-                                        widened,
-                                        CtxBuffer.argOffset(i));
+                                .emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
                     }
 
                     // Load trampoline ptr from ctxBuffer

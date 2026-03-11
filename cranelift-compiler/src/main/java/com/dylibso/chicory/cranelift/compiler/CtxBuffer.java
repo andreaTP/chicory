@@ -8,6 +8,24 @@ package com.dylibso.chicory.cranelift.compiler;
  * Native code accesses it through the ctxPtr parameter (second arg of every
  * compiled function). Java code accesses it through MemorySegment get/set.
  *
+ * <h3>Re-entrancy safety</h3>
+ *
+ * <p>The ctxBuffer is shared across all call depths. Re-entrancy is safe because:
+ * <ul>
+ *   <li>All Java-side readers ({@code callIndirectTrampoline}, {@code importDispatchDirect})
+ *       copy values from ctxBuffer/argsBuffer into Java local variables <em>before</em>
+ *       dispatching the call. The re-entrant call may overwrite the buffers, but the
+ *       outer reader has already captured what it needs.</li>
+ *   <li>Native-to-native direct calls pass args via CPU registers (System V ABI).
+ *       The ctxBuffer/argsBuffer writes before a CALL are only for import stubs;
+ *       native callees never read them.</li>
+ *   <li>trapCode is written by native pre-check blocks that immediately return.
+ *       A trap handler never calls another function, so no re-entrancy conflict.</li>
+ *   <li>{@code call()} sets memBaseAddr/memoryPages before each native invocation and
+ *       reads trapCode after. An inner {@code call()} resets trapCode for its own check,
+ *       which cannot interfere because the outer native frame has not yet returned.</li>
+ * </ul>
+ *
  * <pre>
  * Offset  Type   Field             Description
  * ──────  ─────  ────────────────  ──────────────────────────────────────────
@@ -17,9 +35,9 @@ package com.dylibso.chicory.cranelift.compiler;
  *  20     i32    typeId            CALL_INDIRECT: expected type index
  *  24     i32    tableIdx          CALL_INDIRECT: table index
  *  28     i32    elemIdx           CALL_INDIRECT: table element index
- *  32     i32    argCount          Arg count for calls; grow delta for memory.grow
- *  36     ---    (padding)
- *  40     i64[]  args              Up to 20 call arguments (widened to i64)
+ *  32     i32    argCount          Number of call arguments
+ *  36     i32    memGrowDelta      Page count delta for memory.grow
+ *  40     i64    argsPtr           Pointer to separate args buffer
  * 200     i64    globalsPtr        Pointer to globals buffer
  * 208     i64    memGrowPtr        Upcall stub for memory.grow
  * 216     i32    memoryPages       Current memory page count
@@ -27,6 +45,13 @@ package com.dylibso.chicory.cranelift.compiler;
  * 224     i64    memBaseAddr       Current memory base address
  * ──────  ─────  ────────────────  ──────────────────────────────────────────
  * Total: 232 bytes used, 256 allocated (CTX_SIZE)
+ *
+ * Args buffer (separate allocation, pointed to by argsPtr):
+ *   [0]    i64   arg0
+ *   [8]    i64   arg1
+ *   ...
+ *   [N*8]  i64   argN
+ * Size: ARGS_BUFFER_CAPACITY * 8 bytes
  * </pre>
  */
 final class CtxBuffer {
@@ -35,6 +60,9 @@ final class CtxBuffer {
 
     /** Total allocated size of the context buffer. */
     static final int CTX_SIZE = 256;
+
+    /** Number of i64 slots in the args buffer. */
+    static final int ARGS_BUFFER_CAPACITY = 1024;
 
     // --- Fixed pointer slots (written once at init) ---
 
@@ -62,14 +90,14 @@ final class CtxBuffer {
 
     // --- Call arguments ---
 
-    /** Argument count (also used as grow delta for memory.grow). */
+    /** Number of call arguments written to the args buffer. */
     static final int ARG_COUNT = 32;
 
-    /** Base offset for call arguments (each i64, up to 20). */
-    static final int ARGS_BASE = 40;
+    /** Page count delta for memory.grow (dedicated field, not overloaded). */
+    static final int MEM_GROW_DELTA = 36;
 
-    /** Maximum number of call arguments that fit in the buffer. */
-    static final int MAX_ARGS = 20;
+    /** Pointer to the separate args buffer (each arg is i64). */
+    static final int ARGS_PTR = 40;
 
     // --- Memory and globals ---
 
@@ -93,8 +121,8 @@ final class CtxBuffer {
     static final int TRAP_UNREACHABLE = 3;
     static final int TRAP_TRUNC_OVERFLOW = 4;
 
-    /** Returns the byte offset for the i-th call argument. */
+    /** Returns the byte offset for the i-th call argument within the args buffer. */
     static int argOffset(int i) {
-        return ARGS_BASE + 8 * i;
+        return 8 * i;
     }
 }

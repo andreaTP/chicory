@@ -41,6 +41,7 @@ final class NativeMachine implements Machine {
     private final MemorySegment codeRegion;
     private final MemorySegment ctxBuffer;
     private final MemorySegment funcTable;
+    private final MemorySegment argsBuffer;
     private final MemorySegment globalsBuffer;
     private final int numImports;
     private final int globalCount;
@@ -85,6 +86,9 @@ final class NativeMachine implements Machine {
         this.globalsBuffer =
                 globalCount > 0 ? ARENA.allocate((long) globalCount * 8, 8) : MemorySegment.NULL;
 
+        // Allocate args buffer (separate from ctxBuffer, no fixed arg limit)
+        this.argsBuffer = ARENA.allocate((long) CtxBuffer.ARGS_BUFFER_CAPACITY * 8, 8);
+
         // Create CALL_INDIRECT trampoline upcall stub
         MemorySegment trampolineStub = createTrampolineStub();
 
@@ -94,6 +98,7 @@ final class NativeMachine implements Machine {
         // Write pointers to ctxBuffer
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.FUNC_TABLE_PTR, funcTable.address());
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.TRAMPOLINE_PTR, trampolineStub.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.ARGS_PTR, argsBuffer.address());
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.GLOBALS_PTR, globalsBuffer.address());
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.MEM_GROW_PTR, memGrowStub.address());
 
@@ -289,7 +294,7 @@ final class NativeMachine implements Machine {
             int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
             long[] args = new long[argCount];
             for (int i = 0; i < argCount; i++) {
-                args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
+                args[i] = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
             }
             if (funcId < numImports) {
                 var importFunc = instance.imports().function(funcId);
@@ -341,7 +346,7 @@ final class NativeMachine implements Machine {
 
             long[] args = new long[argCount];
             for (int i = 0; i < argCount; i++) {
-                args[i] = ctx.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
+                args[i] = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
             }
 
             long[] result = this.call(funcId, args);
@@ -373,7 +378,7 @@ final class NativeMachine implements Machine {
     private long memoryGrowHandler(long ctxAddr) {
         try {
             var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
-            int delta = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
+            int delta = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.MEM_GROW_DELTA);
             var mem = instance.memory();
             int oldPages = mem.grow(delta);
             // Update memory base and page count in ctxBuffer
