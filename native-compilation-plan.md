@@ -222,14 +222,25 @@ Cranelift issue #5908 discusses related optimization but doesn't change semantic
 
 ### Decision
 
-**Skip trap-asserting tests for now.** The `i32.wast` spec tests are enabled with
-`assert_trap` tests excluded (10 tests). This is **unsafe** — division by zero or
-`sdiv(INT_MIN, -1)` in user code will crash the JVM. This is acceptable for the
-current experimental phase.
+**Pre-check approach implemented (2026-03-11).** Instead of relying on Cranelift's
+trapping instructions (which emit ud2), we emit explicit checks before each trapping
+operation:
+- **div/rem**: `icmp(divisor, 0)` + `brif` → trap block. For signed div, also check
+  `dividend == INT_MIN && divisor == -1`. Trap block writes trap code to ctxBuffer[16]
+  and returns dummy value. Cranelift's ud2 becomes dead code after our branch.
+- **unreachable**: write trap code to ctxBuffer[16] + return (no ud2 emitted at all)
+- **float trunc**: use `fcvt_to_sint_sat` (non-trapping) + NaN check via `fcmp(NE, x, x)`
+- **NativeMachine.call()**: checks ctxBuffer[16] after native return, throws
+  ChicoryException with appropriate message
 
-Proper trap handling requires deeper analysis and experimentation with signal handlers.
-The pre-check approach (option 1) is the likely solution once control flow (blocks)
-is implemented in NativeCompiler.
+Zero performance cost on happy path (branch predicted not-taken).
+
+**Remaining blocker for f32.wast/f64.wast**: uncompiled functions get the CALL_INDIRECT
+trampoline as fallback, but its signature `(i64) → i64` doesn't match the direct CALL
+convention `(memBase, ctxPtr, params...) → ret`. Need per-signature safety stubs.
+
+**Long-term**: contribute to Cranelift upstream to make ud2 emission configurable
+per-opcode, allowing embedders to provide trap handler callbacks instead.
 
 ### Excluded i32.wast trap tests
 
