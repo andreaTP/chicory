@@ -2042,6 +2042,9 @@ final class NativeCompiler {
         if (type.equals(ValType.I64)) return CraneliftBridge.TYPE_I64;
         if (type.equals(ValType.F32)) return CraneliftBridge.TYPE_F32;
         if (type.equals(ValType.F64)) return CraneliftBridge.TYPE_F64;
+        // Reference types (funcref, externref) are opaque i64 values
+        int op = type.opcode();
+        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) return CraneliftBridge.TYPE_I64;
         throw new UnsupportedOperationException("Unsupported ValType for native: " + type);
     }
 }

@@ -448,6 +448,9 @@ final class NativeMachine implements Machine {
         if (type.equals(ValType.I64)) return ValueLayout.JAVA_LONG;
         if (type.equals(ValType.F32)) return ValueLayout.JAVA_FLOAT;
         if (type.equals(ValType.F64)) return ValueLayout.JAVA_DOUBLE;
+        // Reference types (funcref, externref) are opaque i64
+        int op = type.opcode();
+        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) return ValueLayout.JAVA_LONG;
         throw new ChicoryException("Unsupported type for native: " + type);
     }
 
@@ -456,6 +459,8 @@ final class NativeMachine implements Machine {
         if (type.equals(ValType.I64)) return long.class;
         if (type.equals(ValType.F32)) return float.class;
         if (type.equals(ValType.F64)) return double.class;
+        int op = type.opcode();
+        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) return long.class;
         throw new ChicoryException("Unsupported type: " + type);
     }
 
@@ -505,7 +510,8 @@ final class NativeMachine implements Machine {
                 } else if (paramType.equals(ValType.F64)) {
                     callArgs[i + 2] = Value.longToDouble(args[i]);
                 } else {
-                    throw new ChicoryException("Unsupported param type: " + paramType);
+                    // Reference types and others: treat as i64
+                    callArgs[i + 2] = args[i];
                 }
             }
 
@@ -534,7 +540,8 @@ final class NativeMachine implements Machine {
             } else if (returnType.equals(ValType.F64)) {
                 return new long[] {Value.doubleToLong((Double) result)};
             } else {
-                throw new ChicoryException("Unsupported return type: " + returnType);
+                // Reference types and others: treat as i64
+                return new long[] {(Long) result};
             }
         } catch (ChicoryException e) {
             throw e;
