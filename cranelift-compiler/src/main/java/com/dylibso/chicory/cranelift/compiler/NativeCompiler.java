@@ -59,6 +59,7 @@ final class NativeCompiler {
         final int[] mergeParamIds;
         final FunctionType blockType;
         final int stackHeight;
+        int[] elseParamIds; // IF only: block param IDs for else block
         boolean unreachable;
         boolean hasElse;
 
@@ -98,7 +99,7 @@ final class NativeCompiler {
             try {
                 results[i] = compileFunction(i);
             } catch (Exception e) {
-                System.err.println("Failed to compile function " + i + ": " + e.getMessage());
+                System.err.println("Failed to compile function " + i + ": " + e);
                 results[i] = null;
             }
         }
@@ -226,6 +227,39 @@ final class NativeCompiler {
                         break;
                 }
                 continue;
+            }
+
+            // After a dead block's END, the parent may still be in a dead
+            // merge block. The analyzer doesn't track this (it resets at END),
+            // so we check frame.unreachable here for parent-level dead code.
+            if (!controlStack.isEmpty() && controlStack.peek().unreachable) {
+                switch (ins.opcode()) {
+                    case END:
+                    case ELSE:
+                        // Process normally — these exit the unreachable state
+                        break;
+                    case BLOCK:
+                    case LOOP:
+                    case IF:
+                        // Push dummy frame to keep control stack balanced
+                        controlStack.push(
+                                new ControlFrame(
+                                        ins.opcode() == OpCode.IF
+                                                ? ControlFrame.Kind.IF
+                                                : ins.opcode() == OpCode.LOOP
+                                                        ? ControlFrame.Kind.LOOP
+                                                        : ControlFrame.Kind.BLOCK,
+                                        -1,
+                                        -1,
+                                        -1,
+                                        new int[0],
+                                        FunctionType.empty(),
+                                        valueStack.size()));
+                        controlStack.peek().unreachable = true;
+                        continue;
+                    default:
+                        continue; // skip all other instructions
+                }
             }
 
             if (ins.opcode() == OpCode.END) {
@@ -976,9 +1010,50 @@ final class NativeCompiler {
         int mergeBlock = bridge.exports().createBlock();
         int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
         int savedHeight = ctx.valueStack.size() - bt.params().size();
-        bridge.exports().emitBrif(condition, thenBlock, elseBlock);
-        bridge.exports().switchToBlock(thenBlock);
-        controlStack.push(
+
+        int[] elseParamIds = null;
+        if (bt.params().isEmpty()) {
+            bridge.exports().emitBrif(condition, thenBlock, elseBlock);
+            bridge.exports().switchToBlock(thenBlock);
+        } else {
+            // Block has params — both branches need them.
+            // brif only passes args to the true target, so we use a
+            // fallthrough block for the false path.
+            int[] thenParamIds = appendBlockParams(thenBlock, bt.params());
+            elseParamIds = appendBlockParams(elseBlock, bt.params());
+
+            int paramCount = bt.params().size();
+            int[] paramVals = new int[paramCount];
+            for (int i = paramCount - 1; i >= 0; i--) {
+                paramVals[i] = ctx.valueStack.pop();
+            }
+
+            // brif → thenBlock (with args) / fallthroughBlock (no args)
+            int fallthroughBlock = bridge.exports().createBlock();
+            for (int pv : paramVals) {
+                bridge.exports().pushCallArg(pv);
+            }
+            bridge.exports().emitBrifWithJumpArgs(condition, thenBlock, fallthroughBlock);
+
+            // Fallthrough → elseBlock (with args)
+            bridge.exports().switchToBlock(fallthroughBlock);
+            if (paramCount == 1) {
+                bridge.exports().emitJumpWithArg(elseBlock, paramVals[0]);
+            } else {
+                for (int pv : paramVals) {
+                    bridge.exports().pushCallArg(pv);
+                }
+                bridge.exports().emitJumpWithArgs(elseBlock);
+            }
+
+            // Switch to then block, push its block params onto value stack
+            bridge.exports().switchToBlock(thenBlock);
+            for (int pid : thenParamIds) {
+                ctx.valueStack.push(pid);
+            }
+        }
+
+        var frame =
                 new ControlFrame(
                         ControlFrame.Kind.IF,
                         mergeBlock,
@@ -986,7 +1061,9 @@ final class NativeCompiler {
                         elseBlock,
                         mergeParamIds,
                         bt,
-                        savedHeight));
+                        savedHeight);
+        frame.elseParamIds = elseParamIds;
+        controlStack.push(frame);
         ctx.valueStack.enterScope(bt.params().size(), mergeParamIds);
     }
 
@@ -1001,6 +1078,14 @@ final class NativeCompiler {
         }
         ctx.valueStack.trimTo(frame.stackHeight);
         bridge.exports().switchToBlock(frame.elseBlock);
+
+        // Push else block's param IDs for the else branch
+        if (frame.elseParamIds != null) {
+            for (int pid : frame.elseParamIds) {
+                ctx.valueStack.push(pid);
+            }
+        }
+
         frame.hasElse = true;
         frame.unreachable = false;
     }
