@@ -79,6 +79,7 @@
             <wast>float_literals.wast</wast>
             <wast>global.wast</wast>
             <wast>i32.wast</wast>
+            <wast>i64.wast</wast>
             <wast>if.wast</wast>
             <wast>int_literals.wast</wast>
             <wast>local_get.wast</wast>
@@ -160,16 +161,6 @@
             SpecV1LoopTest.test70, SpecV1LoopTest.test71, SpecV1LoopTest.test72,
             SpecV1LoopTest.test73, SpecV1LoopTest.test74, SpecV1LoopTest.test75,
             SpecV1LoopTest.test76, SpecV1LoopTest.test77,
-            SpecV1I32Test.test25,
-            SpecV1I32Test.test26,
-            SpecV1I32Test.test27,
-            SpecV1I32Test.test28,
-            SpecV1I32Test.test45,
-            SpecV1I32Test.test46,
-            SpecV1I32Test.test61,
-            SpecV1I32Test.test62,
-            SpecV1I32Test.test81,
-            SpecV1I32Test.test82,
             SpecV1MemoryGrowTest.test2, SpecV1MemoryGrowTest.test3,
             SpecV1MemoryGrowTest.test4, SpecV1MemoryGrowTest.test5,
             SpecV1MemoryGrowTest.test11, SpecV1MemoryGrowTest.test12,
@@ -221,7 +212,6 @@
             <wast>forward.wast</wast>
             <wast>func.wast</wast>
             <wast>func_ptrs.wast</wast>
-            <wast>i64.wast</wast>
             <wast>imports.wast</wast>
             <wast>inline-module.wast</wast>
             <wast>int_exprs.wast</wast>

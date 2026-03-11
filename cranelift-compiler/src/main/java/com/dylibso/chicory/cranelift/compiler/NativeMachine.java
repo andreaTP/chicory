@@ -441,6 +441,24 @@ final class NativeMachine implements Machine {
         }
     }
 
+    // --- Trap codes (written by native pre-checks to ctxBuffer[16]) ---
+
+    static final int TRAP_NONE = 0;
+    static final int TRAP_DIV_BY_ZERO = 1;
+    static final int TRAP_INT_OVERFLOW = 2;
+    static final int TRAP_UNREACHABLE = 3;
+    static final int TRAP_TRUNC_OVERFLOW = 4;
+
+    private static ChicoryException trapException(int trapCode) {
+        return switch (trapCode) {
+            case TRAP_DIV_BY_ZERO -> new ChicoryException("integer divide by zero");
+            case TRAP_INT_OVERFLOW -> new ChicoryException("integer overflow");
+            case TRAP_UNREACHABLE -> new ChicoryException("unreachable");
+            case TRAP_TRUNC_OVERFLOW -> new ChicoryException("invalid conversion to integer");
+            default -> new ChicoryException("trap: unknown code " + trapCode);
+        };
+    }
+
     // --- Main dispatch ---
 
     private ValueLayout valTypeToLayout(ValType type) {
@@ -516,6 +534,13 @@ final class NativeMachine implements Machine {
             }
 
             Object result = handle.invokeWithArguments(callArgs);
+
+            // Check for traps (pre-checks write trap code to ctxBuffer[16])
+            int trapCode = ctxBuffer.get(ValueLayout.JAVA_INT, 16);
+            if (trapCode != 0) {
+                ctxBuffer.set(ValueLayout.JAVA_INT, 16, 0); // reset
+                throw trapException(trapCode);
+            }
 
             // Check for exceptions from upcall stubs (cannot throw through native)
             if (pendingException != null) {

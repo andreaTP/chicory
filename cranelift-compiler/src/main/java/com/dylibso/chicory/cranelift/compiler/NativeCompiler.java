@@ -228,6 +228,104 @@ final class NativeCompiler {
         return it.next();
     }
 
+    /**
+     * Emit a trap handler block: writes trapCode to ctxBuffer[16] and returns a dummy value.
+     * Returns the block ID of the trap handler.
+     */
+    private int emitTrapBlock(int trapCode, int ctxPtr, FunctionType funcType) {
+        int trapBlock = bridge.exports().createBlock();
+        // Don't switch yet — caller will reference it in brif, we emit it later
+        // Actually we need to emit it now since Cranelift needs all blocks defined.
+        // We'll switch back to the current block after.
+        // Use a deferred approach: just create the block, emit into it, switch back.
+        return trapBlock;
+    }
+
+    /**
+     * Emit the trap handler body into the given block.
+     * Must be called when we're NOT in the middle of emitting another block's instructions.
+     */
+    private void fillTrapBlock(int trapBlock, int trapCode, int ctxPtr, FunctionType funcType) {
+        bridge.exports().switchToBlock(trapBlock);
+        int zero = bridge.exports().emitIconst32(0);
+        int code = bridge.exports().emitIconst32(trapCode);
+        bridge.exports().emitStoreI32(ctxPtr, zero, code, 16);
+        // Return dummy value matching function signature
+        if (funcType.returns().isEmpty()) {
+            bridge.exports().emitReturnVoid();
+        } else {
+            int dummyVal = emitZero(funcType.returns().get(0));
+            bridge.exports().emitReturn(dummyVal);
+        }
+    }
+
+    /**
+     * Emit a safe division with pre-checks. Returns the result value ID.
+     * Handles div-by-zero and (for signed div) integer overflow.
+     */
+    private int emitSafeDiv(
+            int dividend,
+            int divisor,
+            boolean signed,
+            boolean isRem,
+            boolean is64,
+            int ctxPtr,
+            FunctionType funcType) {
+        int trapBlockZero = bridge.exports().createBlock();
+        int safeBlock;
+
+        // Check divisor == 0
+        int zero = is64 ? bridge.exports().emitIconst64(0, 0) : bridge.exports().emitIconst32(0);
+        int isZero = bridge.exports().emitIcmp(0, divisor, zero); // EQ
+
+        if (signed && !isRem) {
+            // sdiv: also check INT_MIN / -1 overflow
+            int checkOverflow = bridge.exports().createBlock();
+            safeBlock = bridge.exports().createBlock();
+            bridge.exports().emitBrif(isZero, trapBlockZero, checkOverflow);
+
+            bridge.exports().switchToBlock(checkOverflow);
+            int intMin;
+            int negOne;
+            if (is64) {
+                // INT64_MIN = 0x8000000000000000
+                intMin = bridge.exports().emitIconst64(0, 0x80000000);
+                negOne = bridge.exports().emitIconst64(-1, -1);
+            } else {
+                intMin = bridge.exports().emitIconst32(0x80000000);
+                negOne = bridge.exports().emitIconst32(-1);
+            }
+            int isMin = bridge.exports().emitIcmp(0, dividend, intMin); // EQ
+            int isNeg1 = bridge.exports().emitIcmp(0, divisor, negOne); // EQ
+            int both = bridge.exports().emitBand(isMin, isNeg1);
+
+            int trapBlockOverflow = bridge.exports().createBlock();
+            bridge.exports().emitBrif(both, trapBlockOverflow, safeBlock);
+
+            // Fill overflow trap block
+            fillTrapBlock(trapBlockOverflow, NativeMachine.TRAP_INT_OVERFLOW, ctxPtr, funcType);
+        } else {
+            // udiv, srem, urem: only zero check
+            safeBlock = bridge.exports().createBlock();
+            bridge.exports().emitBrif(isZero, trapBlockZero, safeBlock);
+        }
+
+        // Fill zero trap block
+        fillTrapBlock(trapBlockZero, NativeMachine.TRAP_DIV_BY_ZERO, ctxPtr, funcType);
+
+        // Safe block: emit the actual division
+        bridge.exports().switchToBlock(safeBlock);
+        if (signed) {
+            return isRem
+                    ? bridge.exports().emitSrem(dividend, divisor)
+                    : bridge.exports().emitSdiv(dividend, divisor);
+        } else {
+            return isRem
+                    ? bridge.exports().emitUrem(dividend, divisor)
+                    : bridge.exports().emitUdiv(dividend, divisor);
+        }
+    }
+
     private int[] appendBlockParams(int blockId, java.util.List<ValType> types) {
         int[] paramIds = new int[types.size()];
         for (int i = 0; i < types.size(); i++) {
@@ -356,28 +454,28 @@ final class NativeCompiler {
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSdiv(a, bb));
+                    valueStack.push(emitSafeDiv(a, bb, true, false, false, ctxPtr, funcType));
                     break;
                 }
             case I32_DIV_U:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUdiv(a, bb));
+                    valueStack.push(emitSafeDiv(a, bb, false, false, false, ctxPtr, funcType));
                     break;
                 }
             case I32_REM_S:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSrem(a, bb));
+                    valueStack.push(emitSafeDiv(a, bb, true, true, false, ctxPtr, funcType));
                     break;
                 }
             case I32_REM_U:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUrem(a, bb));
+                    valueStack.push(emitSafeDiv(a, bb, false, true, false, ctxPtr, funcType));
                     break;
                 }
             case I32_AND:
@@ -874,9 +972,19 @@ final class NativeCompiler {
 
             // --- Unreachable ---
             case UNREACHABLE:
-                bridge.exports().emitTrap();
-                controlStack.peek().unreachable = true;
-                break;
+                {
+                    // Write trap code to ctxBuffer and return (no ud2)
+                    int zero = bridge.exports().emitIconst32(0);
+                    int code = bridge.exports().emitIconst32(NativeMachine.TRAP_UNREACHABLE);
+                    bridge.exports().emitStoreI32(ctxPtr, zero, code, 16);
+                    if (funcType.returns().isEmpty()) {
+                        bridge.exports().emitReturnVoid();
+                    } else {
+                        bridge.exports().emitReturn(emitZero(funcType.returns().get(0)));
+                    }
+                    controlStack.peek().unreachable = true;
+                    break;
+                }
 
             // --- i64 Arithmetic ---
             case I64_ADD:
@@ -907,7 +1015,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSdiv(a, b));
+                    valueStack.push(emitSafeDiv(a, b, true, false, true, ctxPtr, funcType));
                     break;
                 }
 
@@ -915,7 +1023,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUdiv(a, b));
+                    valueStack.push(emitSafeDiv(a, b, false, false, true, ctxPtr, funcType));
                     break;
                 }
 
@@ -923,7 +1031,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSrem(a, b));
+                    valueStack.push(emitSafeDiv(a, b, true, true, true, ctxPtr, funcType));
                     break;
                 }
 
@@ -931,7 +1039,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUrem(a, b));
+                    valueStack.push(emitSafeDiv(a, b, false, true, true, ctxPtr, funcType));
                     break;
                 }
 
