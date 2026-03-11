@@ -1361,6 +1361,14 @@ pub extern "C" fn emit_return_void() {
     b().ins().return_(&[]);
 }
 
+/// Return multiple values from accumulated call_args.
+/// Clears call_args after use.
+#[no_mangle]
+pub extern "C" fn emit_return_multi() {
+    let args: Vec<cranelift_codegen::ir::Value> = s().call_args.drain(..).collect();
+    b().ins().return_(&args);
+}
+
 // --- Compile ---
 
 /// Finalize the builder, compile to native code, return code length.

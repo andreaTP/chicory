@@ -272,17 +272,21 @@ All three ctxBuffer scalability issues have been fixed:
 # Switch to Java 25
 sdk use java 25-tem
 
-# Rebuild Rust bridge (only when lib.rs changes)
-cd cranelift-bridge/src/main/rust && cargo build --release --target wasm32-wasip1
+# 1. Rebuild Rust bridge (only when lib.rs changes)
+cranelift-bridge/src/main/rust/build.sh
 
-# Rebuild cranelift-bridge Java (only when Rust or bridge Java changes)
-mvn install -f cranelift-bridge/pom.xml -q
+# 2. ALWAYS run clean install after Rust rebuild (regenerates @WasmModuleInterface exports)
+mvn clean install -f cranelift-bridge/pom.xml
 
-# Build and run cranelift-compiler tests
-mvn install -f cranelift-compiler/pom.xml
+# 3. Build and run cranelift-compiler tests
+mvn clean install -f cranelift-compiler/pom.xml
 
 # Run specific tests
 mvn install -f cranelift-compiler/pom.xml -Dtest=AddTest
-mvn install -f cranelift-compiler/pom.xml -Dtest=AddAndStoreTest
 mvn install -f cranelift-compiler/pom.xml -Dtest=SpecV1ConstTest
 ```
+
+**Important**: After rebuilding Rust, you MUST run `mvn clean install -f cranelift-bridge/pom.xml`
+before building cranelift-compiler. The annotation processor reads the .wasm file at compile
+time — if the .wasm changed but Java sources didn't, incremental compilation may skip
+regeneration. Always use `clean install` to avoid stale state.

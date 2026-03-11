@@ -208,6 +208,20 @@ final class NativeCompiler {
         throw new UnsupportedOperationException("Unsupported local type: " + type);
     }
 
+    /** Emit a return matching the function's full return type (handles 0, 1, or N values). */
+    private void emitReturnForFuncType(FunctionType ft) {
+        if (ft.returns().isEmpty()) {
+            bridge.exports().emitReturnVoid();
+        } else if (ft.returns().size() == 1) {
+            bridge.exports().emitReturn(emitZero(ft.returns().get(0)));
+        } else {
+            for (ValType rt : ft.returns()) {
+                bridge.exports().pushCallArg(emitZero(rt));
+            }
+            bridge.exports().emitReturnMulti();
+        }
+    }
+
     // --- Block type decoding ---
 
     private FunctionType decodeBlockType(AnnotatedInstruction ins) {
@@ -242,13 +256,7 @@ final class NativeCompiler {
         int zero = bridge.exports().emitIconst32(0);
         int code = bridge.exports().emitIconst32(trapCode);
         bridge.exports().emitStoreI32(ctxVal, zero, code, CtxBuffer.TRAP_CODE);
-        // Return dummy value matching function signature
-        if (funcType.returns().isEmpty()) {
-            bridge.exports().emitReturnVoid();
-        } else {
-            int dummyVal = emitZero(funcType.returns().get(0));
-            bridge.exports().emitReturn(dummyVal);
-        }
+        emitReturnForFuncType(funcType);
     }
 
     /**
@@ -370,6 +378,24 @@ final class NativeCompiler {
                 bridge.exports().pushCallArg(args[i]);
             }
             bridge.exports().emitJumpWithArgs(blockId);
+        }
+    }
+
+    /**
+     * Create a dead block that jumps to targetBlock with dummy zero values.
+     * This satisfies Cranelift's verifier which requires every block param
+     * to have at least one incoming value, even in unreachable code.
+     */
+    private void emitDeadPredecessor(int targetBlock, java.util.List<ValType> types) {
+        int deadBlock = bridge.exports().createBlock();
+        bridge.exports().switchToBlock(deadBlock);
+        if (types.size() == 1) {
+            bridge.exports().emitJumpWithArg(targetBlock, emitZero(types.get(0)));
+        } else {
+            for (ValType t : types) {
+                bridge.exports().pushCallArg(emitZero(t));
+            }
+            bridge.exports().emitJumpWithArgs(targetBlock);
         }
     }
 
@@ -1033,11 +1059,7 @@ final class NativeCompiler {
                     int zero = bridge.exports().emitIconst32(0);
                     int code = bridge.exports().emitIconst32(CtxBuffer.TRAP_UNREACHABLE);
                     bridge.exports().emitStoreI32(ctxVal, zero, code, CtxBuffer.TRAP_CODE);
-                    if (funcType.returns().isEmpty()) {
-                        bridge.exports().emitReturnVoid();
-                    } else {
-                        bridge.exports().emitReturn(emitZero(funcType.returns().get(0)));
-                    }
+                    emitReturnForFuncType(funcType);
                     controlStack.peek().unreachable = true;
                     break;
                 }
@@ -1803,9 +1825,19 @@ final class NativeCompiler {
                         case FUNCTION:
                             if (!frame.unreachable) {
                                 int retCount = frame.blockType.returns().size();
-                                if (retCount > 0 && !valueStack.isEmpty()) {
-                                    // TODO: multi-return functions
+                                if (retCount == 0) {
+                                    bridge.exports().emitReturnVoid();
+                                } else if (retCount == 1 && !valueStack.isEmpty()) {
                                     bridge.exports().emitReturn(valueStack.pop());
+                                } else if (retCount > 1 && valueStack.size() >= retCount) {
+                                    int[] retVals = new int[retCount];
+                                    for (int ri = retCount - 1; ri >= 0; ri--) {
+                                        retVals[ri] = valueStack.pop();
+                                    }
+                                    for (int rv : retVals) {
+                                        bridge.exports().pushCallArg(rv);
+                                    }
+                                    bridge.exports().emitReturnMulti();
                                 } else {
                                     bridge.exports().emitReturnVoid();
                                 }
@@ -1820,6 +1852,10 @@ final class NativeCompiler {
                                         frame.mergeBlock,
                                         frame.blockType.returns().size(),
                                         valueStack);
+                            } else if (frame.mergeParamIds.length > 0) {
+                                // Dead predecessor: emit a jump with dummy zeros so
+                                // the merge block's params are satisfied for the verifier
+                                emitDeadPredecessor(frame.mergeBlock, frame.blockType.returns());
                             }
                             bridge.exports().switchToBlock(frame.mergeBlock);
                             trimValueStack(valueStack, frame.stackHeight);
@@ -1845,6 +1881,9 @@ final class NativeCompiler {
                                             frame.mergeBlock,
                                             frame.blockType.returns().size(),
                                             valueStack);
+                                } else if (frame.mergeParamIds.length > 0) {
+                                    emitDeadPredecessor(
+                                            frame.mergeBlock, frame.blockType.returns());
                                 }
                             }
                             bridge.exports().switchToBlock(frame.mergeBlock);
