@@ -16,9 +16,7 @@ import java.util.List;
  * <p>Output: two parallel boolean arrays indexed by instruction index.
  * <ul>
  *   <li>{@code skip[i]} — instruction should not be emitted (dead code)
- *   <li>{@code scopeRestore[i]} — at this END, the emitter should call
- *       {@link NativeValueStack#scopeRestore()} to fix the value stack
- *       after an unreachable block
+ *   <li>{@code scopeRestore[i]} — at this END, the block body was unreachable
  * </ul>
  */
 final class NativeAnalyzer {
@@ -46,7 +44,7 @@ final class NativeAnalyzer {
         boolean[] scopeRestore = new boolean[count];
 
         boolean inDeadCode = false;
-        int skipNesting = 0; // nested BLOCK/LOOP/IF count inside dead code
+        int skipNesting = 0;
 
         for (int i = 0; i < count; i++) {
             AnnotatedInstruction ins = instructions.get(i);
@@ -69,7 +67,6 @@ final class NativeAnalyzer {
                         // This END closes the block where the transfer occurred
                         inDeadCode = false;
                         scopeRestore[i] = true;
-                        // Don't skip — the emitter needs to process this END
                         continue;
 
                     case ELSE:
@@ -79,7 +76,6 @@ final class NativeAnalyzer {
                         }
                         // ELSE at the exit level — else branch is reachable
                         inDeadCode = false;
-                        // Don't skip, don't scopeRestore
                         continue;
 
                     default:
@@ -88,7 +84,6 @@ final class NativeAnalyzer {
                 }
             }
 
-            // Mark instructions that begin unreachable regions
             switch (ins.opcode()) {
                 case UNREACHABLE:
                 case BR:
