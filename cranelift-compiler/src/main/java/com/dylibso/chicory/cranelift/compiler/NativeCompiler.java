@@ -4,7 +4,6 @@ import com.dylibso.chicory.cranelift.CraneliftBridge;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.AnnotatedInstruction;
 import com.dylibso.chicory.wasm.types.ExternalType;
-import com.dylibso.chicory.wasm.types.FunctionImport;
 import com.dylibso.chicory.wasm.types.FunctionType;
 import com.dylibso.chicory.wasm.types.OpCode;
 import com.dylibso.chicory.wasm.types.ValType;
@@ -12,12 +11,20 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
 
 /**
- * Walks Wasm function bodies and emits Cranelift IR via the bridge.
- * Maintains an explicit value stack mapping Wasm stack semantics to
- * Cranelift's SSA value IDs, and a control stack for structured control flow.
+ * Thin orchestrator that compiles Wasm functions to native code via Cranelift.
+ *
+ * <p>Two-pass architecture:
+ * <ol>
+ *   <li>{@link NativeAnalyzer} — pre-pass that determines reachability per instruction
+ *   <li>Emission loop — walks instructions, delegates opcodes to {@link NativeEmitters},
+ *       handles control flow (BLOCK/LOOP/IF/ELSE/END/BR/BR_IF/BR_TABLE/RETURN) inline
+ * </ol>
+ *
+ * <p>The {@link NativeValueStack} tracks Cranelift value IDs with scope-aware
+ * restore for polymorphic stack behavior after unreachable code.
  */
 final class NativeCompiler {
 
@@ -46,14 +53,14 @@ final class NativeCompiler {
         }
 
         final Kind kind;
-        final int mergeBlock; // after-END block (forward target)
-        final int loopBlock; // LOOP only: loop header (backward target), -1 otherwise
-        int elseBlock; // IF only: else block, -1 otherwise
-        final int[] mergeParamIds; // value IDs of merge block's params (one per return)
-        final FunctionType blockType; // full block type (params + returns)
-        final int stackHeight; // value stack height at block entry
-        boolean unreachable; // after br/return, code is dead
-        boolean hasElse; // IF: have we seen ELSE?
+        final int mergeBlock;
+        final int loopBlock;
+        int elseBlock;
+        final int[] mergeParamIds;
+        final FunctionType blockType;
+        final int stackHeight;
+        boolean unreachable;
+        boolean hasElse;
 
         ControlFrame(
                 Kind kind,
@@ -77,20 +84,12 @@ final class NativeCompiler {
         }
 
         int branchArgCount() {
-            if (kind == Kind.LOOP) {
-                return blockType.params().size();
-            }
-            return blockType.returns().size();
+            return kind == Kind.LOOP ? blockType.params().size() : blockType.returns().size();
         }
     }
 
     // --- Compilation ---
 
-    /**
-     * Compile all module-defined functions. Returns array indexed by
-     * function body index (not funcId — add numImports to get funcId).
-     * Null entries mean compilation was skipped/failed.
-     */
     byte[][] compileAll() {
         int count = module.codeSection().functionBodyCount();
         byte[][] results = new byte[count][];
@@ -111,30 +110,29 @@ final class NativeCompiler {
         int typeIdx = module.functionSection().getFunctionType(bodyIndex);
         var funcType = (FunctionType) module.typeSection().getType(typeIdx);
 
+        // --- Pre-pass: analyze reachability ---
+        var analyzer = NativeAnalyzer.analyze(body);
+
+        // --- Setup function ---
         bridge.exports().createFunction();
 
-        // Our calling convention: memBase (i64), ctxPtr (i64), then Wasm params
         bridge.exports().addParamType(CraneliftBridge.TYPE_I64); // memBase
         bridge.exports().addParamType(CraneliftBridge.TYPE_I64); // ctxPtr
-
-        // Then Wasm function params
         for (ValType param : funcType.params()) {
-            bridge.exports().addParamType(valTypeToBridgeType(param));
+            bridge.exports().addParamType(EmitContext.valTypeToBridgeType(param));
         }
-
-        // Return types
         for (ValType ret : funcType.returns()) {
-            bridge.exports().addReturnType(valTypeToBridgeType(ret));
+            bridge.exports().addReturnType(EmitContext.valTypeToBridgeType(ret));
         }
 
         bridge.exports().buildFunction();
 
-        // Create entry block — do NOT seal (deferred sealing)
+        // Create entry block
         int entry = bridge.exports().createBlock();
         bridge.exports().appendBlockParamsForFuncParams(entry);
         bridge.exports().switchToBlock(entry);
 
-        // Get params as value IDs
+        // Get params
         int memBaseParam = bridge.exports().funcParam(entry, 0);
         int ctxPtrParam = bridge.exports().funcParam(entry, 1);
         int[] paramVals = new int[funcType.params().size()];
@@ -142,97 +140,114 @@ final class NativeCompiler {
             paramVals[i] = bridge.exports().funcParam(entry, i + 2);
         }
 
-        // memBase as a variable (can be re-defined after memory.grow)
+        // memBase and ctxPtr as variables
         int memBaseVar = bridge.exports().declareVar(CraneliftBridge.TYPE_I64);
         bridge.exports().defVar(memBaseVar, memBaseParam);
-
-        // ctxPtr as a variable (accessible from trap handler blocks)
         int ctxPtrVar = bridge.exports().declareVar(CraneliftBridge.TYPE_I64);
         bridge.exports().defVar(ctxPtrVar, ctxPtrParam);
 
-        // Cache for SigRef IDs per unique function type (for call_indirect)
-        Map<String, Integer> sigRefCache = new HashMap<>();
-
-        // Declare variables for all locals (params + body locals)
+        // Locals
         int numParams = funcType.params().size();
         int numBodyLocals = body.localTypes().size();
         int totalLocals = numParams + numBodyLocals;
         int[] localVars = new int[totalLocals];
-
-        // Declare param locals
         for (int i = 0; i < numParams; i++) {
             localVars[i] =
-                    bridge.exports().declareVar(valTypeToBridgeType(funcType.params().get(i)));
+                    bridge.exports()
+                            .declareVar(EmitContext.valTypeToBridgeType(funcType.params().get(i)));
             bridge.exports().defVar(localVars[i], paramVals[i]);
         }
-
-        // Declare body locals (initialized to zero)
         for (int i = 0; i < numBodyLocals; i++) {
             ValType localType = body.localTypes().get(i);
-            localVars[numParams + i] = bridge.exports().declareVar(valTypeToBridgeType(localType));
+            localVars[numParams + i] =
+                    bridge.exports().declareVar(EmitContext.valTypeToBridgeType(localType));
             int zero = emitZero(localType);
             bridge.exports().defVar(localVars[numParams + i], zero);
         }
 
-        // Walk instructions with control stack
-        Deque<Integer> valueStack = new ArrayDeque<>();
+        // --- Create emit context ---
+        var valueStack = new NativeValueStack();
+        var ctx =
+                new EmitContext(
+                        bridge,
+                        valueStack,
+                        module,
+                        numImports,
+                        funcType,
+                        localVars,
+                        memBaseVar,
+                        ctxPtrVar,
+                        new HashMap<>());
+
+        // --- Emission loop ---
         Deque<ControlFrame> controlStack = new ArrayDeque<>();
 
-        // Push implicit function-level frame
+        // Implicit function-level frame
         controlStack.push(
                 new ControlFrame(ControlFrame.Kind.FUNCTION, -1, -1, -1, new int[0], funcType, 0));
+        // enterScope for function block (returns only, no params to remove)
+        valueStack.enterScope(0, new int[0]);
 
-        for (AnnotatedInstruction ins : body.instructions()) {
-            emitInstruction(
-                    ins,
-                    valueStack,
-                    controlStack,
-                    localVars,
-                    memBaseVar,
-                    ctxPtrVar,
-                    sigRefCache,
-                    funcType);
-        }
+        List<AnnotatedInstruction> instructions = body.instructions();
+        for (int idx = 0; idx < instructions.size(); idx++) {
+            AnnotatedInstruction ins = instructions.get(idx);
 
-        // Seal all blocks at the end (deferred sealing)
-        bridge.exports().sealAllBlocks();
-
-        return bridge.compile();
-    }
-
-    private int emitZero(ValType type) {
-        if (type.equals(ValType.I32)) return bridge.exports().emitIconst32(0);
-        if (type.equals(ValType.I64)) return bridge.exports().emitIconst64(0, 0);
-        if (type.equals(ValType.F32)) return bridge.exports().emitF32const(0);
-        if (type.equals(ValType.F64)) return bridge.exports().emitF64const(0, 0);
-        throw new UnsupportedOperationException("Unsupported local type: " + type);
-    }
-
-    /** Emit a return matching the function's full return type (handles 0, 1, or N values). */
-    private void emitReturnForFuncType(FunctionType ft) {
-        if (ft.returns().isEmpty()) {
-            bridge.exports().emitReturnVoid();
-        } else if (ft.returns().size() == 1) {
-            bridge.exports().emitReturn(emitZero(ft.returns().get(0)));
-        } else {
-            for (ValType rt : ft.returns()) {
-                bridge.exports().pushCallArg(emitZero(rt));
+            if (analyzer.skip(idx)) {
+                // Dead code — but we still need to track nested BLOCK/LOOP/IF
+                // to keep control stack balanced
+                switch (ins.opcode()) {
+                    case BLOCK:
+                    case LOOP:
+                    case IF:
+                        controlStack.push(
+                                new ControlFrame(
+                                        ins.opcode() == OpCode.IF
+                                                ? ControlFrame.Kind.IF
+                                                : ins.opcode() == OpCode.LOOP
+                                                        ? ControlFrame.Kind.LOOP
+                                                        : ControlFrame.Kind.BLOCK,
+                                        -1,
+                                        -1,
+                                        -1,
+                                        new int[0],
+                                        FunctionType.empty(),
+                                        valueStack.size()));
+                        controlStack.peek().unreachable = true;
+                        break;
+                    case END:
+                        // Pop dummy frame
+                        if (!controlStack.isEmpty()
+                                && controlStack.peek().mergeBlock < 0
+                                && controlStack.peek().kind != ControlFrame.Kind.FUNCTION) {
+                            controlStack.pop();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                continue;
             }
-            bridge.exports().emitReturnMulti();
+
+            if (ins.opcode() == OpCode.END) {
+                emitEnd(ctx, controlStack, analyzer.scopeRestore(idx));
+                continue;
+            }
+
+            emitInstruction(ctx, ins, controlStack);
         }
+
+        bridge.exports().sealAllBlocks();
+        return bridge.compile();
     }
 
     // --- Block type decoding ---
 
     private FunctionType decodeBlockType(AnnotatedInstruction ins) {
         long typeId = ins.operands()[0];
-        if (typeId == 0x40) {
-            return FunctionType.empty();
-        }
+        if (typeId == 0x40) return FunctionType.empty();
         if (ValType.isValid(typeId)) {
             return FunctionType.returning(ValType.builder().fromId(typeId).build());
         }
-        // Type index — look up in type section
         return (FunctionType) module.typeSection().getType((int) typeId);
     }
 
@@ -240,131 +255,22 @@ final class NativeCompiler {
 
     private static ControlFrame getControlFrame(Deque<ControlFrame> controlStack, int depth) {
         Iterator<ControlFrame> it = controlStack.iterator();
-        for (int i = 0; i < depth; i++) {
-            it.next();
-        }
+        for (int i = 0; i < depth; i++) it.next();
         return it.next();
     }
 
-    /**
-     * Emit the trap handler body into the given block.
-     * Must be called when we're NOT in the middle of emitting another block's instructions.
-     */
-    private void fillTrapBlock(int trapBlock, int trapCode, int ctxPtrVar, FunctionType funcType) {
-        bridge.exports().switchToBlock(trapBlock);
-        int ctxVal = bridge.exports().useVar(ctxPtrVar); // resolve variable in this block
-        int zero = bridge.exports().emitIconst32(0);
-        int code = bridge.exports().emitIconst32(trapCode);
-        bridge.exports().emitStoreI32(ctxVal, zero, code, CtxBuffer.TRAP_CODE);
-        emitReturnForFuncType(funcType);
-    }
-
-    /**
-     * Emit a safe division with pre-checks. Returns the result value ID.
-     * Handles div-by-zero and (for signed div) integer overflow.
-     */
-    private int emitSafeDiv(
-            int dividend,
-            int divisor,
-            boolean signed,
-            boolean isRem,
-            boolean is64,
-            int ctxPtr,
-            FunctionType funcType) {
-        int trapBlockZero = bridge.exports().createBlock();
-        int safeBlock;
-
-        // Check divisor == 0
-        int zero = is64 ? bridge.exports().emitIconst64(0, 0) : bridge.exports().emitIconst32(0);
-        int isZero = bridge.exports().emitIcmp(0, divisor, zero); // EQ
-
-        if (signed && !isRem) {
-            // sdiv: also check INT_MIN / -1 overflow
-            int checkOverflow = bridge.exports().createBlock();
-            safeBlock = bridge.exports().createBlock();
-            bridge.exports().emitBrif(isZero, trapBlockZero, checkOverflow);
-
-            bridge.exports().switchToBlock(checkOverflow);
-            int intMin;
-            int negOne;
-            if (is64) {
-                // INT64_MIN = 0x8000000000000000
-                intMin = bridge.exports().emitIconst64(0, 0x80000000);
-                negOne = bridge.exports().emitIconst64(-1, -1);
-            } else {
-                intMin = bridge.exports().emitIconst32(0x80000000);
-                negOne = bridge.exports().emitIconst32(-1);
-            }
-            int isMin = bridge.exports().emitIcmp(0, dividend, intMin); // EQ
-            int isNeg1 = bridge.exports().emitIcmp(0, divisor, negOne); // EQ
-            int both = bridge.exports().emitBand(isMin, isNeg1);
-
-            int trapBlockOverflow = bridge.exports().createBlock();
-            bridge.exports().emitBrif(both, trapBlockOverflow, safeBlock);
-
-            // Fill overflow trap block
-            fillTrapBlock(trapBlockOverflow, CtxBuffer.TRAP_INT_OVERFLOW, ctxPtr, funcType);
-        } else {
-            // udiv, srem, urem: only zero check
-            safeBlock = bridge.exports().createBlock();
-            bridge.exports().emitBrif(isZero, trapBlockZero, safeBlock);
-        }
-
-        // Fill zero trap block
-        fillTrapBlock(trapBlockZero, CtxBuffer.TRAP_DIV_BY_ZERO, ctxPtr, funcType);
-
-        // Safe block: emit the actual division
-        bridge.exports().switchToBlock(safeBlock);
-        if (signed) {
-            return isRem
-                    ? bridge.exports().emitSrem(dividend, divisor)
-                    : bridge.exports().emitSdiv(dividend, divisor);
-        } else {
-            return isRem
-                    ? bridge.exports().emitUrem(dividend, divisor)
-                    : bridge.exports().emitUdiv(dividend, divisor);
-        }
-    }
-
-    /**
-     * Emit a safe float-to-int truncation with NaN and range checks.
-     * Uses saturating conversion (no ud2) + post-check for NaN/overflow.
-     */
-    private int emitSafeTrunc(
-            int fval, int targetType, boolean signed, int ctxPtr, FunctionType funcType) {
-        // Use saturating conversion (never traps)
-        int satResult =
-                signed
-                        ? bridge.exports().emitFcvtToSintSat(targetType, fval)
-                        : bridge.exports().emitFcvtToUintSat(targetType, fval);
-
-        // Check NaN: NaN != NaN
-        int isNan = bridge.exports().emitFcmp(1, fval, fval); // NE → true if NaN
-        int trapBlock = bridge.exports().createBlock();
-        int okBlock = bridge.exports().createBlock();
-        bridge.exports().emitBrif(isNan, trapBlock, okBlock);
-
-        // Trap block
-        fillTrapBlock(trapBlock, CtxBuffer.TRAP_TRUNC_OVERFLOW, ctxPtr, funcType);
-
-        // Ok block — satResult is valid (sat handles overflow by clamping,
-        // but Wasm requires trap on overflow, not clamping)
-        // For correctness we should also check range, but for now NaN check
-        // catches the most common crash case. Full range check deferred.
-        bridge.exports().switchToBlock(okBlock);
-        return satResult;
-    }
-
-    private int[] appendBlockParams(int blockId, java.util.List<ValType> types) {
+    private int[] appendBlockParams(int blockId, List<ValType> types) {
         int[] paramIds = new int[types.size()];
         for (int i = 0; i < types.size(); i++) {
             paramIds[i] =
-                    bridge.exports().appendBlockParam(blockId, valTypeToBridgeType(types.get(i)));
+                    bridge.exports()
+                            .appendBlockParam(
+                                    blockId, EmitContext.valTypeToBridgeType(types.get(i)));
         }
         return paramIds;
     }
 
-    private void emitJumpToBlock(int blockId, int argCount, Deque<Integer> valueStack) {
+    private void emitJumpToBlock(int blockId, int argCount, NativeValueStack valueStack) {
         if (argCount == 0) {
             bridge.exports().emitJump(blockId);
         } else if (argCount == 1) {
@@ -374,19 +280,14 @@ final class NativeCompiler {
             for (int i = argCount - 1; i >= 0; i--) {
                 args[i] = valueStack.pop();
             }
-            for (int i = 0; i < argCount; i++) {
-                bridge.exports().pushCallArg(args[i]);
+            for (int a : args) {
+                bridge.exports().pushCallArg(a);
             }
             bridge.exports().emitJumpWithArgs(blockId);
         }
     }
 
-    /**
-     * Create a dead block that jumps to targetBlock with dummy zero values.
-     * This satisfies Cranelift's verifier which requires every block param
-     * to have at least one incoming value, even in unreachable code.
-     */
-    private void emitDeadPredecessor(int targetBlock, java.util.List<ValType> types) {
+    private void emitDeadPredecessor(int targetBlock, List<ValType> types) {
         int deadBlock = bridge.exports().createBlock();
         bridge.exports().switchToBlock(deadBlock);
         if (types.size() == 1) {
@@ -399,1929 +300,933 @@ final class NativeCompiler {
         }
     }
 
-    private static void trimValueStack(Deque<Integer> valueStack, int targetHeight) {
-        while (valueStack.size() > targetHeight) {
-            valueStack.pop();
-        }
+    private int emitZero(ValType type) {
+        if (type.equals(ValType.I32)) return bridge.exports().emitIconst32(0);
+        if (type.equals(ValType.I64)) return bridge.exports().emitIconst64(0, 0);
+        if (type.equals(ValType.F32)) return bridge.exports().emitF32const(0);
+        if (type.equals(ValType.F64)) return bridge.exports().emitF64const(0, 0);
+        throw new UnsupportedOperationException("Unsupported type: " + type);
     }
 
     // --- Instruction emission ---
 
     private void emitInstruction(
-            AnnotatedInstruction ins,
-            Deque<Integer> valueStack,
-            Deque<ControlFrame> controlStack,
-            int[] localVars,
-            int memBaseVar,
-            int ctxPtrVar,
-            Map<String, Integer> sigRefCache,
-            FunctionType funcType) {
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
 
-        // ctxPtrVar is a Cranelift variable — use useVar(ctxPtrVar) at each point of use
-        // (needed because trap blocks switch the current block, invalidating prior values)
-        int ctxPtr = ctxPtrVar; // alias for readability — but it's a variable ID, not value ID
-
-        // Skip dead code after unconditional transfers
-        if (!controlStack.isEmpty() && controlStack.peek().unreachable) {
-            switch (ins.opcode()) {
-                case END:
-                case ELSE:
-                    // These reset unreachable — process normally below
-                    break;
-                case BLOCK:
-                case LOOP:
-                case IF:
-                    // Push dummy frame to keep control stack balanced
-                    controlStack.push(
-                            new ControlFrame(
-                                    ins.opcode() == OpCode.IF
-                                            ? ControlFrame.Kind.IF
-                                            : ins.opcode() == OpCode.LOOP
-                                                    ? ControlFrame.Kind.LOOP
-                                                    : ControlFrame.Kind.BLOCK,
-                                    -1,
-                                    -1,
-                                    -1,
-                                    new int[0],
-                                    FunctionType.empty(),
-                                    valueStack.size()));
-                    controlStack.peek().unreachable = true;
-                    return;
-                default:
-                    return; // skip all other instructions
-            }
-        }
+        var valueStack = ctx.valueStack;
 
         switch (ins.opcode()) {
             // --- Constants ---
             case I32_CONST:
-                valueStack.push(bridge.exports().emitIconst32((int) ins.operands()[0]));
+                NativeEmitters.emitI32Const(ctx, ins);
                 break;
-
             case I64_CONST:
-                {
-                    long val = ins.operands()[0];
-                    valueStack.push(bridge.exports().emitIconst64((int) val, (int) (val >>> 32)));
-                    break;
-                }
-
+                NativeEmitters.emitI64Const(ctx, ins);
+                break;
             case F32_CONST:
-                valueStack.push(bridge.exports().emitF32const((int) ins.operands()[0]));
+                NativeEmitters.emitF32Const(ctx, ins);
+                break;
+            case F64_CONST:
+                NativeEmitters.emitF64Const(ctx, ins);
                 break;
 
-            case F64_CONST:
-                {
-                    long bits = ins.operands()[0];
-                    valueStack.push(bridge.exports().emitF64const((int) bits, (int) (bits >>> 32)));
-                    break;
-                }
-
-            // --- Arithmetic ---
+            // --- i32 Arithmetic ---
             case I32_ADD:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIadd(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 0);
+                break;
             case I32_SUB:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIsub(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 1);
+                break;
             case I32_MUL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitImul(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 2);
+                break;
             case I32_DIV_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, true, false, false, ctxPtrVar, funcType));
-                    break;
-                }
+                NativeEmitters.emitSafeDiv(ctx, true, false, false);
+                break;
             case I32_DIV_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, false, false, false, ctxPtrVar, funcType));
-                    break;
-                }
+                NativeEmitters.emitSafeDiv(ctx, false, false, false);
+                break;
             case I32_REM_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, true, true, false, ctxPtrVar, funcType));
-                    break;
-                }
+                NativeEmitters.emitSafeDiv(ctx, true, true, false);
+                break;
             case I32_REM_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, false, true, false, ctxPtrVar, funcType));
-                    break;
-                }
+                NativeEmitters.emitSafeDiv(ctx, false, true, false);
+                break;
             case I32_AND:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBand(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 3);
+                break;
             case I32_OR:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBor(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 4);
+                break;
             case I32_XOR:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBxor(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 5);
+                break;
             case I32_SHL:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIshl(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 6);
+                break;
             case I32_SHR_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSshr(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 7);
+                break;
             case I32_SHR_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUshr(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 8);
+                break;
             case I32_ROTL:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitRotl(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 9);
+                break;
             case I32_ROTR:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitRotr(a, bb));
-                    break;
-                }
+                NativeEmitters.emitI32BinaryOp(ctx, 10);
+                break;
             case I32_CLZ:
-                valueStack.push(bridge.exports().emitClz(valueStack.pop()));
+                NativeEmitters.emitI32UnaryOp(ctx, 0);
                 break;
             case I32_CTZ:
-                valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
+                NativeEmitters.emitI32UnaryOp(ctx, 1);
                 break;
             case I32_POPCNT:
-                valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
+                NativeEmitters.emitI32UnaryOp(ctx, 2);
                 break;
 
-            // --- Comparisons ---
+            // --- i32 Comparisons ---
             case I32_EQZ:
-                valueStack.push(bridge.exports().emitEqz(valueStack.pop()));
+                NativeEmitters.emitI32UnaryOp(ctx, 3);
                 break;
             case I32_EQ:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(0, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 0);
+                break;
             case I32_NE:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(1, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 1);
+                break;
             case I32_LT_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(2, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 2);
+                break;
             case I32_LT_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(3, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 3);
+                break;
             case I32_GT_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(4, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 4);
+                break;
             case I32_GT_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(5, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 5);
+                break;
             case I32_LE_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(6, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 6);
+                break;
             case I32_LE_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(7, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 7);
+                break;
             case I32_GE_S:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(8, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 8);
+                break;
             case I32_GE_U:
-                {
-                    int bb = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(9, a, bb));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 9);
+                break;
 
-            // --- Extensions ---
+            // --- i32 Extensions ---
             case I32_EXTEND_8_S:
-                valueStack.push(bridge.exports().emitSextend832(valueStack.pop()));
+                NativeEmitters.emitI32Extend8S(ctx);
                 break;
             case I32_EXTEND_16_S:
-                valueStack.push(bridge.exports().emitSextend1632(valueStack.pop()));
+                NativeEmitters.emitI32Extend16S(ctx);
                 break;
-
-            // --- Memory ---
-            case I32_STORE:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStoreI32(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case I32_LOAD:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoadI32(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_STORE:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStoreI64(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case I64_LOAD:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case F32_STORE:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStoreF32(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case F32_LOAD:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoadF32(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case F64_STORE:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStoreF64(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case F64_LOAD:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoadF64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            // --- Sub-word memory loads (i32) ---
-            case I32_LOAD8_U:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad8u(bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I32_LOAD8_S:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad8s(bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I32_LOAD16_U:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad16u(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I32_LOAD16_S:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad16s(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            // --- Sub-word memory stores (i32) ---
-            case I32_STORE8:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStore8(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case I32_STORE16:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStore16(bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            // --- Sub-word memory loads (i64) ---
-            case I64_LOAD8_U:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad8uI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_LOAD8_S:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad8sI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_LOAD16_U:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad16uI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_LOAD16_S:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad16sI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_LOAD32_U:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad32uI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            case I64_LOAD32_S:
-                {
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    valueStack.push(
-                            bridge.exports()
-                                    .emitLoad32sI64(
-                                            bridge.exports().useVar(memBaseVar), addr, offset));
-                    break;
-                }
-
-            // --- Sub-word memory stores (i64) ---
-            case I64_STORE8:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStore8I64(
-                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case I64_STORE16:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStore16I64(
-                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            case I64_STORE32:
-                {
-                    int value = valueStack.pop();
-                    int addr = valueStack.pop();
-                    int offset = (int) ins.operands()[1];
-                    bridge.exports()
-                            .emitStore32I64(
-                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
-                    break;
-                }
-
-            // --- Locals ---
-            case LOCAL_GET:
-                valueStack.push(bridge.exports().useVar(localVars[(int) ins.operands()[0]]));
-                break;
-
-            case LOCAL_SET:
-                {
-                    int val = valueStack.pop();
-                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
-                    break;
-                }
-
-            case LOCAL_TEE:
-                {
-                    int val = valueStack.peek();
-                    bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
-                    break;
-                }
-
-            // --- Select ---
-            case SELECT:
-            case SELECT_T:
-                {
-                    int cond = valueStack.pop();
-                    int val2 = valueStack.pop();
-                    int val1 = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSelect(cond, val1, val2));
-                    break;
-                }
-
-            // --- Globals ---
-            case GLOBAL_GET:
-                {
-                    int globalIdx = (int) ins.operands()[0];
-                    // Load globalsPtr from ctxBuffer
-                    int zero = bridge.exports().emitIconst32(0);
-                    int globalsPtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.GLOBALS_PTR);
-                    // Load value as i64 from globals buffer
-                    int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
-                    int rawVal = bridge.exports().emitLoadI64(globalsPtr, offsetVal, 0);
-                    // Narrow to the actual global type
-                    ValType globalType = resolveGlobalType(globalIdx);
-                    valueStack.push(narrowFromI64ForType(rawVal, globalType));
-                    break;
-                }
-
-            case GLOBAL_SET:
-                {
-                    int globalIdx = (int) ins.operands()[0];
-                    int value = valueStack.pop();
-                    // Widen to i64 for storage
-                    ValType globalType = resolveGlobalType(globalIdx);
-                    int widened = widenToI64ForType(value, globalType);
-                    // Load globalsPtr from ctxBuffer
-                    int zero = bridge.exports().emitIconst32(0);
-                    int globalsPtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.GLOBALS_PTR);
-                    // Store to globals buffer
-                    int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
-                    bridge.exports().emitStoreI64(globalsPtr, offsetVal, widened, 0);
-                    break;
-                }
-
-            // --- Memory operations ---
-            case MEMORY_SIZE:
-                {
-                    // Load current page count from ctxBuffer
-                    int zero = bridge.exports().emitIconst32(0);
-                    int pages =
-                            bridge.exports()
-                                    .emitLoadI32(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.MEMORY_PAGES);
-                    valueStack.push(pages);
-                    break;
-                }
-
-            case MEMORY_GROW:
-                {
-                    int delta = valueStack.pop();
-                    int zero = bridge.exports().emitIconst32(0);
-                    // Write grow delta to dedicated MEM_GROW_DELTA field
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    delta,
-                                    CtxBuffer.MEM_GROW_DELTA);
-                    // Load memGrowStub ptr from ctxBuffer
-                    int memGrowPtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.MEM_GROW_PTR);
-                    // Call memGrowStub(ctxPtr) -> i64 (old page count or -1)
-                    int growSig = getOrCreateTrampolineSigRef(sigRefCache);
-                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
-                    int rawResult = bridge.exports().emitCallIndirect(growSig, memGrowPtr);
-                    // Result is i32 (old page count or -1)
-                    int result = bridge.exports().emitIreduceI32(rawResult);
-                    valueStack.push(result);
-                    // Reload memBase from ctxBuffer (may have changed after grow)
-                    int newMemBase =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.MEM_BASE_ADDR);
-                    bridge.exports().defVar(memBaseVar, newMemBase);
-                    break;
-                }
-
-            // --- Unreachable ---
-            case UNREACHABLE:
-                {
-                    // Write trap code to ctxBuffer and return (no ud2)
-                    int ctxVal = bridge.exports().useVar(ctxPtrVar);
-                    int zero = bridge.exports().emitIconst32(0);
-                    int code = bridge.exports().emitIconst32(CtxBuffer.TRAP_UNREACHABLE);
-                    bridge.exports().emitStoreI32(ctxVal, zero, code, CtxBuffer.TRAP_CODE);
-                    emitReturnForFuncType(funcType);
-                    controlStack.peek().unreachable = true;
-                    break;
-                }
 
             // --- i64 Arithmetic ---
             case I64_ADD:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIadd(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 0);
+                break;
             case I64_SUB:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIsub(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 1);
+                break;
             case I64_MUL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitImul(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 2);
+                break;
             case I64_DIV_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, true, false, true, ctxPtrVar, funcType));
-                    break;
-                }
-
+                NativeEmitters.emitSafeDiv(ctx, true, false, true);
+                break;
             case I64_DIV_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, false, false, true, ctxPtrVar, funcType));
-                    break;
-                }
-
+                NativeEmitters.emitSafeDiv(ctx, false, false, true);
+                break;
             case I64_REM_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, true, true, true, ctxPtrVar, funcType));
-                    break;
-                }
-
+                NativeEmitters.emitSafeDiv(ctx, true, true, true);
+                break;
             case I64_REM_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, false, true, true, ctxPtrVar, funcType));
-                    break;
-                }
-
+                NativeEmitters.emitSafeDiv(ctx, false, true, true);
+                break;
             case I64_AND:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBand(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 3);
+                break;
             case I64_OR:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBor(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 4);
+                break;
             case I64_XOR:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitBxor(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 5);
+                break;
             case I64_SHL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIshl(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 6);
+                break;
             case I64_SHR_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitSshr(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 7);
+                break;
             case I64_SHR_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitUshr(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 8);
+                break;
             case I64_ROTL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitRotl(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 9);
+                break;
             case I64_ROTR:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitRotr(a, b));
-                    break;
-                }
-
+                NativeEmitters.emitI32BinaryOp(ctx, 10);
+                break;
             case I64_CLZ:
-                valueStack.push(bridge.exports().emitClz(valueStack.pop()));
+                NativeEmitters.emitI64UnaryOp(ctx, 0);
                 break;
-
             case I64_CTZ:
-                valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
+                NativeEmitters.emitI64UnaryOp(ctx, 1);
                 break;
-
             case I64_POPCNT:
-                valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
+                NativeEmitters.emitI64UnaryOp(ctx, 2);
                 break;
 
             // --- i64 Comparisons ---
             case I64_EQZ:
-                valueStack.push(bridge.exports().emitEqzI64(valueStack.pop()));
+                NativeEmitters.emitI64UnaryOp(ctx, 3);
                 break;
-
             case I64_EQ:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(0, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 0);
+                break;
             case I64_NE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(1, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 1);
+                break;
             case I64_LT_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(2, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 2);
+                break;
             case I64_LT_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(3, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 3);
+                break;
             case I64_GT_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(4, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 4);
+                break;
             case I64_GT_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(5, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 5);
+                break;
             case I64_LE_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(6, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 6);
+                break;
             case I64_LE_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(7, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 7);
+                break;
             case I64_GE_S:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(8, a, b));
-                    break;
-                }
-
+                NativeEmitters.emitIcmp(ctx, 8);
+                break;
             case I64_GE_U:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitIcmp(9, a, b));
-                    break;
-                }
+                NativeEmitters.emitIcmp(ctx, 9);
+                break;
 
             // --- i64 Extensions ---
             case I64_EXTEND_I32_S:
-                valueStack.push(bridge.exports().emitSextendI64(valueStack.pop()));
+                NativeEmitters.emitI64ExtendI32S(ctx);
                 break;
-
             case I64_EXTEND_I32_U:
-                valueStack.push(bridge.exports().emitUextendI64(valueStack.pop()));
+                NativeEmitters.emitI64ExtendI32U(ctx);
                 break;
-
             case I64_EXTEND_8_S:
-                valueStack.push(bridge.exports().emitSextend864(valueStack.pop()));
+                NativeEmitters.emitI64Extend8S(ctx);
                 break;
-
             case I64_EXTEND_16_S:
-                valueStack.push(bridge.exports().emitSextend1664(valueStack.pop()));
+                NativeEmitters.emitI64Extend16S(ctx);
                 break;
-
             case I64_EXTEND_32_S:
-                valueStack.push(bridge.exports().emitSextend3264(valueStack.pop()));
+                NativeEmitters.emitI64Extend32S(ctx);
                 break;
-
-            // --- i32 wrap i64 ---
             case I32_WRAP_I64:
-                valueStack.push(bridge.exports().emitI32WrapI64(valueStack.pop()));
+                NativeEmitters.emitI32WrapI64(ctx);
                 break;
 
-            // --- f32 Arithmetic ---
-            case F32_ADD:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFadd(a, b));
-                    break;
-                }
-            case F32_SUB:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFsub(a, b));
-                    break;
-                }
-            case F32_MUL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmul(a, b));
-                    break;
-                }
-            case F32_DIV:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFdiv(a, b));
-                    break;
-                }
-            case F32_MIN:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmin(a, b));
-                    break;
-                }
-            case F32_MAX:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmax(a, b));
-                    break;
-                }
-            case F32_COPYSIGN:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcopysign(a, b));
-                    break;
-                }
-            case F32_ABS:
-                valueStack.push(bridge.exports().emitFabs(valueStack.pop()));
+            // --- Memory loads ---
+            case I32_LOAD:
+                NativeEmitters.emitLoad(ctx, ins, 0);
                 break;
-            case F32_NEG:
-                valueStack.push(bridge.exports().emitFneg(valueStack.pop()));
+            case I64_LOAD:
+                NativeEmitters.emitLoad(ctx, ins, 1);
                 break;
-            case F32_CEIL:
-                valueStack.push(bridge.exports().emitCeil(valueStack.pop()));
+            case F32_LOAD:
+                NativeEmitters.emitLoad(ctx, ins, 2);
                 break;
-            case F32_FLOOR:
-                valueStack.push(bridge.exports().emitFloor(valueStack.pop()));
+            case F64_LOAD:
+                NativeEmitters.emitLoad(ctx, ins, 3);
                 break;
-            case F32_TRUNC:
-                valueStack.push(bridge.exports().emitTruncFloat(valueStack.pop()));
+            case I32_LOAD8_U:
+                NativeEmitters.emitLoad(ctx, ins, 4);
                 break;
-            case F32_NEAREST:
-                valueStack.push(bridge.exports().emitNearest(valueStack.pop()));
+            case I32_LOAD8_S:
+                NativeEmitters.emitLoad(ctx, ins, 5);
                 break;
-            case F32_SQRT:
-                valueStack.push(bridge.exports().emitSqrt(valueStack.pop()));
+            case I32_LOAD16_U:
+                NativeEmitters.emitLoad(ctx, ins, 6);
+                break;
+            case I32_LOAD16_S:
+                NativeEmitters.emitLoad(ctx, ins, 7);
+                break;
+            case I64_LOAD8_U:
+                NativeEmitters.emitLoad(ctx, ins, 8);
+                break;
+            case I64_LOAD8_S:
+                NativeEmitters.emitLoad(ctx, ins, 9);
+                break;
+            case I64_LOAD16_U:
+                NativeEmitters.emitLoad(ctx, ins, 10);
+                break;
+            case I64_LOAD16_S:
+                NativeEmitters.emitLoad(ctx, ins, 11);
+                break;
+            case I64_LOAD32_U:
+                NativeEmitters.emitLoad(ctx, ins, 12);
+                break;
+            case I64_LOAD32_S:
+                NativeEmitters.emitLoad(ctx, ins, 13);
                 break;
 
-            // --- f32 Comparisons ---
-            case F32_EQ:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(0, a, b));
-                    break;
-                }
-            case F32_NE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(1, a, b));
-                    break;
-                }
-            case F32_LT:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(2, a, b));
-                    break;
-                }
-            case F32_GT:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(3, a, b));
-                    break;
-                }
-            case F32_LE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(4, a, b));
-                    break;
-                }
-            case F32_GE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(5, a, b));
-                    break;
-                }
-
-            // --- f64 Arithmetic ---
-            case F64_ADD:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFadd(a, b));
-                    break;
-                }
-            case F64_SUB:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFsub(a, b));
-                    break;
-                }
-            case F64_MUL:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmul(a, b));
-                    break;
-                }
-            case F64_DIV:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFdiv(a, b));
-                    break;
-                }
-            case F64_MIN:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmin(a, b));
-                    break;
-                }
-            case F64_MAX:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFmax(a, b));
-                    break;
-                }
-            case F64_COPYSIGN:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcopysign(a, b));
-                    break;
-                }
-            case F64_ABS:
-                valueStack.push(bridge.exports().emitFabs(valueStack.pop()));
+            // --- Memory stores ---
+            case I32_STORE:
+                NativeEmitters.emitStore(ctx, ins, 0);
                 break;
-            case F64_NEG:
-                valueStack.push(bridge.exports().emitFneg(valueStack.pop()));
+            case I64_STORE:
+                NativeEmitters.emitStore(ctx, ins, 1);
                 break;
-            case F64_CEIL:
-                valueStack.push(bridge.exports().emitCeil(valueStack.pop()));
+            case F32_STORE:
+                NativeEmitters.emitStore(ctx, ins, 2);
                 break;
-            case F64_FLOOR:
-                valueStack.push(bridge.exports().emitFloor(valueStack.pop()));
+            case F64_STORE:
+                NativeEmitters.emitStore(ctx, ins, 3);
                 break;
-            case F64_TRUNC:
-                valueStack.push(bridge.exports().emitTruncFloat(valueStack.pop()));
+            case I32_STORE8:
+                NativeEmitters.emitStore(ctx, ins, 4);
                 break;
-            case F64_NEAREST:
-                valueStack.push(bridge.exports().emitNearest(valueStack.pop()));
+            case I32_STORE16:
+                NativeEmitters.emitStore(ctx, ins, 5);
                 break;
-            case F64_SQRT:
-                valueStack.push(bridge.exports().emitSqrt(valueStack.pop()));
+            case I64_STORE8:
+                NativeEmitters.emitStore(ctx, ins, 6);
+                break;
+            case I64_STORE16:
+                NativeEmitters.emitStore(ctx, ins, 7);
+                break;
+            case I64_STORE32:
+                NativeEmitters.emitStore(ctx, ins, 8);
                 break;
 
-            // --- f64 Comparisons ---
-            case F64_EQ:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(0, a, b));
-                    break;
-                }
-            case F64_NE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(1, a, b));
-                    break;
-                }
-            case F64_LT:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(2, a, b));
-                    break;
-                }
-            case F64_GT:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(3, a, b));
-                    break;
-                }
-            case F64_LE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(4, a, b));
-                    break;
-                }
-            case F64_GE:
-                {
-                    int b = valueStack.pop();
-                    int a = valueStack.pop();
-                    valueStack.push(bridge.exports().emitFcmp(5, a, b));
-                    break;
-                }
-
-            // --- Conversions ---
-            case I32_TRUNC_F32_S:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I32,
-                                true,
-                                ctxPtr,
-                                funcType));
+            // --- Locals ---
+            case LOCAL_GET:
+                NativeEmitters.emitLocalGet(ctx, ins);
                 break;
-            case I32_TRUNC_F32_U:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I32,
-                                false,
-                                ctxPtr,
-                                funcType));
+            case LOCAL_SET:
+                NativeEmitters.emitLocalSet(ctx, ins);
                 break;
-            case I32_TRUNC_F64_S:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I32,
-                                true,
-                                ctxPtr,
-                                funcType));
-                break;
-            case I32_TRUNC_F64_U:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I32,
-                                false,
-                                ctxPtr,
-                                funcType));
-                break;
-            case I64_TRUNC_F32_S:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I64,
-                                true,
-                                ctxPtr,
-                                funcType));
-                break;
-            case I64_TRUNC_F32_U:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I64,
-                                false,
-                                ctxPtr,
-                                funcType));
-                break;
-            case I64_TRUNC_F64_S:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I64,
-                                true,
-                                ctxPtr,
-                                funcType));
-                break;
-            case I64_TRUNC_F64_U:
-                valueStack.push(
-                        emitSafeTrunc(
-                                valueStack.pop(),
-                                CraneliftBridge.TYPE_I64,
-                                false,
-                                ctxPtr,
-                                funcType));
+            case LOCAL_TEE:
+                NativeEmitters.emitLocalTee(ctx, ins);
                 break;
 
-            case I32_TRUNC_SAT_F32_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
-                break;
-            case I32_TRUNC_SAT_F32_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
-                break;
-            case I32_TRUNC_SAT_F64_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
-                break;
-            case I32_TRUNC_SAT_F64_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I32, valueStack.pop()));
-                break;
-            case I64_TRUNC_SAT_F32_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
-                break;
-            case I64_TRUNC_SAT_F32_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
-                break;
-            case I64_TRUNC_SAT_F64_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToSintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
-                break;
-            case I64_TRUNC_SAT_F64_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtToUintSat(CraneliftBridge.TYPE_I64, valueStack.pop()));
+            // --- Select ---
+            case SELECT:
+            case SELECT_T:
+                NativeEmitters.emitSelect(ctx);
                 break;
 
-            case F32_CONVERT_I32_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromSint(CraneliftBridge.TYPE_F32, valueStack.pop()));
+            // --- Globals ---
+            case GLOBAL_GET:
+                NativeEmitters.emitGlobalGet(ctx, ins);
                 break;
-            case F32_CONVERT_I32_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromUint(CraneliftBridge.TYPE_F32, valueStack.pop()));
-                break;
-            case F32_CONVERT_I64_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromSint(CraneliftBridge.TYPE_F32, valueStack.pop()));
-                break;
-            case F32_CONVERT_I64_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromUint(CraneliftBridge.TYPE_F32, valueStack.pop()));
-                break;
-            case F64_CONVERT_I32_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromSint(CraneliftBridge.TYPE_F64, valueStack.pop()));
-                break;
-            case F64_CONVERT_I32_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromUint(CraneliftBridge.TYPE_F64, valueStack.pop()));
-                break;
-            case F64_CONVERT_I64_S:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromSint(CraneliftBridge.TYPE_F64, valueStack.pop()));
-                break;
-            case F64_CONVERT_I64_U:
-                valueStack.push(
-                        bridge.exports()
-                                .emitFcvtFromUint(CraneliftBridge.TYPE_F64, valueStack.pop()));
+            case GLOBAL_SET:
+                NativeEmitters.emitGlobalSet(ctx, ins);
                 break;
 
-            case F64_PROMOTE_F32:
-                valueStack.push(bridge.exports().emitFpromote(valueStack.pop()));
+            // --- Memory operations ---
+            case MEMORY_SIZE:
+                NativeEmitters.emitMemorySize(ctx);
                 break;
-            case F32_DEMOTE_F64:
-                valueStack.push(bridge.exports().emitFdemote(valueStack.pop()));
-                break;
-
-            case F32_REINTERPRET_I32:
-                valueStack.push(bridge.exports().emitBitcastI32ToF32(valueStack.pop()));
-                break;
-            case I32_REINTERPRET_F32:
-                valueStack.push(bridge.exports().emitBitcastF32ToI32(valueStack.pop()));
-                break;
-            case F64_REINTERPRET_I64:
-                valueStack.push(bridge.exports().emitBitcastI64ToF64(valueStack.pop()));
-                break;
-            case I64_REINTERPRET_F64:
-                valueStack.push(bridge.exports().emitBitcastF64ToI64(valueStack.pop()));
+            case MEMORY_GROW:
+                NativeEmitters.emitMemoryGrow(ctx);
                 break;
 
             // --- Misc ---
             case NOP:
                 break;
-
             case DROP:
                 valueStack.pop();
                 break;
+            case UNREACHABLE:
+                NativeEmitters.emitUnreachable(ctx);
+                controlStack.peek().unreachable = true;
+                break;
 
-            // --- Control flow ---
-            case BLOCK:
-                {
-                    FunctionType bt = decodeBlockType(ins);
-                    int mergeBlock = bridge.exports().createBlock();
-                    int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
-                    // Pop block params from stack (block inputs)
-                    int savedHeight = valueStack.size() - bt.params().size();
-                    controlStack.push(
-                            new ControlFrame(
-                                    ControlFrame.Kind.BLOCK,
-                                    mergeBlock,
-                                    -1,
-                                    -1,
-                                    mergeParamIds,
-                                    bt,
-                                    savedHeight));
-                    break;
-                }
+            // --- f32 Arithmetic ---
+            case F32_ADD:
+                NativeEmitters.emitFloatBinaryOp(ctx, 0);
+                break;
+            case F32_SUB:
+                NativeEmitters.emitFloatBinaryOp(ctx, 1);
+                break;
+            case F32_MUL:
+                NativeEmitters.emitFloatBinaryOp(ctx, 2);
+                break;
+            case F32_DIV:
+                NativeEmitters.emitFloatBinaryOp(ctx, 3);
+                break;
+            case F32_MIN:
+                NativeEmitters.emitFloatBinaryOp(ctx, 4);
+                break;
+            case F32_MAX:
+                NativeEmitters.emitFloatBinaryOp(ctx, 5);
+                break;
+            case F32_COPYSIGN:
+                NativeEmitters.emitFloatBinaryOp(ctx, 6);
+                break;
+            case F32_ABS:
+                NativeEmitters.emitFloatUnaryOp(ctx, 0);
+                break;
+            case F32_NEG:
+                NativeEmitters.emitFloatUnaryOp(ctx, 1);
+                break;
+            case F32_CEIL:
+                NativeEmitters.emitFloatUnaryOp(ctx, 2);
+                break;
+            case F32_FLOOR:
+                NativeEmitters.emitFloatUnaryOp(ctx, 3);
+                break;
+            case F32_TRUNC:
+                NativeEmitters.emitFloatUnaryOp(ctx, 4);
+                break;
+            case F32_NEAREST:
+                NativeEmitters.emitFloatUnaryOp(ctx, 5);
+                break;
+            case F32_SQRT:
+                NativeEmitters.emitFloatUnaryOp(ctx, 6);
+                break;
 
-            case LOOP:
-                {
-                    FunctionType bt = decodeBlockType(ins);
-                    int loopHeader = bridge.exports().createBlock();
-                    int mergeBlock = bridge.exports().createBlock();
-                    int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
-                    // Loop header gets params (for backward branches)
-                    int[] loopParamIds = appendBlockParams(loopHeader, bt.params());
-                    // Pop block params from stack and pass to loop header
-                    int savedHeight = valueStack.size() - bt.params().size();
-                    emitJumpToBlock(loopHeader, bt.params().size(), valueStack);
-                    bridge.exports().switchToBlock(loopHeader);
-                    // Push loop header params onto value stack
-                    for (int pid : loopParamIds) {
-                        valueStack.push(pid);
-                    }
-                    controlStack.push(
-                            new ControlFrame(
-                                    ControlFrame.Kind.LOOP,
-                                    mergeBlock,
-                                    loopHeader,
-                                    -1,
-                                    mergeParamIds,
-                                    bt,
-                                    savedHeight));
-                    break;
-                }
+            // --- f32 Comparisons ---
+            case F32_EQ:
+                NativeEmitters.emitFcmp(ctx, 0);
+                break;
+            case F32_NE:
+                NativeEmitters.emitFcmp(ctx, 1);
+                break;
+            case F32_LT:
+                NativeEmitters.emitFcmp(ctx, 2);
+                break;
+            case F32_GT:
+                NativeEmitters.emitFcmp(ctx, 3);
+                break;
+            case F32_LE:
+                NativeEmitters.emitFcmp(ctx, 4);
+                break;
+            case F32_GE:
+                NativeEmitters.emitFcmp(ctx, 5);
+                break;
 
-            case IF:
-                {
-                    FunctionType bt = decodeBlockType(ins);
-                    int condition = valueStack.pop();
-                    int thenBlock = bridge.exports().createBlock();
-                    int elseBlock = bridge.exports().createBlock();
-                    int mergeBlock = bridge.exports().createBlock();
-                    int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
-                    int savedHeight = valueStack.size() - bt.params().size();
-                    bridge.exports().emitBrif(condition, thenBlock, elseBlock);
-                    bridge.exports().switchToBlock(thenBlock);
-                    controlStack.push(
-                            new ControlFrame(
-                                    ControlFrame.Kind.IF,
-                                    mergeBlock,
-                                    -1,
-                                    elseBlock,
-                                    mergeParamIds,
-                                    bt,
-                                    savedHeight));
-                    break;
-                }
+            // --- f64 Arithmetic ---
+            case F64_ADD:
+                NativeEmitters.emitFloatBinaryOp(ctx, 0);
+                break;
+            case F64_SUB:
+                NativeEmitters.emitFloatBinaryOp(ctx, 1);
+                break;
+            case F64_MUL:
+                NativeEmitters.emitFloatBinaryOp(ctx, 2);
+                break;
+            case F64_DIV:
+                NativeEmitters.emitFloatBinaryOp(ctx, 3);
+                break;
+            case F64_MIN:
+                NativeEmitters.emitFloatBinaryOp(ctx, 4);
+                break;
+            case F64_MAX:
+                NativeEmitters.emitFloatBinaryOp(ctx, 5);
+                break;
+            case F64_COPYSIGN:
+                NativeEmitters.emitFloatBinaryOp(ctx, 6);
+                break;
+            case F64_ABS:
+                NativeEmitters.emitFloatUnaryOp(ctx, 0);
+                break;
+            case F64_NEG:
+                NativeEmitters.emitFloatUnaryOp(ctx, 1);
+                break;
+            case F64_CEIL:
+                NativeEmitters.emitFloatUnaryOp(ctx, 2);
+                break;
+            case F64_FLOOR:
+                NativeEmitters.emitFloatUnaryOp(ctx, 3);
+                break;
+            case F64_TRUNC:
+                NativeEmitters.emitFloatUnaryOp(ctx, 4);
+                break;
+            case F64_NEAREST:
+                NativeEmitters.emitFloatUnaryOp(ctx, 5);
+                break;
+            case F64_SQRT:
+                NativeEmitters.emitFloatUnaryOp(ctx, 6);
+                break;
 
-            case ELSE:
-                {
-                    ControlFrame frame = controlStack.peek();
-                    if (frame.mergeBlock < 0) {
-                        frame.hasElse = true;
-                        break;
-                    }
-                    if (!frame.unreachable) {
-                        emitJumpToBlock(
-                                frame.mergeBlock, frame.blockType.returns().size(), valueStack);
-                    }
-                    trimValueStack(valueStack, frame.stackHeight);
-                    bridge.exports().switchToBlock(frame.elseBlock);
-                    // Re-push block params for else branch (they're still on the
-                    // outer stack at stackHeight)
-                    frame.hasElse = true;
-                    frame.unreachable = false;
-                    break;
-                }
+            // --- f64 Comparisons ---
+            case F64_EQ:
+                NativeEmitters.emitFcmp(ctx, 0);
+                break;
+            case F64_NE:
+                NativeEmitters.emitFcmp(ctx, 1);
+                break;
+            case F64_LT:
+                NativeEmitters.emitFcmp(ctx, 2);
+                break;
+            case F64_GT:
+                NativeEmitters.emitFcmp(ctx, 3);
+                break;
+            case F64_LE:
+                NativeEmitters.emitFcmp(ctx, 4);
+                break;
+            case F64_GE:
+                NativeEmitters.emitFcmp(ctx, 5);
+                break;
 
-            case END:
-                {
-                    ControlFrame frame = controlStack.pop();
-                    boolean isDummy =
-                            frame.mergeBlock < 0 && frame.kind != ControlFrame.Kind.FUNCTION;
+            // --- Conversions ---
+            case I32_TRUNC_F32_S:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I32, true);
+                break;
+            case I32_TRUNC_F32_U:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I32, false);
+                break;
+            case I32_TRUNC_F64_S:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I32, true);
+                break;
+            case I32_TRUNC_F64_U:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I32, false);
+                break;
+            case I64_TRUNC_F32_S:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I64, true);
+                break;
+            case I64_TRUNC_F32_U:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I64, false);
+                break;
+            case I64_TRUNC_F64_S:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I64, true);
+                break;
+            case I64_TRUNC_F64_U:
+                NativeEmitters.emitSafeTrunc(ctx, CraneliftBridge.TYPE_I64, false);
+                break;
 
-                    switch (frame.kind) {
-                        case FUNCTION:
-                            if (!frame.unreachable) {
-                                int retCount = frame.blockType.returns().size();
-                                if (retCount == 0) {
-                                    bridge.exports().emitReturnVoid();
-                                } else if (retCount == 1 && !valueStack.isEmpty()) {
-                                    bridge.exports().emitReturn(valueStack.pop());
-                                } else if (retCount > 1 && valueStack.size() >= retCount) {
-                                    int[] retVals = new int[retCount];
-                                    for (int ri = retCount - 1; ri >= 0; ri--) {
-                                        retVals[ri] = valueStack.pop();
-                                    }
-                                    for (int rv : retVals) {
-                                        bridge.exports().pushCallArg(rv);
-                                    }
-                                    bridge.exports().emitReturnMulti();
-                                } else {
-                                    bridge.exports().emitReturnVoid();
-                                }
-                            }
-                            break;
+            case I32_TRUNC_SAT_F32_S:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I32, true);
+                break;
+            case I32_TRUNC_SAT_F32_U:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I32, false);
+                break;
+            case I32_TRUNC_SAT_F64_S:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I32, true);
+                break;
+            case I32_TRUNC_SAT_F64_U:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I32, false);
+                break;
+            case I64_TRUNC_SAT_F32_S:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I64, true);
+                break;
+            case I64_TRUNC_SAT_F32_U:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I64, false);
+                break;
+            case I64_TRUNC_SAT_F64_S:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I64, true);
+                break;
+            case I64_TRUNC_SAT_F64_U:
+                NativeEmitters.emitTruncSat(ctx, CraneliftBridge.TYPE_I64, false);
+                break;
 
-                        case BLOCK:
-                        case LOOP:
-                            if (isDummy) break;
-                            if (!frame.unreachable) {
-                                emitJumpToBlock(
-                                        frame.mergeBlock,
-                                        frame.blockType.returns().size(),
-                                        valueStack);
-                            } else if (frame.mergeParamIds.length > 0) {
-                                // Dead predecessor: emit a jump with dummy zeros so
-                                // the merge block's params are satisfied for the verifier
-                                emitDeadPredecessor(frame.mergeBlock, frame.blockType.returns());
-                            }
-                            bridge.exports().switchToBlock(frame.mergeBlock);
-                            trimValueStack(valueStack, frame.stackHeight);
-                            for (int pid : frame.mergeParamIds) {
-                                valueStack.push(pid);
-                            }
-                            break;
+            case F32_CONVERT_I32_S:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F32, true);
+                break;
+            case F32_CONVERT_I32_U:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F32, false);
+                break;
+            case F32_CONVERT_I64_S:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F32, true);
+                break;
+            case F32_CONVERT_I64_U:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F32, false);
+                break;
+            case F64_CONVERT_I32_S:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F64, true);
+                break;
+            case F64_CONVERT_I32_U:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F64, false);
+                break;
+            case F64_CONVERT_I64_S:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F64, true);
+                break;
+            case F64_CONVERT_I64_U:
+                NativeEmitters.emitConvertFloat(ctx, CraneliftBridge.TYPE_F64, false);
+                break;
 
-                        case IF:
-                            if (isDummy) break;
-                            if (!frame.hasElse) {
-                                if (!frame.unreachable) {
-                                    emitJumpToBlock(
-                                            frame.mergeBlock,
-                                            frame.blockType.returns().size(),
-                                            valueStack);
-                                }
-                                bridge.exports().switchToBlock(frame.elseBlock);
-                                bridge.exports().emitJump(frame.mergeBlock);
-                            } else {
-                                if (!frame.unreachable) {
-                                    emitJumpToBlock(
-                                            frame.mergeBlock,
-                                            frame.blockType.returns().size(),
-                                            valueStack);
-                                } else if (frame.mergeParamIds.length > 0) {
-                                    emitDeadPredecessor(
-                                            frame.mergeBlock, frame.blockType.returns());
-                                }
-                            }
-                            bridge.exports().switchToBlock(frame.mergeBlock);
-                            trimValueStack(valueStack, frame.stackHeight);
-                            for (int pid : frame.mergeParamIds) {
-                                valueStack.push(pid);
-                            }
-                            break;
-                    }
-                    if (!controlStack.isEmpty() && !isDummy) {
-                        controlStack.peek().unreachable = false;
-                    }
-                    break;
-                }
+            case F64_PROMOTE_F32:
+                NativeEmitters.emitFpromote(ctx);
+                break;
+            case F32_DEMOTE_F64:
+                NativeEmitters.emitFdemote(ctx);
+                break;
 
-            case BR:
-                {
-                    int depth = (int) ins.operands()[0];
-                    ControlFrame target = getControlFrame(controlStack, depth);
-                    if (target.kind == ControlFrame.Kind.FUNCTION) {
-                        int retCount = target.blockType.returns().size();
-                        if (retCount > 0) {
-                            bridge.exports().emitReturn(valueStack.pop());
-                        } else {
-                            bridge.exports().emitReturnVoid();
-                        }
-                    } else {
-                        int brTarget = target.branchTarget();
-                        int argCount = target.branchArgCount();
-                        emitJumpToBlock(brTarget, argCount, valueStack);
-                    }
-                    controlStack.peek().unreachable = true;
-                    break;
-                }
+            case F32_REINTERPRET_I32:
+                NativeEmitters.emitBitcastI32ToF32(ctx);
+                break;
+            case I32_REINTERPRET_F32:
+                NativeEmitters.emitBitcastF32ToI32(ctx);
+                break;
+            case F64_REINTERPRET_I64:
+                NativeEmitters.emitBitcastI64ToF64(ctx);
+                break;
+            case I64_REINTERPRET_F64:
+                NativeEmitters.emitBitcastF64ToI64(ctx);
+                break;
 
-            case BR_IF:
-                {
-                    int depth = (int) ins.operands()[0];
-                    int condition = valueStack.pop();
-                    ControlFrame target = getControlFrame(controlStack, depth);
-                    int brTarget = target.branchTarget();
-                    int fallthroughBlock = bridge.exports().createBlock();
-                    int argCount = target.branchArgCount();
-
-                    if (argCount > 0) {
-                        // Pop args, push to accumulator, emit brif with jump args
-                        int[] args = new int[argCount];
-                        for (int i = argCount - 1; i >= 0; i--) {
-                            args[i] = valueStack.pop();
-                        }
-                        for (int i = 0; i < argCount; i++) {
-                            bridge.exports().pushCallArg(args[i]);
-                        }
-                        bridge.exports()
-                                .emitBrifWithJumpArgs(condition, brTarget, fallthroughBlock);
-                        // Push args back for fallthrough
-                        for (int i = 0; i < argCount; i++) {
-                            valueStack.push(args[i]);
-                        }
-                    } else {
-                        bridge.exports().emitBrif(condition, brTarget, fallthroughBlock);
-                    }
-                    bridge.exports().switchToBlock(fallthroughBlock);
-                    break;
-                }
-
-            case RETURN:
-                {
-                    ControlFrame funcFrame = null;
-                    for (ControlFrame f : controlStack) {
-                        funcFrame = f;
-                    }
-                    if (funcFrame != null && !funcFrame.blockType.returns().isEmpty()) {
-                        bridge.exports().emitReturn(valueStack.pop());
-                    } else {
-                        bridge.exports().emitReturnVoid();
-                    }
-                    controlStack.peek().unreachable = true;
-                    break;
-                }
-
-            case BR_TABLE:
-                {
-                    int index = valueStack.pop();
-                    int defaultIdx = ins.operandCount() - 1;
-                    int defaultDepth = (int) ins.operand(defaultIdx);
-
-                    // Pop branch args (all targets have same arity)
-                    ControlFrame defaultTarget = getControlFrame(controlStack, defaultDepth);
-                    int argCount = defaultTarget.branchArgCount();
-                    int[] brArgs = new int[argCount];
-                    for (int i = argCount - 1; i >= 0; i--) {
-                        brArgs[i] = valueStack.pop();
-                    }
-
-                    // Emit if-else chain: for each target, compare index and branch
-                    for (int i = 0; i < defaultIdx; i++) {
-                        int depth = (int) ins.operand(i);
-                        ControlFrame target = getControlFrame(controlStack, depth);
-                        int brTarget = target.branchTarget();
-
-                        int cmpVal = bridge.exports().emitIconst32(i);
-                        int cmp = bridge.exports().emitIcmp(0, index, cmpVal); // eq
-
-                        int hitBlock = bridge.exports().createBlock();
-                        int nextBlock = bridge.exports().createBlock();
-                        bridge.exports().emitBrif(cmp, hitBlock, nextBlock);
-
-                        // Hit block: jump to actual target with args
-                        bridge.exports().switchToBlock(hitBlock);
-                        if (target.kind == ControlFrame.Kind.FUNCTION) {
-                            if (argCount > 0) {
-                                bridge.exports().emitReturn(brArgs[0]);
-                            } else {
-                                bridge.exports().emitReturnVoid();
-                            }
-                        } else {
-                            if (argCount == 0) {
-                                bridge.exports().emitJump(brTarget);
-                            } else if (argCount == 1) {
-                                bridge.exports().emitJumpWithArg(brTarget, brArgs[0]);
-                            } else {
-                                for (int a : brArgs) {
-                                    bridge.exports().pushCallArg(a);
-                                }
-                                bridge.exports().emitJumpWithArgs(brTarget);
-                            }
-                        }
-
-                        bridge.exports().switchToBlock(nextBlock);
-                    }
-
-                    // Default: jump to default target
-                    int defTarget = defaultTarget.branchTarget();
-                    if (defaultTarget.kind == ControlFrame.Kind.FUNCTION) {
-                        if (argCount > 0) {
-                            bridge.exports().emitReturn(brArgs[0]);
-                        } else {
-                            bridge.exports().emitReturnVoid();
-                        }
-                    } else {
-                        if (argCount == 0) {
-                            bridge.exports().emitJump(defTarget);
-                        } else if (argCount == 1) {
-                            bridge.exports().emitJumpWithArg(defTarget, brArgs[0]);
-                        } else {
-                            for (int a : brArgs) {
-                                bridge.exports().pushCallArg(a);
-                            }
-                            bridge.exports().emitJumpWithArgs(defTarget);
-                        }
-                    }
-
-                    controlStack.peek().unreachable = true;
-                    break;
-                }
-
-            // --- Function calls ---
+            // --- Calls ---
             case CALL:
-                {
-                    int targetFuncId = (int) ins.operands()[0];
-                    FunctionType targetType = resolveCallTargetType(targetFuncId);
-
-                    // Get or create SigRef for the target's calling convention
-                    int sigRef = getOrCreateSigRef(targetType, sigRefCache);
-
-                    // Pop Wasm args from value stack (reverse order)
-                    int argCount = targetType.params().size();
-                    int[] argVals = new int[argCount];
-                    for (int i = argCount - 1; i >= 0; i--) {
-                        argVals[i] = valueStack.pop();
-                    }
-
-                    // Write args to args buffer for imports (they read from buffer)
-                    int zero = bridge.exports().emitIconst32(0);
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    bridge.exports().emitIconst32(argCount),
-                                    CtxBuffer.ARG_COUNT);
-                    int argsPtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.ARGS_PTR);
-                    for (int i = 0; i < argCount; i++) {
-                        int widened = widenToI64(argVals[i], targetType.params().get(i));
-                        bridge.exports()
-                                .emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
-                    }
-
-                    // Load function pointer from funcTable[funcId]
-                    int funcTablePtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.FUNC_TABLE_PTR);
-                    int funcIdOffset =
-                            bridge.exports().emitIconst32(targetFuncId * 8); // byte offset
-                    int funcPtr = bridge.exports().emitLoadI64(funcTablePtr, funcIdOffset, 0);
-
-                    // Push call args: memBase, ctxPtr, then wasm args
-                    bridge.exports().pushCallArg(bridge.exports().useVar(memBaseVar));
-                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
-                    for (int i = 0; i < argCount; i++) {
-                        bridge.exports().pushCallArg(argVals[i]);
-                    }
-
-                    // Emit call_indirect
-                    int rawResult = bridge.exports().emitCallIndirect(sigRef, funcPtr);
-
-                    // Push result if function returns a value
-                    if (!targetType.returns().isEmpty()) {
-                        valueStack.push(rawResult);
-                    }
-                    break;
-                }
-
+                NativeEmitters.emitCall(ctx, ins);
+                break;
             case CALL_INDIRECT:
-                {
-                    int typeId = (int) ins.operands()[0];
-                    int tableIdx = (int) ins.operands()[1];
-                    FunctionType targetType = (FunctionType) module.typeSection().getType(typeId);
+                NativeEmitters.emitCallIndirect(ctx, ins);
+                break;
 
-                    // Pop table element index from Wasm stack
-                    int tableElemIdx = valueStack.pop();
-
-                    // Pop Wasm args
-                    int argCount = targetType.params().size();
-                    int[] argVals = new int[argCount];
-                    for (int i = argCount - 1; i >= 0; i--) {
-                        argVals[i] = valueStack.pop();
-                    }
-
-                    int zero = bridge.exports().emitIconst32(0);
-
-                    // Write CALL_INDIRECT metadata to ctxBuffer
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    bridge.exports().emitIconst32(typeId),
-                                    CtxBuffer.TYPE_ID);
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    bridge.exports().emitIconst32(tableIdx),
-                                    CtxBuffer.TABLE_IDX);
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    tableElemIdx,
-                                    CtxBuffer.ELEM_IDX);
-                    bridge.exports()
-                            .emitStoreI32(
-                                    bridge.exports().useVar(ctxPtr),
-                                    zero,
-                                    bridge.exports().emitIconst32(argCount),
-                                    CtxBuffer.ARG_COUNT);
-
-                    // Write args to args buffer (widened to i64)
-                    int argsPtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.ARGS_PTR);
-                    for (int i = 0; i < argCount; i++) {
-                        int widened = widenToI64(argVals[i], targetType.params().get(i));
-                        bridge.exports()
-                                .emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
-                    }
-
-                    // Load trampoline ptr from ctxBuffer
-                    int trampolinePtr =
-                            bridge.exports()
-                                    .emitLoadI64(
-                                            bridge.exports().useVar(ctxPtr),
-                                            zero,
-                                            CtxBuffer.TRAMPOLINE_PTR);
-
-                    // Create SigRef for trampoline: (i64) -> i64
-                    int trampolineSig = getOrCreateTrampolineSigRef(sigRefCache);
-
-                    // Call trampoline with ctxPtr
-                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
-                    int rawResult = bridge.exports().emitCallIndirect(trampolineSig, trampolinePtr);
-
-                    // Narrow result and push
-                    if (!targetType.returns().isEmpty()) {
-                        int narrowed = narrowFromI64(rawResult, targetType.returns().get(0));
-                        valueStack.push(narrowed);
-                    }
-                    break;
-                }
+            // --- Control flow (stays in orchestrator) ---
+            case BLOCK:
+                emitBlock(ctx, ins, controlStack);
+                break;
+            case LOOP:
+                emitLoop(ctx, ins, controlStack);
+                break;
+            case IF:
+                emitIf(ctx, ins, controlStack);
+                break;
+            case ELSE:
+                emitElse(ctx, controlStack);
+                break;
+            // END is handled in the main loop, not here
+            case BR:
+                emitBr(ctx, ins, controlStack);
+                break;
+            case BR_IF:
+                emitBrIf(ctx, ins, controlStack);
+                break;
+            case BR_TABLE:
+                emitBrTable(ctx, ins, controlStack);
+                break;
+            case RETURN:
+                emitReturn(ctx, controlStack);
+                break;
 
             default:
                 throw new UnsupportedOperationException(
-                        "Opcode not yet supported by native compiler: " + ins.opcode());
+                        "Opcode not yet supported: " + ins.opcode());
         }
     }
 
-    // --- Call helpers ---
+    // --- Control flow handlers ---
 
-    private FunctionType resolveCallTargetType(int funcId) {
-        if (funcId < numImports) {
-            int idx = 0;
-            for (var imp : module.importSection().stream().toList()) {
-                if (imp.importType() == ExternalType.FUNCTION) {
-                    if (idx == funcId) {
-                        int typeIdx = ((FunctionImport) imp).typeIndex();
-                        return (FunctionType) module.typeSection().getType(typeIdx);
+    private void emitBlock(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        FunctionType bt = decodeBlockType(ins);
+        int mergeBlock = bridge.exports().createBlock();
+        int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
+        int savedHeight = ctx.valueStack.size() - bt.params().size();
+        controlStack.push(
+                new ControlFrame(
+                        ControlFrame.Kind.BLOCK,
+                        mergeBlock,
+                        -1,
+                        -1,
+                        mergeParamIds,
+                        bt,
+                        savedHeight));
+        ctx.valueStack.enterScope(bt.params().size(), mergeParamIds);
+    }
+
+    private void emitLoop(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        FunctionType bt = decodeBlockType(ins);
+        int loopHeader = bridge.exports().createBlock();
+        int mergeBlock = bridge.exports().createBlock();
+        int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
+        int[] loopParamIds = appendBlockParams(loopHeader, bt.params());
+        int savedHeight = ctx.valueStack.size() - bt.params().size();
+        emitJumpToBlock(loopHeader, bt.params().size(), ctx.valueStack);
+        bridge.exports().switchToBlock(loopHeader);
+        for (int pid : loopParamIds) {
+            ctx.valueStack.push(pid);
+        }
+        controlStack.push(
+                new ControlFrame(
+                        ControlFrame.Kind.LOOP,
+                        mergeBlock,
+                        loopHeader,
+                        -1,
+                        mergeParamIds,
+                        bt,
+                        savedHeight));
+        ctx.valueStack.enterScope(bt.params().size(), mergeParamIds);
+    }
+
+    private void emitIf(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        FunctionType bt = decodeBlockType(ins);
+        int condition = ctx.valueStack.pop();
+        int thenBlock = bridge.exports().createBlock();
+        int elseBlock = bridge.exports().createBlock();
+        int mergeBlock = bridge.exports().createBlock();
+        int[] mergeParamIds = appendBlockParams(mergeBlock, bt.returns());
+        int savedHeight = ctx.valueStack.size() - bt.params().size();
+        bridge.exports().emitBrif(condition, thenBlock, elseBlock);
+        bridge.exports().switchToBlock(thenBlock);
+        controlStack.push(
+                new ControlFrame(
+                        ControlFrame.Kind.IF,
+                        mergeBlock,
+                        -1,
+                        elseBlock,
+                        mergeParamIds,
+                        bt,
+                        savedHeight));
+        ctx.valueStack.enterScope(bt.params().size(), mergeParamIds);
+    }
+
+    private void emitElse(EmitContext ctx, Deque<ControlFrame> controlStack) {
+        ControlFrame frame = controlStack.peek();
+        if (frame.mergeBlock < 0) {
+            frame.hasElse = true;
+            return;
+        }
+        if (!frame.unreachable) {
+            emitJumpToBlock(frame.mergeBlock, frame.blockType.returns().size(), ctx.valueStack);
+        }
+        ctx.valueStack.trimTo(frame.stackHeight);
+        bridge.exports().switchToBlock(frame.elseBlock);
+        frame.hasElse = true;
+        frame.unreachable = false;
+    }
+
+    /**
+     * Unified END handler. The {@code scopeRestore} flag (from analyzer) indicates
+     * the block body ended with unreachable code and the value stack needs
+     * polymorphic restore.
+     */
+    private void emitEnd(EmitContext ctx, Deque<ControlFrame> controlStack, boolean scopeRestore) {
+        ControlFrame frame = controlStack.pop();
+        var valueStack = ctx.valueStack;
+        boolean isDummy = frame.mergeBlock < 0 && frame.kind != ControlFrame.Kind.FUNCTION;
+        // The block is unreachable if the analyzer flagged scopeRestore OR
+        // the frame was marked unreachable by BR/RETURN/etc.
+        boolean dead = scopeRestore || frame.unreachable;
+
+        switch (frame.kind) {
+            case FUNCTION:
+                if (!dead) {
+                    emitFuncReturn(ctx, frame.blockType);
+                }
+                // If dead, the block is already terminated (by BR/RETURN at
+                // function level). No return needed — inner block ENDs switch
+                // to merge blocks and reset unreachable, so they go through
+                // the !dead path above.
+                valueStack.exitScope();
+                break;
+
+            case BLOCK:
+            case LOOP:
+                if (isDummy) break;
+                if (!dead) {
+                    emitJumpToBlock(frame.mergeBlock, frame.blockType.returns().size(), valueStack);
+                } else if (frame.mergeParamIds.length > 0) {
+                    emitDeadPredecessor(frame.mergeBlock, frame.blockType.returns());
+                }
+                bridge.exports().switchToBlock(frame.mergeBlock);
+                // Always use trimTo + push: merge block params are the canonical
+                // values regardless of whether the block was reachable.
+                valueStack.trimTo(frame.stackHeight);
+                for (int pid : frame.mergeParamIds) {
+                    valueStack.push(pid);
+                }
+                valueStack.exitScope();
+                break;
+
+            case IF:
+                if (isDummy) break;
+                if (!frame.hasElse) {
+                    if (!dead) {
+                        emitJumpToBlock(
+                                frame.mergeBlock, frame.blockType.returns().size(), valueStack);
                     }
-                    idx++;
+                    bridge.exports().switchToBlock(frame.elseBlock);
+                    bridge.exports().emitJump(frame.mergeBlock);
+                } else {
+                    if (!dead) {
+                        emitJumpToBlock(
+                                frame.mergeBlock, frame.blockType.returns().size(), valueStack);
+                    } else if (frame.mergeParamIds.length > 0) {
+                        emitDeadPredecessor(frame.mergeBlock, frame.blockType.returns());
+                    }
+                }
+                bridge.exports().switchToBlock(frame.mergeBlock);
+                valueStack.trimTo(frame.stackHeight);
+                for (int pid : frame.mergeParamIds) {
+                    valueStack.push(pid);
+                }
+                valueStack.exitScope();
+                break;
+        }
+        if (!controlStack.isEmpty() && !isDummy) {
+            controlStack.peek().unreachable = false;
+        }
+    }
+
+    private void emitFuncReturn(EmitContext ctx, FunctionType funcType) {
+        int retCount = funcType.returns().size();
+        var valueStack = ctx.valueStack;
+        if (retCount == 0) {
+            bridge.exports().emitReturnVoid();
+        } else if (retCount == 1 && !valueStack.isEmpty()) {
+            bridge.exports().emitReturn(valueStack.pop());
+        } else if (retCount > 1 && valueStack.size() >= retCount) {
+            int[] retVals = new int[retCount];
+            for (int ri = retCount - 1; ri >= 0; ri--) {
+                retVals[ri] = valueStack.pop();
+            }
+            for (int rv : retVals) {
+                bridge.exports().pushCallArg(rv);
+            }
+            bridge.exports().emitReturnMulti();
+        } else {
+            ctx.emitReturnForFuncType();
+        }
+    }
+
+    private void emitBr(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        int depth = (int) ins.operands()[0];
+        ControlFrame target = getControlFrame(controlStack, depth);
+        if (target.kind == ControlFrame.Kind.FUNCTION) {
+            int retCount = target.blockType.returns().size();
+            if (retCount > 0) {
+                bridge.exports().emitReturn(ctx.valueStack.pop());
+            } else {
+                bridge.exports().emitReturnVoid();
+            }
+        } else {
+            int brTarget = target.branchTarget();
+            int argCount = target.branchArgCount();
+            emitJumpToBlock(brTarget, argCount, ctx.valueStack);
+        }
+        controlStack.peek().unreachable = true;
+    }
+
+    private void emitBrIf(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        int depth = (int) ins.operands()[0];
+        int condition = ctx.valueStack.pop();
+        ControlFrame target = getControlFrame(controlStack, depth);
+        int brTarget = target.branchTarget();
+        int fallthroughBlock = bridge.exports().createBlock();
+        int argCount = target.branchArgCount();
+
+        if (argCount > 0) {
+            int[] args = new int[argCount];
+            for (int i = argCount - 1; i >= 0; i--) {
+                args[i] = ctx.valueStack.pop();
+            }
+            for (int a : args) {
+                bridge.exports().pushCallArg(a);
+            }
+            bridge.exports().emitBrifWithJumpArgs(condition, brTarget, fallthroughBlock);
+            for (int a : args) {
+                ctx.valueStack.push(a);
+            }
+        } else {
+            bridge.exports().emitBrif(condition, brTarget, fallthroughBlock);
+        }
+        bridge.exports().switchToBlock(fallthroughBlock);
+    }
+
+    private void emitBrTable(
+            EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
+        int index = ctx.valueStack.pop();
+        int defaultIdx = ins.operandCount() - 1;
+        int defaultDepth = (int) ins.operand(defaultIdx);
+
+        ControlFrame defaultTarget = getControlFrame(controlStack, defaultDepth);
+        int argCount = defaultTarget.branchArgCount();
+        int[] brArgs = new int[argCount];
+        for (int i = argCount - 1; i >= 0; i--) {
+            brArgs[i] = ctx.valueStack.pop();
+        }
+
+        for (int i = 0; i < defaultIdx; i++) {
+            int depth = (int) ins.operand(i);
+            ControlFrame target = getControlFrame(controlStack, depth);
+            int brTarget = target.branchTarget();
+
+            int cmpVal = bridge.exports().emitIconst32(i);
+            int cmp = bridge.exports().emitIcmp(0, index, cmpVal);
+
+            int hitBlock = bridge.exports().createBlock();
+            int nextBlock = bridge.exports().createBlock();
+            bridge.exports().emitBrif(cmp, hitBlock, nextBlock);
+
+            bridge.exports().switchToBlock(hitBlock);
+            if (target.kind == ControlFrame.Kind.FUNCTION) {
+                if (argCount > 0) {
+                    bridge.exports().emitReturn(brArgs[0]);
+                } else {
+                    bridge.exports().emitReturnVoid();
+                }
+            } else {
+                if (argCount == 0) {
+                    bridge.exports().emitJump(brTarget);
+                } else if (argCount == 1) {
+                    bridge.exports().emitJumpWithArg(brTarget, brArgs[0]);
+                } else {
+                    for (int a : brArgs) {
+                        bridge.exports().pushCallArg(a);
+                    }
+                    bridge.exports().emitJumpWithArgs(brTarget);
                 }
             }
-            throw new IllegalArgumentException("Import function not found: " + funcId);
-        }
-        int bodyIdx = funcId - numImports;
-        int typeIdx = module.functionSection().getFunctionType(bodyIdx);
-        return (FunctionType) module.typeSection().getType(typeIdx);
-    }
 
-    /**
-     * Get or create a SigRef matching the native calling convention for a function type:
-     * (memBase: i64, ctxPtr: i64, wasm_params...) -> wasm_return
-     */
-    private int getOrCreateSigRef(FunctionType funcType, Map<String, Integer> cache) {
-        String key = funcType.toString();
-        Integer cached = cache.get(key);
-        if (cached != null) {
-            return cached;
+            bridge.exports().switchToBlock(nextBlock);
         }
 
-        bridge.exports().beginSig();
-        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // memBase
-        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // ctxPtr
-        for (ValType param : funcType.params()) {
-            bridge.exports().sigAddParam(valTypeToBridgeType(param));
-        }
-        for (ValType ret : funcType.returns()) {
-            bridge.exports().sigAddReturn(valTypeToBridgeType(ret));
-        }
-        int sigRef = bridge.exports().endSig();
-        cache.put(key, sigRef);
-        return sigRef;
-    }
-
-    /**
-     * Get or create a SigRef for the CALL_INDIRECT trampoline: (i64) -> i64
-     */
-    private int getOrCreateTrampolineSigRef(Map<String, Integer> cache) {
-        String key = "__trampoline__";
-        Integer cached = cache.get(key);
-        if (cached != null) {
-            return cached;
-        }
-
-        bridge.exports().beginSig();
-        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64);
-        bridge.exports().sigAddReturn(CraneliftBridge.TYPE_I64);
-        int sigRef = bridge.exports().endSig();
-        cache.put(key, sigRef);
-        return sigRef;
-    }
-
-    private int widenToI64(int valId, ValType type) {
-        if (type.equals(ValType.I32)) {
-            return bridge.exports().emitUextendI64(valId);
-        }
-        // I64 is already 64-bit
-        return valId;
-    }
-
-    private int narrowFromI64(int valId, ValType type) {
-        if (type.equals(ValType.I32)) {
-            return bridge.exports().emitIreduceI32(valId);
-        }
-        return valId;
-    }
-
-    private int widenToI64ForType(int valId, ValType type) {
-        if (type.equals(ValType.I32)) {
-            return bridge.exports().emitUextendI64(valId);
-        }
-        if (type.equals(ValType.F32)) {
-            int bits = bridge.exports().emitBitcastF32ToI32(valId);
-            return bridge.exports().emitUextendI64(bits);
-        }
-        if (type.equals(ValType.F64)) {
-            return bridge.exports().emitBitcastF64ToI64(valId);
-        }
-        return valId; // I64
-    }
-
-    private int narrowFromI64ForType(int valId, ValType type) {
-        if (type.equals(ValType.I32)) {
-            return bridge.exports().emitIreduceI32(valId);
-        }
-        if (type.equals(ValType.F32)) {
-            int narrow = bridge.exports().emitIreduceI32(valId);
-            return bridge.exports().emitBitcastI32ToF32(narrow);
-        }
-        if (type.equals(ValType.F64)) {
-            return bridge.exports().emitBitcastI64ToF64(valId);
-        }
-        return valId; // I64
-    }
-
-    private ValType resolveGlobalType(int globalIdx) {
-        // Check imported globals first
-        int importGlobalIdx = 0;
-        for (var imp : module.importSection().stream().toList()) {
-            if (imp.importType() == ExternalType.GLOBAL) {
-                if (importGlobalIdx == globalIdx) {
-                    return ((com.dylibso.chicory.wasm.types.GlobalImport) imp).type();
+        // Default
+        int defTarget = defaultTarget.branchTarget();
+        if (defaultTarget.kind == ControlFrame.Kind.FUNCTION) {
+            if (argCount > 0) {
+                bridge.exports().emitReturn(brArgs[0]);
+            } else {
+                bridge.exports().emitReturnVoid();
+            }
+        } else {
+            if (argCount == 0) {
+                bridge.exports().emitJump(defTarget);
+            } else if (argCount == 1) {
+                bridge.exports().emitJumpWithArg(defTarget, brArgs[0]);
+            } else {
+                for (int a : brArgs) {
+                    bridge.exports().pushCallArg(a);
                 }
-                importGlobalIdx++;
+                bridge.exports().emitJumpWithArgs(defTarget);
             }
         }
-        // Module-defined global
-        int moduleGlobalIdx = globalIdx - importGlobalIdx;
-        return module.globalSection().getGlobal(moduleGlobalIdx).valueType();
+
+        controlStack.peek().unreachable = true;
     }
 
-    private static int valTypeToBridgeType(ValType type) {
-        if (type.equals(ValType.I32)) return CraneliftBridge.TYPE_I32;
-        if (type.equals(ValType.I64)) return CraneliftBridge.TYPE_I64;
-        if (type.equals(ValType.F32)) return CraneliftBridge.TYPE_F32;
-        if (type.equals(ValType.F64)) return CraneliftBridge.TYPE_F64;
-        // Reference types (funcref, externref) are opaque i64 values
-        int op = type.opcode();
-        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) return CraneliftBridge.TYPE_I64;
-        throw new UnsupportedOperationException("Unsupported ValType for native: " + type);
+    private void emitReturn(EmitContext ctx, Deque<ControlFrame> controlStack) {
+        ControlFrame funcFrame = null;
+        for (ControlFrame f : controlStack) {
+            funcFrame = f;
+        }
+        if (funcFrame != null && !funcFrame.blockType.returns().isEmpty()) {
+            bridge.exports().emitReturn(ctx.valueStack.pop());
+        } else {
+            bridge.exports().emitReturnVoid();
+        }
+        controlStack.peek().unreachable = true;
     }
 }

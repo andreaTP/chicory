@@ -54,7 +54,13 @@ cranelift-compiler/                     Native compiler + spec tests
     ├── main/java/.../compiler/
     │   ├── MachineFactoryNative.java   Public API (mirrors MachineFactoryCompiler)
     │   ├── NativeMachine.java          Machine impl with Panama downcalls
-    │   ├── NativeCompiler.java         Walks opcodes, calls bridge
+    │   ├── NativeCompiler.java         Thin orchestrator (analyzer → emitters)
+    │   ├── NativeAnalyzer.java         Pre-pass: reachability via exitBlockDepth
+    │   ├── NativeValueStack.java       Scope-aware Cranelift value ID stack
+    │   ├── NativeEmitters.java         Static opcode emission methods
+    │   ├── EmitContext.java            Shared state for emitters
+    │   ├── CtxBuffer.java              ctxBuffer layout constants
+    │   ├── NativeMemory.java           Off-heap memory via Panama
     │   └── PanamaExecutor.java         mmap/mprotect helpers
     └── test/java/.../testing/
         ├── TestModule.java             Injects MachineFactoryNative::compile
@@ -100,7 +106,7 @@ cranelift-compiler/                     Native compiler + spec tests
 20. **i32/i64 wrap/extend** — I32_WRAP_I64, I64_EXTEND_I32_S/U, I64_EXTEND_{8,16,32}_S
 21. **Memory load/store variants** — i64, f32, f64 full-width; i32/i64 sub-word
     (load8/16 signed/unsigned, store8/16; i64 load32 signed/unsigned, store32)
-22. **25 spec test files, 14023 tests** — 13776 pass, 247 skipped, 0 failures
+22. **25 spec test files, ~14000 tests** — 13976 pass, 47 skipped, 0 failures
 23. **Full i32/i64/f32/f64 arithmetic/comparison/conversion opcodes** — all ~120 opcodes
 24. **Multi-value blocks** — ControlFrame uses FunctionType, block type indices resolved
 25. **BR_TABLE** — implemented as if-else chain (Cranelift JumpTable API issues)
@@ -116,7 +122,7 @@ cranelift-compiler/                     Native compiler + spec tests
 
 - **NativeMemory shortcomings** — leaks, no bounds checking (SIGSEGV on OOB)
 - **Float trunc overflow check** — only NaN check implemented, not range check
-- **ctxBuffer scalability** — RESOLVED (see P0 section)
+- **Two-pass compiler refactoring** — in progress (see Refactor plan below)
 
 ### Current opcode support
 
@@ -229,31 +235,15 @@ call_indirect type mismatch, validation errors, etc.)
 - [Oracle Signal Chaining docs](https://docs.oracle.com/javase/8/docs/technotes/guides/vm/signal-chaining.html)
 - [Cranelift issue #5908 — trapping arithmetic optimization](https://github.com/bytecodealliance/wasmtime/issues/5908)
 
-## Next steps (pick up here next session)
+## Next steps
 
-### P0: ctxBuffer scalability issues — RESOLVED
+### P0 (in progress): two-pass compiler refactoring
 
-All three ctxBuffer scalability issues have been fixed:
-
-1. **Re-entrancy safety** — Verified safe by design. All Java-side readers
-   (`callIndirectTrampoline`, `importDispatchDirect`) copy ctxBuffer/argsBuffer
-   values into Java locals before dispatching. Re-entrant calls overwrite the
-   buffers, but outer readers have already captured what they need. Native-to-native
-   calls pass args via CPU registers; ctxBuffer writes are only for import stubs.
-   Full analysis documented in `CtxBuffer.java` javadoc.
-
-2. **Args moved to separate buffer** — Args are now in a dedicated `argsBuffer`
-   MemorySegment (1024 × 8 bytes = 8KB), pointed to by `ctxBuffer[ARGS_PTR]`.
-   No more hard cap of 20 args. Native code loads argsPtr from ctxBuffer, then
-   reads/writes args at `argsPtr + i*8`.
-
-3. **ARG_COUNT no longer overloaded** — Dedicated `MEM_GROW_DELTA` field at
-   offset 36 for `memory.grow` page delta. `ARG_COUNT` at offset 32 is now
-   exclusively for call argument count.
+Restructure `NativeCompiler` into analyzer + emitters (see Refactor plan below).
+This fixes the remaining 45 verifier failures from polymorphic stack handling.
 
 ### P1: increase test coverage
 
-- Remove all excludedTests, re-run, re-exclude only genuine failures
 - Full float trunc range check (currently NaN-only, not overflow)
 - Enable more wast files: conversions, call, call_indirect, load, store, etc.
 - Memory bounds checking (currently no bounds checks = SIGSEGV on OOB)
@@ -318,64 +308,105 @@ the value stack at END, but doesn't propagate unreachability to the parent
 frame. Code after a fully-dead block continues to emit IR in a zombie merge
 block with stale values.
 
-### Architecture (follow `compiler/` pattern)
+### Architecture: two-pass compilation (follow `compiler/` pattern)
 
 ```
-compiler/                           cranelift-compiler/ (proposed)
-=========                           ====================
+compiler/ module                    cranelift-compiler/ (new)
+===============                     ====================
 
-WasmAnalyzer                        NativeAnalyzer (new)
-  - walks instructions                - pre-pass: annotates each instruction
-  - tracks exitBlockDepth              with reachability info
-  - manages TypeStack                 - resolves block types
-  - produces CompilerInstruction[]    - marks merge blocks as dead/live
-                                      - computes restored stack per scope
+WasmAnalyzer                        NativeAnalyzer
+  - walks instructions                - pre-pass over AnnotatedInstruction[]
+  - tracks exitBlockDepth             - tracks exitBlockDepth via ins.depth()
+  - manages TypeStack                 - produces boolean[] skip, boolean[] scopeRestore
+  - produces CompilerInstruction[]    - NO type stack needed (just depth comparison)
 
-TypeStack                           (reuse or adapt TypeStack)
-  - enterScope / exitScope            - scopeRestore at END
-  - pushTypes / popTypes              - polymorphic pop (BOT type)
-  - scopeRestore for unreachable
+TypeStack                           NativeValueStack
+  - tracks ValTypes                   - tracks Cranelift value IDs (int)
+  - enterScope / scopeRestore         - enterScope(paramCount, mergeParamIds)
+  - polymorphic pop                   - scopeRestore() at END when analyzer says so
+  - lives in analyzer                 - lives in emission pass (needs bridge IDs)
 
-Emitters (static methods)           NativeEmitters (new, or inline)
-  - one method per opcode             - one method per opcode
-  - no control flow logic             - calls bridge.exports().emitXxx()
-  - takes stack values as args        - takes Cranelift value IDs as args
+Emitters (static methods)           NativeEmitters (static methods)
+  - one method per opcode             - grouped by category (arithmetic, memory, etc.)
+  - no control flow logic             - takes EmitContext, calls bridge.emitXxx()
+  - takes JVM MethodVisitor           - pops/pushes NativeValueStack
 
-AotCompiler (orchestrator)          NativeCompiler (simplified)
-  - loops over CompilerInstruction[]  - loops over instructions
-  - switches on opcode                - switches on opcode
-  - calls Emitters                    - calls NativeEmitters
-  - trusts WasmAnalyzer for CF        - trusts NativeAnalyzer for CF
+AotCompiler (orchestrator)          NativeCompiler (thin orchestrator)
+  - loops over CompilerInstruction[]  - runs NativeAnalyzer, gets annotations
+  - switches on opcode                - loops over instructions + annotations
+  - calls Emitters                    - control flow: manages ControlFrame + blocks
+  - trusts WasmAnalyzer for CF        - opcodes: delegates to NativeEmitters
 ```
+
+### Key design decisions
+
+1. **Analyzer produces parallel arrays, not a new instruction stream.**
+   Unlike WasmAnalyzer which produces `CompilerInstruction[]` (a transformed
+   stream with DROP_KEEP, GOTO, LABEL), NativeAnalyzer produces `boolean[]`
+   arrays parallel to the original `AnnotatedInstruction[]` list. This is
+   simpler because Cranelift handles its own block/jump semantics — we don't
+   need to translate to GOTO/LABEL.
+
+2. **Type stack lives in analyzer, value stack lives in emitter.**
+   The analyzer only needs `exitBlockDepth` + `ins.depth()` to decide
+   reachability — no type stack required. The NativeValueStack tracks
+   Cranelift value IDs and is populated during emission when bridge calls
+   produce value IDs. `enterScope()` is called during emission (needs
+   merge block param IDs from bridge), `scopeRestore()` is triggered by
+   analyzer annotations.
+
+3. **EmitContext bundles shared state for emitters.**
+   Instead of passing 8+ parameters, emitters receive an `EmitContext`
+   holding: bridge, valueStack, memBaseVar, ctxPtrVar, localVars,
+   funcType, module, numImports, sigRefCache.
+
+4. **NativeEmitters are pure opcode handlers.**
+   Static methods grouped by category. No control flow logic — they just
+   pop operands from value stack, call bridge, push results. The compiler
+   orchestrator handles BLOCK/LOOP/IF/ELSE/END/BR/BR_IF/BR_TABLE/RETURN.
 
 ### Implementation steps
 
-1. **Extract `NativeValueStack`** — wrapper around `Deque<Integer>` with:
-   - `enterScope(blockType)` — save current stack state for scopeRestore
-   - `scopeRestore()` — at END after unreachable, replace stack with
-     (savedStack - params + mergeParamIds)
-   - `height()`, `trimTo(height)` — existing trimValueStack logic
+1. **`NativeAnalyzer`** — pre-pass that walks `AnnotatedInstruction[]`:
+   - Uses `exitBlockDepth` (same pattern as `WasmAnalyzer`)
+   - `ins.depth() > exitBlockDepth` → mark skip
+   - END at exit depth → mark scopeRestore
+   - ELSE at exit depth → reset exitBlockDepth (not scopeRestore)
+   - BLOCK/LOOP/IF in dead code → increment depth tracking (implicit)
+   - Output: `boolean[] skip`, `boolean[] scopeRestore` per instruction index
 
-2. **Add `mergeReachable` to ControlFrame** — set by br/br_if/br_table when
-   targeting a forward frame, and by live fallthrough at END. Used to decide:
-   - Whether to emit dead predecessor (Cranelift verifier satisfaction)
-   - Whether to propagate unreachable to parent
+2. **`NativeValueStack`** — scope-aware value stack (DONE):
+   - `enterScope(paramCount, mergeParamIds)` — snapshot for restore
+   - `scopeRestore()` — replace stack with snapshot
+   - `exitScope()` — pop restore entry
+   - `push/pop/peek/size/trimTo`
 
-3. **Fix END handler** — when `!mergeReachable`:
-   - Emit dead predecessor with dummy zeros (already done)
-   - Switch to merge block (always — Cranelift needs it)
-   - Call `scopeRestore()` to replace value stack with correct-typed values
-   - Propagate unreachable to parent
-   - FUNCTION END: always emit return (use `emitReturnForFuncType` when
-     unreachable, use value stack when reachable)
+3. **`EmitContext`** — shared state class:
+   - bridge, valueStack, memBaseVar, ctxPtrVar, localVars
+   - funcType, module, numImports, sigRefCache
+   - Helper methods: emitZero, valTypeToBridgeType, resolveGlobalType, etc.
 
-4. **Verify** — remove all 45 excludedTests, run, confirm 0 failures
+4. **`NativeEmitters`** — static methods extracted from emitInstruction:
+   - `emitArithmetic(ctx, opcode)` — i32/i64/f32/f64 add/sub/mul/...
+   - `emitComparison(ctx, opcode)` — icmp/fcmp/eqz
+   - `emitMemory(ctx, ins)` — load/store with all widths
+   - `emitConversion(ctx, opcode)` — trunc/extend/convert/reinterpret
+   - `emitLocal(ctx, ins)` — local.get/set/tee
+   - `emitGlobal(ctx, ins)` — global.get/set
+   - `emitCall(ctx, ins)` — call/call_indirect
+   - `emitMisc(ctx, ins)` — select, drop, nop, memory.size/grow, unreachable
+   - `emitSafeDiv(ctx, ...)` — division with trap pre-checks
+   - `emitSafeTrunc(ctx, ...)` — float-to-int with NaN check
 
-### What NOT to do
+5. **`NativeCompiler`** — rewritten as thin orchestrator:
+   - `compileFunction()`: setup (create function, entry block, locals)
+   - Run `NativeAnalyzer.analyze()` to get skip/scopeRestore arrays
+   - Loop over instructions:
+     - If `skip[i]`: continue (but still track dummy frames for BLOCK/LOOP/IF)
+     - Control flow (BLOCK/LOOP/IF/ELSE/END): manage ControlFrame stack,
+       NativeValueStack scopes, Cranelift blocks. At END, if `scopeRestore[i]`,
+       call `valueStack.scopeRestore()`
+     - BR/BR_IF/BR_TABLE/RETURN: emit branches (stays in compiler)
+     - All other opcodes: delegate to `NativeEmitters`
 
-- Don't add a separate pre-pass yet — the control flow logic can stay inline
-  in `emitInstruction` for now. The key fix is `scopeRestore` + `mergeReachable`
-  + always-emit-return-at-FUNCTION-END.
-- Don't extract NativeEmitters yet — the 1:1 opcode emission is already clean
-  enough inline. Extract when we need to share emission logic across modules.
-- Don't refactor the entire compiler — minimal changes to fix the 45 tests.
+6. **Verify** — remove all 45 excludedTests, run `mvn clean install`, 0 failures
