@@ -955,6 +955,27 @@ pub extern "C" fn emit_jump_with_arg(block_id: u32, val_id: u32) {
     b().ins().jump(block, &[BlockArg::Value(val)]);
 }
 
+/// Jump to block_id, passing accumulated call_args as block arguments.
+/// Clears call_args after use.
+#[no_mangle]
+pub extern "C" fn emit_jump_with_args(block_id: u32) {
+    let block = s().blocks[block_id as usize];
+    let args: Vec<BlockArg> = s().call_args.drain(..).map(|v| BlockArg::Value(v)).collect();
+    b().ins().jump(block, &args);
+}
+
+/// Conditional branch where then_block gets accumulated call_args, else_block gets none.
+/// Clears call_args after use.
+#[no_mangle]
+pub extern "C" fn emit_brif_with_jump_args(cond: u32, then_block: u32, else_block: u32) {
+    let vcond = s().values[cond as usize];
+    let bt = s().blocks[then_block as usize];
+    let be = s().blocks[else_block as usize];
+    let args: Vec<BlockArg> = s().call_args.drain(..).map(|v| BlockArg::Value(v)).collect();
+    let no_args: &[BlockArg] = &[];
+    b().ins().brif(vcond, bt, &args, be, no_args);
+}
+
 #[no_mangle]
 pub extern "C" fn emit_brif(cond: u32, then_block: u32, else_block: u32) {
     let vcond = s().values[cond as usize];
