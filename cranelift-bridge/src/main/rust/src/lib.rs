@@ -534,6 +534,395 @@ pub extern "C" fn emit_store_i32(base: u32, wasm_addr: u32, value: u32, offset: 
     b().ins().store(MemFlags::new(), vvalue, effective, offset);
 }
 
+// --- Memory: f32 ---
+
+#[no_mangle]
+pub extern "C" fn emit_load_f32(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::F32, MemFlags::new(), effective, offset);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(val);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_store_f32(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    b().ins().store(MemFlags::new(), vvalue, effective, offset);
+}
+
+// --- Memory: f64 ---
+
+#[no_mangle]
+pub extern "C" fn emit_load_f64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::F64, MemFlags::new(), effective, offset);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(val);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_store_f64(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    b().ins().store(MemFlags::new(), vvalue, effective, offset);
+}
+
+// --- Memory: sub-word i32 loads ---
+
+/// Load u8 and zero-extend to i32
+#[no_mangle]
+pub extern "C" fn emit_load_8u(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I8, MemFlags::new(), effective, offset);
+    let r = b().ins().uextend(types::I32, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load i8 and sign-extend to i32
+#[no_mangle]
+pub extern "C" fn emit_load_8s(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I8, MemFlags::new(), effective, offset);
+    let r = b().ins().sextend(types::I32, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load u16 and zero-extend to i32
+#[no_mangle]
+pub extern "C" fn emit_load_16u(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I16, MemFlags::new(), effective, offset);
+    let r = b().ins().uextend(types::I32, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load i16 and sign-extend to i32
+#[no_mangle]
+pub extern "C" fn emit_load_16s(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I16, MemFlags::new(), effective, offset);
+    let r = b().ins().sextend(types::I32, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Store low 8 bits of i32
+#[no_mangle]
+pub extern "C" fn emit_store_8(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let truncated = b().ins().ireduce(types::I8, vvalue);
+    b().ins().store(MemFlags::new(), truncated, effective, offset);
+}
+
+/// Store low 16 bits of i32
+#[no_mangle]
+pub extern "C" fn emit_store_16(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let truncated = b().ins().ireduce(types::I16, vvalue);
+    b().ins().store(MemFlags::new(), truncated, effective, offset);
+}
+
+// --- Memory: i64 sub-word loads ---
+
+/// Load u8 and zero-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_8u_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I8, MemFlags::new(), effective, offset);
+    let r = b().ins().uextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load i8 and sign-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_8s_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I8, MemFlags::new(), effective, offset);
+    let r = b().ins().sextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load u16 and zero-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_16u_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I16, MemFlags::new(), effective, offset);
+    let r = b().ins().uextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load i16 and sign-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_16s_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I16, MemFlags::new(), effective, offset);
+    let r = b().ins().sextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load u32 and zero-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_32u_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I32, MemFlags::new(), effective, offset);
+    let r = b().ins().uextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Load i32 and sign-extend to i64
+#[no_mangle]
+pub extern "C" fn emit_load_32s_i64(base: u32, wasm_addr: u32, offset: i32) -> u32 {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let val = b().ins().load(types::I32, MemFlags::new(), effective, offset);
+    let r = b().ins().sextend(types::I64, val);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Store low 8 bits of i64
+#[no_mangle]
+pub extern "C" fn emit_store_8_i64(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let truncated = b().ins().ireduce(types::I8, vvalue);
+    b().ins().store(MemFlags::new(), truncated, effective, offset);
+}
+
+/// Store low 16 bits of i64
+#[no_mangle]
+pub extern "C" fn emit_store_16_i64(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let truncated = b().ins().ireduce(types::I16, vvalue);
+    b().ins().store(MemFlags::new(), truncated, effective, offset);
+}
+
+/// Store low 32 bits of i64
+#[no_mangle]
+pub extern "C" fn emit_store_32_i64(base: u32, wasm_addr: u32, value: u32, offset: i32) {
+    let vbase = s().values[base as usize];
+    let vaddr = s().values[wasm_addr as usize];
+    let vvalue = s().values[value as usize];
+    let extended = b().ins().uextend(types::I64, vaddr);
+    let effective = b().ins().iadd(vbase, extended);
+    let truncated = b().ins().ireduce(types::I32, vvalue);
+    b().ins().store(MemFlags::new(), truncated, effective, offset);
+}
+
+// --- i64 extensions ---
+
+/// Sign-extend i32 to i64
+#[no_mangle]
+pub extern "C" fn emit_sextend_i64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().sextend(types::I64, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Sign-extend i8 to i64
+#[no_mangle]
+pub extern "C" fn emit_sextend_8_64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let truncated = b().ins().ireduce(types::I8, va);
+    let r = b().ins().sextend(types::I64, truncated);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Sign-extend i16 to i64
+#[no_mangle]
+pub extern "C" fn emit_sextend_16_64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let truncated = b().ins().ireduce(types::I16, va);
+    let r = b().ins().sextend(types::I64, truncated);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+/// Sign-extend i32 to i64 (for extend32_s on i64 values)
+#[no_mangle]
+pub extern "C" fn emit_sextend_32_64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let truncated = b().ins().ireduce(types::I32, va);
+    let r = b().ins().sextend(types::I64, truncated);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- i64 comparisons ---
+
+/// i64 eqz: compare with zero, return i32
+#[no_mangle]
+pub extern "C" fn emit_eqz_i64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let zero = b().ins().iconst(types::I64, 0);
+    let cmp = b().ins().icmp(IntCC::Equal, va, zero);
+    let r = b().ins().uextend(types::I32, cmp);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- i32 wrap i64 ---
+
+#[no_mangle]
+pub extern "C" fn emit_i32_wrap_i64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().ireduce(types::I32, va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- Bitcast (for f32/f64 <-> i32/i64) ---
+
+#[no_mangle]
+pub extern "C" fn emit_bitcast_i32_to_f32(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().bitcast(types::F32, MemFlags::new(), va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_bitcast_f32_to_i32(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().bitcast(types::I32, MemFlags::new(), va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_bitcast_i64_to_f64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().bitcast(types::F64, MemFlags::new(), va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn emit_bitcast_f64_to_i64(a: u32) -> u32 {
+    let va = s().values[a as usize];
+    let r = b().ins().bitcast(types::I64, MemFlags::new(), va);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
+}
+
+// --- Trap ---
+
+#[no_mangle]
+pub extern "C" fn emit_trap() {
+    b().ins().trap(cranelift_codegen::ir::TrapCode::user(0).unwrap());
+}
+
 // --- Block parameters ---
 
 /// Append a typed parameter to a block. Returns the block parameter Value ID.
@@ -624,6 +1013,24 @@ pub extern "C" fn emit_store_i64(base: u32, wasm_addr: u32, value: u32, offset: 
     let extended = b().ins().uextend(types::I64, vaddr);
     let effective = b().ins().iadd(vbase, extended);
     b().ins().store(MemFlags::new(), vvalue, effective, offset);
+}
+
+// --- Select ---
+
+/// Wasm select: if cond != 0, return val_true, else val_false.
+/// cond is an i32 (Wasm), convert to boolean for Cranelift's select.
+#[no_mangle]
+pub extern "C" fn emit_select(cond: u32, val_true: u32, val_false: u32) -> u32 {
+    let vcond = s().values[cond as usize];
+    let vt = s().values[val_true as usize];
+    let vf = s().values[val_false as usize];
+    // Convert i32 condition to boolean (i8): cond != 0
+    let bool_cond = b().ins().icmp_imm(IntCC::NotEqual, vcond, 0);
+    let r = b().ins().select(bool_cond, vt, vf);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(r);
+    id
 }
 
 // --- Type widening/narrowing ---

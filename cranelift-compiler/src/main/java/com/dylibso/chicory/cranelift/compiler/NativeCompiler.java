@@ -135,12 +135,16 @@ final class NativeCompiler {
         bridge.exports().switchToBlock(entry);
 
         // Get params as value IDs
-        int memBase = bridge.exports().funcParam(entry, 0);
+        int memBaseParam = bridge.exports().funcParam(entry, 0);
         int ctxPtr = bridge.exports().funcParam(entry, 1);
         int[] paramVals = new int[funcType.params().size()];
         for (int i = 0; i < paramVals.length; i++) {
             paramVals[i] = bridge.exports().funcParam(entry, i + 2);
         }
+
+        // memBase as a variable (can be re-defined after memory.grow)
+        int memBaseVar = bridge.exports().declareVar(CraneliftBridge.TYPE_I64);
+        bridge.exports().defVar(memBaseVar, memBaseParam);
 
         // Cache for SigRef IDs per unique function type (for call_indirect)
         Map<String, Integer> sigRefCache = new HashMap<>();
@@ -181,7 +185,7 @@ final class NativeCompiler {
                     valueStack,
                     controlStack,
                     localVars,
-                    memBase,
+                    memBaseVar,
                     ctxPtr,
                     sigRefCache,
                     funcType);
@@ -239,7 +243,7 @@ final class NativeCompiler {
             Deque<Integer> valueStack,
             Deque<ControlFrame> controlStack,
             int[] localVars,
-            int memBase,
+            int memBaseVar,
             int ctxPtr,
             Map<String, Integer> sigRefCache,
             FunctionType funcType) {
@@ -507,7 +511,8 @@ final class NativeCompiler {
                     int value = valueStack.pop();
                     int addr = valueStack.pop();
                     int offset = (int) ins.operands()[1];
-                    bridge.exports().emitStoreI32(memBase, addr, value, offset);
+                    bridge.exports()
+                            .emitStoreI32(bridge.exports().useVar(memBaseVar), addr, value, offset);
                     break;
                 }
 
@@ -515,7 +520,238 @@ final class NativeCompiler {
                 {
                     int addr = valueStack.pop();
                     int offset = (int) ins.operands()[1];
-                    valueStack.push(bridge.exports().emitLoadI32(memBase, addr, offset));
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoadI32(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_STORE:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStoreI64(bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case I64_LOAD:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoadI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case F32_STORE:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStoreF32(bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case F32_LOAD:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoadF32(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case F64_STORE:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStoreF64(bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case F64_LOAD:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoadF64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            // --- Sub-word memory loads (i32) ---
+            case I32_LOAD8_U:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad8u(bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I32_LOAD8_S:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad8s(bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I32_LOAD16_U:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad16u(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I32_LOAD16_S:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad16s(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            // --- Sub-word memory stores (i32) ---
+            case I32_STORE8:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStore8(bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case I32_STORE16:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStore16(bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            // --- Sub-word memory loads (i64) ---
+            case I64_LOAD8_U:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad8uI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_LOAD8_S:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad8sI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_LOAD16_U:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad16uI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_LOAD16_S:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad16sI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_LOAD32_U:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad32uI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            case I64_LOAD32_S:
+                {
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    valueStack.push(
+                            bridge.exports()
+                                    .emitLoad32sI64(
+                                            bridge.exports().useVar(memBaseVar), addr, offset));
+                    break;
+                }
+
+            // --- Sub-word memory stores (i64) ---
+            case I64_STORE8:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStore8I64(
+                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case I64_STORE16:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStore16I64(
+                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
+                    break;
+                }
+
+            case I64_STORE32:
+                {
+                    int value = valueStack.pop();
+                    int addr = valueStack.pop();
+                    int offset = (int) ins.operands()[1];
+                    bridge.exports()
+                            .emitStore32I64(
+                                    bridge.exports().useVar(memBaseVar), addr, value, offset);
                     break;
                 }
 
@@ -537,6 +773,330 @@ final class NativeCompiler {
                     bridge.exports().defVar(localVars[(int) ins.operands()[0]], val);
                     break;
                 }
+
+            // --- Select ---
+            case SELECT:
+            case SELECT_T:
+                {
+                    int cond = valueStack.pop();
+                    int val2 = valueStack.pop();
+                    int val1 = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSelect(cond, val1, val2));
+                    break;
+                }
+
+            // --- Globals ---
+            case GLOBAL_GET:
+                {
+                    int globalIdx = (int) ins.operands()[0];
+                    // Load globalsPtr from ctxBuffer[200]
+                    int zero = bridge.exports().emitIconst32(0);
+                    int globalsPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 200);
+                    // Load value as i64 from globals buffer
+                    int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
+                    int rawVal = bridge.exports().emitLoadI64(globalsPtr, offsetVal, 0);
+                    // Narrow to the actual global type
+                    ValType globalType = resolveGlobalType(globalIdx);
+                    valueStack.push(narrowFromI64ForType(rawVal, globalType));
+                    break;
+                }
+
+            case GLOBAL_SET:
+                {
+                    int globalIdx = (int) ins.operands()[0];
+                    int value = valueStack.pop();
+                    // Widen to i64 for storage
+                    ValType globalType = resolveGlobalType(globalIdx);
+                    int widened = widenToI64ForType(value, globalType);
+                    // Load globalsPtr from ctxBuffer[200]
+                    int zero = bridge.exports().emitIconst32(0);
+                    int globalsPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 200);
+                    // Store to globals buffer
+                    int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
+                    bridge.exports().emitStoreI64(globalsPtr, offsetVal, widened, 0);
+                    break;
+                }
+
+            // --- Memory operations ---
+            case MEMORY_SIZE:
+                {
+                    // Load current page count from ctxBuffer[216]
+                    int zero = bridge.exports().emitIconst32(0);
+                    int pages = bridge.exports().emitLoadI32(ctxPtr, zero, 216);
+                    valueStack.push(pages);
+                    break;
+                }
+
+            case MEMORY_GROW:
+                {
+                    int delta = valueStack.pop();
+                    int zero = bridge.exports().emitIconst32(0);
+                    // Write grow delta to ctxBuffer[32] as argCount (repurposed)
+                    bridge.exports().emitStoreI32(ctxPtr, zero, delta, 32);
+                    // Load memGrowStub ptr from ctxBuffer[208]
+                    int memGrowPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 208);
+                    // Call memGrowStub(ctxPtr) -> i64 (old page count or -1)
+                    int growSig = getOrCreateTrampolineSigRef(sigRefCache);
+                    bridge.exports().pushCallArg(ctxPtr);
+                    int rawResult = bridge.exports().emitCallIndirect(growSig, memGrowPtr);
+                    // Result is i32 (old page count or -1)
+                    int result = bridge.exports().emitIreduceI32(rawResult);
+                    valueStack.push(result);
+                    // Reload memBase from ctxBuffer[224] (may have changed)
+                    int newMemBase = bridge.exports().emitLoadI64(ctxPtr, zero, 224);
+                    bridge.exports().defVar(memBaseVar, newMemBase);
+                    break;
+                }
+
+            // --- Unreachable ---
+            case UNREACHABLE:
+                bridge.exports().emitTrap();
+                controlStack.peek().unreachable = true;
+                break;
+
+            // --- i64 Arithmetic ---
+            case I64_ADD:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIadd(a, b));
+                    break;
+                }
+
+            case I64_SUB:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIsub(a, b));
+                    break;
+                }
+
+            case I64_MUL:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitImul(a, b));
+                    break;
+                }
+
+            case I64_DIV_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSdiv(a, b));
+                    break;
+                }
+
+            case I64_DIV_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUdiv(a, b));
+                    break;
+                }
+
+            case I64_REM_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSrem(a, b));
+                    break;
+                }
+
+            case I64_REM_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUrem(a, b));
+                    break;
+                }
+
+            case I64_AND:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBand(a, b));
+                    break;
+                }
+
+            case I64_OR:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBor(a, b));
+                    break;
+                }
+
+            case I64_XOR:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitBxor(a, b));
+                    break;
+                }
+
+            case I64_SHL:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIshl(a, b));
+                    break;
+                }
+
+            case I64_SHR_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitSshr(a, b));
+                    break;
+                }
+
+            case I64_SHR_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitUshr(a, b));
+                    break;
+                }
+
+            case I64_ROTL:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitRotl(a, b));
+                    break;
+                }
+
+            case I64_ROTR:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitRotr(a, b));
+                    break;
+                }
+
+            case I64_CLZ:
+                valueStack.push(bridge.exports().emitClz(valueStack.pop()));
+                break;
+
+            case I64_CTZ:
+                valueStack.push(bridge.exports().emitCtz(valueStack.pop()));
+                break;
+
+            case I64_POPCNT:
+                valueStack.push(bridge.exports().emitPopcnt(valueStack.pop()));
+                break;
+
+            // --- i64 Comparisons ---
+            case I64_EQZ:
+                valueStack.push(bridge.exports().emitEqzI64(valueStack.pop()));
+                break;
+
+            case I64_EQ:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(0, a, b));
+                    break;
+                }
+
+            case I64_NE:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(1, a, b));
+                    break;
+                }
+
+            case I64_LT_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(2, a, b));
+                    break;
+                }
+
+            case I64_LT_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(3, a, b));
+                    break;
+                }
+
+            case I64_GT_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(4, a, b));
+                    break;
+                }
+
+            case I64_GT_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(5, a, b));
+                    break;
+                }
+
+            case I64_LE_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(6, a, b));
+                    break;
+                }
+
+            case I64_LE_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(7, a, b));
+                    break;
+                }
+
+            case I64_GE_S:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(8, a, b));
+                    break;
+                }
+
+            case I64_GE_U:
+                {
+                    int b = valueStack.pop();
+                    int a = valueStack.pop();
+                    valueStack.push(bridge.exports().emitIcmp(9, a, b));
+                    break;
+                }
+
+            // --- i64 Extensions ---
+            case I64_EXTEND_I32_S:
+                valueStack.push(bridge.exports().emitSextendI64(valueStack.pop()));
+                break;
+
+            case I64_EXTEND_I32_U:
+                valueStack.push(bridge.exports().emitUextendI64(valueStack.pop()));
+                break;
+
+            case I64_EXTEND_8_S:
+                valueStack.push(bridge.exports().emitSextend864(valueStack.pop()));
+                break;
+
+            case I64_EXTEND_16_S:
+                valueStack.push(bridge.exports().emitSextend1664(valueStack.pop()));
+                break;
+
+            case I64_EXTEND_32_S:
+                valueStack.push(bridge.exports().emitSextend3264(valueStack.pop()));
+                break;
+
+            // --- i32 wrap i64 ---
+            case I32_WRAP_I64:
+                valueStack.push(bridge.exports().emitI32WrapI64(valueStack.pop()));
+                break;
 
             // --- Misc ---
             case NOP:
@@ -816,7 +1376,7 @@ final class NativeCompiler {
                     int funcPtr = bridge.exports().emitLoadI64(funcTablePtr, funcIdOffset, 0);
 
                     // Push call args: memBase, ctxPtr, then wasm args
-                    bridge.exports().pushCallArg(memBase);
+                    bridge.exports().pushCallArg(bridge.exports().useVar(memBaseVar));
                     bridge.exports().pushCallArg(ctxPtr);
                     for (int i = 0; i < argCount; i++) {
                         bridge.exports().pushCallArg(argVals[i]);
@@ -968,6 +1528,50 @@ final class NativeCompiler {
             return bridge.exports().emitIreduceI32(valId);
         }
         return valId;
+    }
+
+    private int widenToI64ForType(int valId, ValType type) {
+        if (type.equals(ValType.I32)) {
+            return bridge.exports().emitUextendI64(valId);
+        }
+        if (type.equals(ValType.F32)) {
+            int bits = bridge.exports().emitBitcastF32ToI32(valId);
+            return bridge.exports().emitUextendI64(bits);
+        }
+        if (type.equals(ValType.F64)) {
+            return bridge.exports().emitBitcastF64ToI64(valId);
+        }
+        return valId; // I64
+    }
+
+    private int narrowFromI64ForType(int valId, ValType type) {
+        if (type.equals(ValType.I32)) {
+            return bridge.exports().emitIreduceI32(valId);
+        }
+        if (type.equals(ValType.F32)) {
+            int narrow = bridge.exports().emitIreduceI32(valId);
+            return bridge.exports().emitBitcastI32ToF32(narrow);
+        }
+        if (type.equals(ValType.F64)) {
+            return bridge.exports().emitBitcastI64ToF64(valId);
+        }
+        return valId; // I64
+    }
+
+    private ValType resolveGlobalType(int globalIdx) {
+        // Check imported globals first
+        int importGlobalIdx = 0;
+        for (var imp : module.importSection().stream().toList()) {
+            if (imp.importType() == ExternalType.GLOBAL) {
+                if (importGlobalIdx == globalIdx) {
+                    return ((com.dylibso.chicory.wasm.types.GlobalImport) imp).type();
+                }
+                importGlobalIdx++;
+            }
+        }
+        // Module-defined global
+        int moduleGlobalIdx = globalIdx - importGlobalIdx;
+        return module.globalSection().getGlobal(moduleGlobalIdx).valueType();
     }
 
     private static int valTypeToBridgeType(ValType type) {

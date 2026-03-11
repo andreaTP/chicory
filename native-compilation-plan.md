@@ -87,17 +87,34 @@ cranelift-compiler/                     Native compiler + spec tests
 12. **CALL (direct)** — native-to-native via function pointer table, import calls via
     Panama upcall stubs with ctxBuffer. CallTest verifies both native and import calls.
 13. **CALL_INDIRECT** — dispatches through Java trampoline (table lookup + type check)
-14. **6 spec test files green** — 1672/1764 tests pass (92 skipped):
+14. **Exception propagation** — pendingException pattern for upcall stubs (trampoline,
+    import dispatch). Exceptions caught before they unwind through native frames.
+15. **SELECT** — Cranelift `select` instruction with i32-to-boolean conversion
+16. **GLOBAL_GET/GLOBAL_SET** — off-heap globals buffer with `NativeGlobalInstance` subclass.
+    Native code reads/writes buffer directly; Java reads via overridden `getValue()/setValue()`.
+    No sync needed — the buffer IS the canonical storage.
+17. **MEMORY_SIZE/MEMORY_GROW** — page count in ctxBuffer, grow via dedicated upcall stub.
+    After grow, memBase variable is reloaded from ctxBuffer (memBase is a Cranelift variable).
+18. **UNREACHABLE** — emits Cranelift trap instruction
+19. **i64 arithmetic** — all i64 math, bitwise, shift, rotate, comparison, extension opcodes
+20. **i32/i64 wrap/extend** — I32_WRAP_I64, I64_EXTEND_I32_S/U, I64_EXTEND_{8,16,32}_S
+21. **Memory load/store variants** — i64, f32, f64 full-width; i32/i64 sub-word
+    (load8/16 signed/unsigned, store8/16; i64 load32 signed/unsigned, store32)
+22. **16 spec test files green** — 2550/2807 tests pass (257 skipped):
     const.wast 778/778, i32.wast 450/460, block.wast 171/223,
-    br.wast 94/97, br_if.wast 91/118, return.wast 84/84
+    br.wast 94/97, br_if.wast 91/118, if.wast 183/241, loop.wast 70/120,
+    return.wast 84/84, global.wast 101/110, select.wast 130/148,
+    local_get.wast 33/36, local_set.wast 51/53, local_tee.wast 90/97,
+    memory_grow.wast 94/104, memory_size.wast 40/42, nop.wast 82/88
 
 ### Not yet done
 
 - **NativeMemory shortcomings** — leaks, no bounds checking (see earlier notes)
 - **Native traps crash the JVM** — ud2 on div-by-zero. See trap handling analysis below.
-- **if.wast/loop.wast crash** — JVM crashes from call_indirect assert_trap tests.
-  Need to investigate and exclude specific crashing tests.
 - **Multi-value blocks** — block type index not yet supported (throws UnsupportedOperationException)
+- **BR_TABLE** — not yet implemented
+- **f32/f64 arithmetic/comparison** — F32_NEG, F64_NEG, F32_GT etc. not yet implemented
+- **RefNull types** — function params with RefNull types unsupported
 
 ### Current opcode support
 
@@ -126,6 +143,30 @@ cranelift-compiler/                     Native compiler + spec tests
 | `return` | Working |
 | `call` | Working (direct native-to-native + import via ctxBuffer) |
 | `call_indirect` | Working (via Java trampoline) |
+| `select/select_t` | Working |
+| `global.get/set` | Working (NativeGlobalInstance + off-heap buffer) |
+| `memory.size` | Working (page count from ctxBuffer) |
+| `memory.grow` | Working (upcall stub + memBase reload) |
+| `unreachable` | Working (Cranelift trap) |
+| `i64.add/sub/mul` | Working |
+| `i64.div_s/div_u` | Working (ud2 trap on div-by-zero) |
+| `i64.rem_s/rem_u` | Working (same trap issue) |
+| `i64.and/or/xor` | Working |
+| `i64.shl/shr_s/shr_u` | Working |
+| `i64.rotl/rotr` | Working |
+| `i64.clz/ctz/popcnt` | Working |
+| `i64.eqz` | Working |
+| `i64.eq/ne/lt_s/lt_u/gt_s/gt_u/le_s/le_u/ge_s/ge_u` | Working |
+| `i64.extend_i32_s/u` | Working |
+| `i64.extend8_s/extend16_s/extend32_s` | Working |
+| `i32.wrap_i64` | Working |
+| `i64.store/load` | Working |
+| `f32.store/load` | Working |
+| `f64.store/load` | Working |
+| `i32.load8_s/u, load16_s/u` | Working |
+| `i32.store8, store16` | Working |
+| `i64.load8_s/u, load16_s/u, load32_s/u` | Working |
+| `i64.store8, store16, store32` | Working |
 
 ### Calling convention (our design)
 
@@ -217,25 +258,21 @@ is implemented in NativeCompiler.
 
 ## Next steps (pick up here next session)
 
-### Immediate: enable if.wast and loop.wast
+### Immediate: more opcodes for wider coverage
 
-- These crash the JVM due to assert_trap tests with call_indirect
-- Need to identify and exclude specific crashing tests
-- Should unlock many more passing tests
+- `br_table` — branch table (switch dispatch), needed by many spec tests
+- f32/f64 arithmetic: `neg`, `abs`, `ceil`, `floor`, `trunc`, `nearest`, `sqrt`,
+  `add`, `sub`, `mul`, `div`, `min`, `max`, `copysign`
+- f32/f64 comparison: `eq`, `ne`, `lt`, `gt`, `le`, `ge`
+- Conversions: `f32.convert_i32_s/u`, `f64.convert_i32_s/u`, etc.
+- Multi-value blocks: block type index decoding
 
-### Then: more opcodes
+### Then: more spec test files
 
-- `br_table` — branch table (switch dispatch)
-- `select` — conditional value selection
-- `unreachable` — explicit trap (mark dead code)
-- `global.get/set` — global variable access
-- `memory.grow/size` — memory operations
-
-### Then: more types
-
-- i64 arithmetic opcodes (same pattern as i32, bridge already has i64 support)
-- f32/f64 arithmetic, comparison, conversion opcodes
-- Memory load/store variants (i64.load, f32.load, etc.)
+- `i64.wast` — i64 arithmetic spec tests (opcodes already implemented)
+- `f32.wast`, `f64.wast`, `f32_cmp.wast`, `f64_cmp.wast` — once f32/f64 ops added
+- `call.wast`, `call_indirect.wast` — function call spec tests
+- `load.wast`, `store.wast` — memory access spec tests
 
 ### Future
 

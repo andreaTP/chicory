@@ -72,10 +72,18 @@
             <wast>br.wast</wast>
             <wast>br_if.wast</wast>
             <wast>const.wast</wast>
+            <wast>global.wast</wast>
             <wast>i32.wast</wast>
             <wast>if.wast</wast>
+            <wast>local_get.wast</wast>
+            <wast>local_set.wast</wast>
+            <wast>local_tee.wast</wast>
             <wast>loop.wast</wast>
+            <wast>memory_grow.wast</wast>
+            <wast>memory_size.wast</wast>
+            <wast>nop.wast</wast>
             <wast>return.wast</wast>
+            <wast>select.wast</wast>
           </includedWasts>
           <!-- assert_trap tests excluded: Cranelift emits ud2 for div-by-zero and
                integer overflow traps, which crashes the JVM (SIGILL). This is UNSAFE
@@ -155,7 +163,33 @@
             SpecV1I32Test.test61,
             SpecV1I32Test.test62,
             SpecV1I32Test.test81,
-            SpecV1I32Test.test82</excludedTests>
+            SpecV1I32Test.test82,
+            SpecV1MemoryGrowTest.test2, SpecV1MemoryGrowTest.test3,
+            SpecV1MemoryGrowTest.test4, SpecV1MemoryGrowTest.test5,
+            SpecV1MemoryGrowTest.test11, SpecV1MemoryGrowTest.test12,
+            SpecV1MemoryGrowTest.test72,
+            SpecV1MemorySizeTest.test40, SpecV1MemorySizeTest.test41,
+            SpecV1GlobalTest.test44,
+            SpecV1SelectTest.test83, SpecV1SelectTest.test84,
+            SpecV1GlobalTest.test3, SpecV1GlobalTest.test4,
+            SpecV1GlobalTest.test23, SpecV1GlobalTest.test28,
+            SpecV1GlobalTest.test40, SpecV1GlobalTest.test41,
+            SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
+            SpecV1LocalGetTest.test14, SpecV1LocalGetTest.test18, SpecV1LocalGetTest.test19,
+            SpecV1LocalSetTest.test14, SpecV1LocalSetTest.test19,
+            SpecV1LocalTeeTest.test19, SpecV1LocalTeeTest.test20, SpecV1LocalTeeTest.test21,
+            SpecV1LocalTeeTest.test45,
+            SpecV1LocalTeeTest.test53, SpecV1LocalTeeTest.test54, SpecV1LocalTeeTest.test55,
+            SpecV1MemoryGrowTest.test56, SpecV1MemoryGrowTest.test57, SpecV1MemoryGrowTest.test58,
+            SpecV1NopTest.test32, SpecV1NopTest.test33, SpecV1NopTest.test34, SpecV1NopTest.test35,
+            SpecV1SelectTest.test9, SpecV1SelectTest.test10, SpecV1SelectTest.test11,
+            SpecV1SelectTest.test12, SpecV1SelectTest.test13, SpecV1SelectTest.test14,
+            SpecV1SelectTest.test15, SpecV1SelectTest.test16,
+            SpecV1SelectTest.test29, SpecV1SelectTest.test30,
+            SpecV1SelectTest.test35, SpecV1SelectTest.test36,
+            SpecV1SelectTest.test75, SpecV1SelectTest.test76,
+            SpecV1SelectTest.test77, SpecV1SelectTest.test78,
+            SpecV1NopTest.test36, SpecV1NopTest.test37</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>
@@ -186,7 +220,6 @@
             <wast>forward.wast</wast>
             <wast>func.wast</wast>
             <wast>func_ptrs.wast</wast>
-            <wast>global.wast</wast>
             <wast>i64.wast</wast>
             <wast>imports.wast</wast>
             <wast>inline-module.wast</wast>
@@ -196,24 +229,17 @@
             <wast>left-to-right.wast</wast>
             <wast>linking.wast</wast>
             <wast>load.wast</wast>
-            <wast>local_get.wast</wast>
-            <wast>local_set.wast</wast>
-            <wast>local_tee.wast</wast>
             <wast>memory.wast</wast>
             <wast>memory_copy.wast</wast>
             <wast>memory_fill.wast</wast>
-            <wast>memory_grow.wast</wast>
             <wast>memory_init.wast</wast>
             <wast>memory_redundancy.wast</wast>
-            <wast>memory_size.wast</wast>
             <wast>memory_trap.wast</wast>
             <wast>names.wast</wast>
-            <wast>nop.wast</wast>
             <wast>obsolete-keywords.wast</wast>
             <wast>ref_func.wast</wast>
             <wast>ref_is_null.wast</wast>
             <wast>ref_null.wast</wast>
-            <wast>select.wast</wast>
             <wast>simd_address.wast</wast>
             <wast>simd_align.wast</wast>
             <wast>simd_bit_shift.wast</wast>
