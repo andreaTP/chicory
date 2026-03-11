@@ -29,27 +29,11 @@ import java.util.ArrayList;
  *   return: Wasm return value
  * </pre>
  *
- * <p>ctxBuffer layout:
- * <pre>
- *   [0]:   funcTablePtr (i64) — pointer to function pointer table
- *   [8]:   trampolinePtr (i64) — upcall stub for CALL_INDIRECT fallback
- *   [16]:  callKind (i32) — 0=CALL, 1=CALL_INDIRECT
- *   [20]:  funcIdOrTypeId (i32)
- *   [24]:  tableIdx (i32)
- *   [28]:  tableElementIdx (i32)
- *   [32]:  argCount (i32) — also used as grow delta for MEMORY_GROW
- *   [36]:  padding (i32)
- *   [40+]: args as i64
- *   [200]: globalsPtr (i64) — pointer to globals buffer
- *   [208]: memGrowPtr (i64) — upcall stub for memory.grow
- *   [216]: memoryPages (i32) — current page count
- *   [220]: padding (i32)
- *   [224]: memBaseAddr (i64) — current memory base address
- * </pre>
+ * <p>See {@link CtxBuffer} for the full layout definition.
  */
 final class NativeMachine implements Machine {
 
-    private static final int CTX_SIZE = 256;
+    private static final int CTX_SIZE = CtxBuffer.CTX_SIZE;
     private static final Arena ARENA = Arena.ofShared();
 
     private final Instance instance;
@@ -108,10 +92,10 @@ final class NativeMachine implements Machine {
         MemorySegment memGrowStub = createMemGrowStub();
 
         // Write pointers to ctxBuffer
-        ctxBuffer.set(ValueLayout.JAVA_LONG, 0, funcTable.address());
-        ctxBuffer.set(ValueLayout.JAVA_LONG, 8, trampolineStub.address());
-        ctxBuffer.set(ValueLayout.JAVA_LONG, 200, globalsBuffer.address());
-        ctxBuffer.set(ValueLayout.JAVA_LONG, 208, memGrowStub.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.FUNC_TABLE_PTR, funcTable.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.TRAMPOLINE_PTR, trampolineStub.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.GLOBALS_PTR, globalsBuffer.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.MEM_GROW_PTR, memGrowStub.address());
 
         // Compile all module-defined functions
         var bridge = new CraneliftBridge();
@@ -302,10 +286,10 @@ final class NativeMachine implements Machine {
     @SuppressWarnings("unused")
     private long importDispatchDirect(int funcId) {
         try {
-            int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, 32);
+            int argCount = ctxBuffer.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
             long[] args = new long[argCount];
             for (int i = 0; i < argCount; i++) {
-                args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
+                args[i] = ctxBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
             }
             if (funcId < numImports) {
                 var importFunc = instance.imports().function(funcId);
@@ -342,10 +326,10 @@ final class NativeMachine implements Machine {
     private long callIndirectTrampoline(long ctxAddr) {
         try {
             var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
-            int typeId = ctx.get(ValueLayout.JAVA_INT, 20);
-            int tableIdx = ctx.get(ValueLayout.JAVA_INT, 24);
-            int elemIdx = ctx.get(ValueLayout.JAVA_INT, 28);
-            int argCount = ctx.get(ValueLayout.JAVA_INT, 32);
+            int typeId = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.TYPE_ID);
+            int tableIdx = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.TABLE_IDX);
+            int elemIdx = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ELEM_IDX);
+            int argCount = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
 
             int funcId = instance.table(tableIdx).requiredRef(elemIdx);
 
@@ -357,7 +341,7 @@ final class NativeMachine implements Machine {
 
             long[] args = new long[argCount];
             for (int i = 0; i < argCount; i++) {
-                args[i] = ctx.get(ValueLayout.JAVA_LONG, 40 + 8L * i);
+                args[i] = ctx.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
             }
 
             long[] result = this.call(funcId, args);
@@ -389,13 +373,16 @@ final class NativeMachine implements Machine {
     private long memoryGrowHandler(long ctxAddr) {
         try {
             var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
-            int delta = ctx.get(ValueLayout.JAVA_INT, 32);
+            int delta = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
             var mem = instance.memory();
             int oldPages = mem.grow(delta);
             // Update memory base and page count in ctxBuffer
             if (oldPages != -1 && mem instanceof NativeMemory nativeMemory) {
-                ctx.set(ValueLayout.JAVA_LONG, 224, nativeMemory.nativeAddress().address());
-                ctx.set(ValueLayout.JAVA_INT, 216, mem.pages());
+                ctx.set(
+                        ValueLayout.JAVA_LONG,
+                        CtxBuffer.MEM_BASE_ADDR,
+                        nativeMemory.nativeAddress().address());
+                ctx.set(ValueLayout.JAVA_INT, CtxBuffer.MEMORY_PAGES, mem.pages());
             }
             return oldPages;
         } catch (Throwable t) {
@@ -457,20 +444,13 @@ final class NativeMachine implements Machine {
         }
     }
 
-    // --- Trap codes (written by native pre-checks to ctxBuffer[16]) ---
-
-    static final int TRAP_NONE = 0;
-    static final int TRAP_DIV_BY_ZERO = 1;
-    static final int TRAP_INT_OVERFLOW = 2;
-    static final int TRAP_UNREACHABLE = 3;
-    static final int TRAP_TRUNC_OVERFLOW = 4;
-
     private static ChicoryException trapException(int trapCode) {
         return switch (trapCode) {
-            case TRAP_DIV_BY_ZERO -> new ChicoryException("integer divide by zero");
-            case TRAP_INT_OVERFLOW -> new ChicoryException("integer overflow");
-            case TRAP_UNREACHABLE -> new ChicoryException("unreachable");
-            case TRAP_TRUNC_OVERFLOW -> new ChicoryException("invalid conversion to integer");
+            case CtxBuffer.TRAP_DIV_BY_ZERO -> new ChicoryException("integer divide by zero");
+            case CtxBuffer.TRAP_INT_OVERFLOW -> new ChicoryException("integer overflow");
+            case CtxBuffer.TRAP_UNREACHABLE -> new ChicoryException("unreachable");
+            case CtxBuffer.TRAP_TRUNC_OVERFLOW ->
+                    new ChicoryException("invalid conversion to integer");
             default -> new ChicoryException("trap: unknown code " + trapCode);
         };
     }
@@ -519,8 +499,11 @@ final class NativeMachine implements Machine {
 
             var mem = instance.memory();
             if (mem instanceof NativeMemory nativeMemory) {
-                ctxBuffer.set(ValueLayout.JAVA_LONG, 224, nativeMemory.nativeAddress().address());
-                ctxBuffer.set(ValueLayout.JAVA_INT, 216, mem.pages());
+                ctxBuffer.set(
+                        ValueLayout.JAVA_LONG,
+                        CtxBuffer.MEM_BASE_ADDR,
+                        nativeMemory.nativeAddress().address());
+                ctxBuffer.set(ValueLayout.JAVA_INT, CtxBuffer.MEMORY_PAGES, mem.pages());
             }
 
             // Build arguments: memBase + ctxPtr + wasm params
@@ -551,10 +534,10 @@ final class NativeMachine implements Machine {
 
             Object result = handle.invokeWithArguments(callArgs);
 
-            // Check for traps (pre-checks write trap code to ctxBuffer[16])
-            int trapCode = ctxBuffer.get(ValueLayout.JAVA_INT, 16);
+            // Check for traps (pre-checks write trap code to ctxBuffer)
+            int trapCode = ctxBuffer.get(ValueLayout.JAVA_INT, CtxBuffer.TRAP_CODE);
             if (trapCode != 0) {
-                ctxBuffer.set(ValueLayout.JAVA_INT, 16, 0); // reset
+                ctxBuffer.set(ValueLayout.JAVA_INT, CtxBuffer.TRAP_CODE, 0); // reset
                 throw trapException(trapCode);
             }
 

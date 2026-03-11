@@ -100,80 +100,51 @@ cranelift-compiler/                     Native compiler + spec tests
 20. **i32/i64 wrap/extend** — I32_WRAP_I64, I64_EXTEND_I32_S/U, I64_EXTEND_{8,16,32}_S
 21. **Memory load/store variants** — i64, f32, f64 full-width; i32/i64 sub-word
     (load8/16 signed/unsigned, store8/16; i64 load32 signed/unsigned, store32)
-22. **16 spec test files green** — 2550/2807 tests pass (257 skipped):
-    const.wast 778/778, i32.wast 450/460, block.wast 171/223,
-    br.wast 94/97, br_if.wast 91/118, if.wast 183/241, loop.wast 70/120,
-    return.wast 84/84, global.wast 101/110, select.wast 130/148,
-    local_get.wast 33/36, local_set.wast 51/53, local_tee.wast 90/97,
-    memory_grow.wast 94/104, memory_size.wast 40/42, nop.wast 82/88
+22. **25 spec test files, 14023 tests** — 13776 pass, 247 skipped, 0 failures
+23. **Full i32/i64/f32/f64 arithmetic/comparison/conversion opcodes** — all ~120 opcodes
+24. **Multi-value blocks** — ControlFrame uses FunctionType, block type indices resolved
+25. **BR_TABLE** — implemented as if-else chain (Cranelift JumpTable API issues)
+26. **Trap pre-checks** — div-by-zero, INT_MIN/-1, unreachable, float trunc NaN check.
+    Zero cost on happy path. Cranelift ud2 becomes dead code.
+27. **Safety stubs** — per-signature Panama upcall stubs for uncompiled functions
+28. **SSE4.1 enabled** — required for Cranelift ceil/floor/trunc/nearest instructions.
+    Without it, Cranelift emits libcalls to address 0 (SIGSEGV).
+29. **RefNull types** — mapped to i64 for native code
+30. **ctxBuffer formalized** — `CtxBuffer.java` constants class, no magic numbers
 
 ### Not yet done
 
-- **NativeMemory shortcomings** — leaks, no bounds checking (see earlier notes)
-- **Native traps crash the JVM** — ud2 on div-by-zero. See trap handling analysis below.
-- **Multi-value blocks** — block type index not yet supported (throws UnsupportedOperationException)
-- **BR_TABLE** — not yet implemented
-- **f32/f64 arithmetic/comparison** — F32_NEG, F64_NEG, F32_GT etc. not yet implemented
-- **RefNull types** — function params with RefNull types unsupported
+- **NativeMemory shortcomings** — leaks, no bounds checking (SIGSEGV on OOB)
+- **Float trunc overflow check** — only NaN check implemented, not range check
+- **ctxBuffer scalability** — re-entrancy risk, 20-arg cap, overloaded ARG_COUNT (see P0)
 
 ### Current opcode support
 
-| Opcode | Status |
-|--------|--------|
-| `i32.const` | Working |
-| `i64.const` | Working |
-| `f32.const` | Working |
-| `f64.const` | Working |
-| `i32.add/sub/mul` | Working |
-| `i32.div_s/div_u` | Working (but ud2 trap on div-by-zero crashes JVM) |
-| `i32.rem_s/rem_u` | Working (same trap issue) |
-| `i32.and/or/xor` | Working |
-| `i32.shl/shr_s/shr_u` | Working |
-| `i32.rotl/rotr` | Working |
-| `i32.clz/ctz/popcnt` | Working |
-| `i32.eqz` | Working |
-| `i32.eq/ne/lt_s/lt_u/gt_s/gt_u/le_s/le_u/ge_s/ge_u` | Working |
-| `i32.extend8_s/extend16_s` | Working |
-| `i32.store/load` | Working (with NativeMemory) |
-| `local.get/set/tee` | Working |
-| `drop` | Working |
-| `nop` | Working |
-| `block/loop/if/else/end` | Working |
-| `br/br_if` | Working |
-| `return` | Working |
-| `call` | Working (direct native-to-native + import via ctxBuffer) |
-| `call_indirect` | Working (via Java trampoline) |
-| `select/select_t` | Working |
-| `global.get/set` | Working (NativeGlobalInstance + off-heap buffer) |
-| `memory.size` | Working (page count from ctxBuffer) |
-| `memory.grow` | Working (upcall stub + memBase reload) |
-| `unreachable` | Working (Cranelift trap) |
-| `i64.add/sub/mul` | Working |
-| `i64.div_s/div_u` | Working (ud2 trap on div-by-zero) |
-| `i64.rem_s/rem_u` | Working (same trap issue) |
-| `i64.and/or/xor` | Working |
-| `i64.shl/shr_s/shr_u` | Working |
-| `i64.rotl/rotr` | Working |
-| `i64.clz/ctz/popcnt` | Working |
-| `i64.eqz` | Working |
-| `i64.eq/ne/lt_s/lt_u/gt_s/gt_u/le_s/le_u/ge_s/ge_u` | Working |
-| `i64.extend_i32_s/u` | Working |
-| `i64.extend8_s/extend16_s/extend32_s` | Working |
-| `i32.wrap_i64` | Working |
-| `i64.store/load` | Working |
-| `f32.store/load` | Working |
-| `f64.store/load` | Working |
-| `i32.load8_s/u, load16_s/u` | Working |
-| `i32.store8, store16` | Working |
-| `i64.load8_s/u, load16_s/u, load32_s/u` | Working |
-| `i64.store8, store16, store32` | Working |
+All i32/i64/f32/f64 opcodes are implemented (~120 total):
+- **Constants**: i32/i64/f32/f64.const
+- **Arithmetic**: add, sub, mul, div_s/u, rem_s/u (with pre-check traps)
+- **Bitwise**: and, or, xor, shl, shr_s/u, rotl, rotr, clz, ctz, popcnt
+- **Comparison**: eqz, eq, ne, lt_s/u, gt_s/u, le_s/u, ge_s/u
+- **Float arithmetic**: add, sub, mul, div, min, max, copysign, abs, neg,
+  ceil, floor, trunc, nearest, sqrt
+- **Float comparison**: eq, ne, lt, gt, le, ge
+- **Conversions**: all trunc (with NaN pre-check), trunc_sat, convert, promote,
+  demote, reinterpret, wrap, extend (signed/unsigned, 8/16/32)
+- **Memory**: load/store for all types + all sub-word variants
+- **Control flow**: block, loop, if/else, end, br, br_if, br_table, return
+- **Variables**: local.get/set/tee, global.get/set
+- **Calls**: call (direct native), call_indirect (Java trampoline)
+- **Misc**: drop, nop, select/select_t, unreachable, memory.size, memory.grow
 
 ### Calling convention (our design)
 
-- First param (rdi): memory base pointer (i64, raw pointer to linear memory)
-- Remaining params: Wasm function parameters (mapped to rsi, rdx, rcx, r8, r9)
-- Return: Wasm return value in rax/eax
+- Param 0 (rdi): memBase (i64/ADDRESS) — pointer to linear memory
+- Param 1 (rsi): ctxPtr (i64/ADDRESS) — pointer to call context buffer
+- Param 2+ (rdx, rcx, r8, r9): Wasm function parameters
+- Return: Wasm return value in rax/xmm0
 - Uses System V ABI
+
+See `CtxBuffer.java` for the full ctxBuffer layout (256 bytes, fixed offsets).
 
 ## Trap handling analysis (2026-03-10)
 
@@ -235,27 +206,18 @@ operation:
 
 Zero performance cost on happy path (branch predicted not-taken).
 
-**Remaining blocker for f32.wast/f64.wast**: uncompiled functions get the CALL_INDIRECT
-trampoline as fallback, but its signature `(i64) → i64` doesn't match the direct CALL
-convention `(memBase, ctxPtr, params...) → ret`. Need per-signature safety stubs.
+**Resolved**: per-signature safety stubs added for uncompiled functions. SSE4.1 enabled
+for ceil/floor/trunc/nearest. f32.wast and f64.wast now fully pass (happy path).
 
 **Long-term**: contribute to Cranelift upstream to make ud2 emission configurable
 per-opcode, allowing embedders to provide trap handler callbacks instead.
 
-### Excluded i32.wast trap tests
+### Previously excluded trap tests (now passing)
 
-| Test | Function | Trap | Args |
-|------|----------|------|------|
-| test25 | div_s | integer divide by zero | (1, 0) |
-| test26 | div_s | integer divide by zero | (0, 0) |
-| test27 | div_s | integer overflow | (0x80000000, -1) |
-| test28 | div_s | integer divide by zero | (0x80000000, 0) |
-| test45 | div_u | integer divide by zero | (1, 0) |
-| test46 | div_u | integer divide by zero | (0, 0) |
-| test61 | rem_s | integer divide by zero | (1, 0) |
-| test62 | rem_s | integer divide by zero | (0, 0) |
-| test81 | rem_u | integer divide by zero | (1, 0) |
-| test82 | rem_u | integer divide by zero | (0, 0) |
+With pre-check traps implemented, i32.wast and i64.wast div/rem trap tests now pass
+(integer divide by zero, integer overflow). 247 tests still excluded across 25 wast
+files — these are assert_trap tests for other trapping conditions (uncompiled functions,
+call_indirect type mismatch, validation errors, etc.)
 
 ### References
 
@@ -269,28 +231,43 @@ per-opcode, allowing embedders to provide trap handler callbacks instead.
 
 ## Next steps (pick up here next session)
 
-### Immediate: more opcodes for wider coverage
+### P0: ctxBuffer scalability issues
 
-- `br_table` — branch table (switch dispatch), needed by many spec tests
-- f32/f64 arithmetic: `neg`, `abs`, `ceil`, `floor`, `trunc`, `nearest`, `sqrt`,
-  `add`, `sub`, `mul`, `div`, `min`, `max`, `copysign`
-- f32/f64 comparison: `eq`, `ne`, `lt`, `gt`, `le`, `ge`
-- Conversions: `f32.convert_i32_s/u`, `f64.convert_i32_s/u`, etc.
-- Multi-value blocks: block type index decoding
+The ctxBuffer is a shared 256-byte flat buffer. It works today but has three
+design issues that will block further progress:
 
-### Then: more spec test files
+1. **Re-entrancy safety** — `callIndirectTrampoline` calls `this.call()`, which
+   overwrites ctxBuffer (memBase, pages, trapCode). The inner call sets up its own
+   state and the outer call's native frame has already consumed what it needs, so it
+   works *today*. But any future path where native code reads ctxBuffer *after* a
+   re-entrant return will break silently. Fix: allocate a per-call frame (args +
+   trapCode + call metadata) on a thread-local stack. Static pointers stay in the
+   fixed buffer.
 
-- `i64.wast` — i64 arithmetic spec tests (opcodes already implemented)
-- `f32.wast`, `f64.wast`, `f32_cmp.wast`, `f64_cmp.wast` — once f32/f64 ops added
-- `call.wast`, `call_indirect.wast` — function call spec tests
-- `load.wast`, `store.wast` — memory access spec tests
+2. **Max 20 args hard cap** — The gap between `ARGS_BASE(40)` and `GLOBALS_PTR(200)`
+   limits args to 20 × 8 bytes = 160 bytes. Real C-compiled Wasm can exceed this
+   (structs passed by value decompose to many i32 params). Fix: move args to a
+   separate growable MemorySegment. Replace `args[40..200]` with `argsPtr[40]`.
 
-### Future
+3. **ARG_COUNT overloaded** — Same field means "function call arg count" for
+   CALL/CALL_INDIRECT and "grow page delta" for memory.grow. Works because they
+   never overlap, but confuses readers and will break if memory.grow ever happens
+   during a call setup. Fix: dedicate a separate field for memGrowDelta.
+
+### P1: increase test coverage
+
+- Remove all excludedTests, re-run, re-exclude only genuine failures
+- Full float trunc range check (currently NaN-only, not overflow)
+- Enable more wast files: conversions, call, call_indirect, load, store, etc.
+- Memory bounds checking (currently no bounds checks = SIGSEGV on OOB)
+
+### P2: future work
 
 - Benchmark on real workloads (SQLite, Prism)
 - Wrap Cranelift bridge with Chicory build-time compiler (wabt/wasm-tools pattern)
 - `Machine` implementation with hybrid dispatch (native + interpreter fallback)
 - NativeMemory lifecycle management (Arena cleanup)
+- Contribute ud2 configurability to Cranelift upstream
 
 ## How to build and test
 
