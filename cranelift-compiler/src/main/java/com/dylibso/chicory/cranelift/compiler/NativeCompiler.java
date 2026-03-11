@@ -233,19 +233,6 @@ final class NativeCompiler {
     }
 
     /**
-     * Emit a trap handler block: writes trapCode to ctxBuffer[16] and returns a dummy value.
-     * Returns the block ID of the trap handler.
-     */
-    private int emitTrapBlock(int trapCode, int ctxPtr, FunctionType funcType) {
-        int trapBlock = bridge.exports().createBlock();
-        // Don't switch yet — caller will reference it in brif, we emit it later
-        // Actually we need to emit it now since Cranelift needs all blocks defined.
-        // We'll switch back to the current block after.
-        // Use a deferred approach: just create the block, emit into it, switch back.
-        return trapBlock;
-    }
-
-    /**
      * Emit the trap handler body into the given block.
      * Must be called when we're NOT in the middle of emitting another block's instructions.
      */
