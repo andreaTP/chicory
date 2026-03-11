@@ -920,7 +920,7 @@ pub extern "C" fn emit_bitcast_f64_to_i64(a: u32) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn emit_trap() {
-    b().ins().trap(cranelift_codegen::ir::TrapCode::user(0).unwrap());
+    b().ins().trap(cranelift_codegen::ir::TrapCode::user(1).unwrap());
 }
 
 // --- Block parameters ---
