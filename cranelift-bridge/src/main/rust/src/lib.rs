@@ -76,8 +76,16 @@ pub extern "C" fn init(target_ptr: *const u8, target_len: u32) {
     flag_builder.set("is_pic", "false").unwrap();
     let flags = settings::Flags::new(flag_builder);
     let triple: Triple = target_str.parse().expect("Failed to parse target triple");
-    let isa = isa::lookup(triple)
-        .expect("Unsupported target")
+    let arch = triple.architecture;
+    let mut isa_builder = isa::lookup(triple).expect("Unsupported target");
+    // Enable SSE4.1+ to avoid libcalls for ceil/floor/trunc/nearest
+    if arch == target_lexicon::Architecture::X86_64 {
+        isa_builder.enable("has_sse3").unwrap();
+        isa_builder.enable("has_ssse3").unwrap();
+        isa_builder.enable("has_sse41").unwrap();
+        isa_builder.enable("has_sse42").unwrap();
+    }
+    let isa = isa_builder
         .finish(flags)
         .expect("Failed to create ISA");
     unsafe { ISA = Some(isa); }

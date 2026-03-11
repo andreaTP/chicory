@@ -136,7 +136,7 @@ final class NativeCompiler {
 
         // Get params as value IDs
         int memBaseParam = bridge.exports().funcParam(entry, 0);
-        int ctxPtr = bridge.exports().funcParam(entry, 1);
+        int ctxPtrParam = bridge.exports().funcParam(entry, 1);
         int[] paramVals = new int[funcType.params().size()];
         for (int i = 0; i < paramVals.length; i++) {
             paramVals[i] = bridge.exports().funcParam(entry, i + 2);
@@ -145,6 +145,10 @@ final class NativeCompiler {
         // memBase as a variable (can be re-defined after memory.grow)
         int memBaseVar = bridge.exports().declareVar(CraneliftBridge.TYPE_I64);
         bridge.exports().defVar(memBaseVar, memBaseParam);
+
+        // ctxPtr as a variable (accessible from trap handler blocks)
+        int ctxPtrVar = bridge.exports().declareVar(CraneliftBridge.TYPE_I64);
+        bridge.exports().defVar(ctxPtrVar, ctxPtrParam);
 
         // Cache for SigRef IDs per unique function type (for call_indirect)
         Map<String, Integer> sigRefCache = new HashMap<>();
@@ -185,7 +189,7 @@ final class NativeCompiler {
                     controlStack,
                     localVars,
                     memBaseVar,
-                    ctxPtr,
+                    ctxPtrVar,
                     sigRefCache,
                     funcType);
         }
@@ -245,11 +249,12 @@ final class NativeCompiler {
      * Emit the trap handler body into the given block.
      * Must be called when we're NOT in the middle of emitting another block's instructions.
      */
-    private void fillTrapBlock(int trapBlock, int trapCode, int ctxPtr, FunctionType funcType) {
+    private void fillTrapBlock(int trapBlock, int trapCode, int ctxPtrVar, FunctionType funcType) {
         bridge.exports().switchToBlock(trapBlock);
+        int ctxVal = bridge.exports().useVar(ctxPtrVar); // resolve variable in this block
         int zero = bridge.exports().emitIconst32(0);
         int code = bridge.exports().emitIconst32(trapCode);
-        bridge.exports().emitStoreI32(ctxPtr, zero, code, 16);
+        bridge.exports().emitStoreI32(ctxVal, zero, code, 16);
         // Return dummy value matching function signature
         if (funcType.returns().isEmpty()) {
             bridge.exports().emitReturnVoid();
@@ -395,9 +400,13 @@ final class NativeCompiler {
             Deque<ControlFrame> controlStack,
             int[] localVars,
             int memBaseVar,
-            int ctxPtr,
+            int ctxPtrVar,
             Map<String, Integer> sigRefCache,
             FunctionType funcType) {
+
+        // ctxPtrVar is a Cranelift variable — use useVar(ctxPtrVar) at each point of use
+        // (needed because trap blocks switch the current block, invalidating prior values)
+        int ctxPtr = ctxPtrVar; // alias for readability — but it's a variable ID, not value ID
 
         // Skip dead code after unconditional transfers
         if (!controlStack.isEmpty() && controlStack.peek().unreachable) {
@@ -483,28 +492,28 @@ final class NativeCompiler {
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, true, false, false, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, bb, true, false, false, ctxPtrVar, funcType));
                     break;
                 }
             case I32_DIV_U:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, false, false, false, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, bb, false, false, false, ctxPtrVar, funcType));
                     break;
                 }
             case I32_REM_S:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, true, true, false, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, bb, true, true, false, ctxPtrVar, funcType));
                     break;
                 }
             case I32_REM_U:
                 {
                     int bb = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, bb, false, true, false, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, bb, false, true, false, ctxPtrVar, funcType));
                     break;
                 }
             case I32_AND:
@@ -942,7 +951,9 @@ final class NativeCompiler {
                     int globalIdx = (int) ins.operands()[0];
                     // Load globalsPtr from ctxBuffer[200]
                     int zero = bridge.exports().emitIconst32(0);
-                    int globalsPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 200);
+                    int globalsPtr =
+                            bridge.exports()
+                                    .emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 200);
                     // Load value as i64 from globals buffer
                     int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
                     int rawVal = bridge.exports().emitLoadI64(globalsPtr, offsetVal, 0);
@@ -961,7 +972,9 @@ final class NativeCompiler {
                     int widened = widenToI64ForType(value, globalType);
                     // Load globalsPtr from ctxBuffer[200]
                     int zero = bridge.exports().emitIconst32(0);
-                    int globalsPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 200);
+                    int globalsPtr =
+                            bridge.exports()
+                                    .emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 200);
                     // Store to globals buffer
                     int offsetVal = bridge.exports().emitIconst32(globalIdx * 8);
                     bridge.exports().emitStoreI64(globalsPtr, offsetVal, widened, 0);
@@ -973,7 +986,9 @@ final class NativeCompiler {
                 {
                     // Load current page count from ctxBuffer[216]
                     int zero = bridge.exports().emitIconst32(0);
-                    int pages = bridge.exports().emitLoadI32(ctxPtr, zero, 216);
+                    int pages =
+                            bridge.exports()
+                                    .emitLoadI32(bridge.exports().useVar(ctxPtr), zero, 216);
                     valueStack.push(pages);
                     break;
                 }
@@ -983,18 +998,22 @@ final class NativeCompiler {
                     int delta = valueStack.pop();
                     int zero = bridge.exports().emitIconst32(0);
                     // Write grow delta to ctxBuffer[32] as argCount (repurposed)
-                    bridge.exports().emitStoreI32(ctxPtr, zero, delta, 32);
+                    bridge.exports().emitStoreI32(bridge.exports().useVar(ctxPtr), zero, delta, 32);
                     // Load memGrowStub ptr from ctxBuffer[208]
-                    int memGrowPtr = bridge.exports().emitLoadI64(ctxPtr, zero, 208);
+                    int memGrowPtr =
+                            bridge.exports()
+                                    .emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 208);
                     // Call memGrowStub(ctxPtr) -> i64 (old page count or -1)
                     int growSig = getOrCreateTrampolineSigRef(sigRefCache);
-                    bridge.exports().pushCallArg(ctxPtr);
+                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
                     int rawResult = bridge.exports().emitCallIndirect(growSig, memGrowPtr);
                     // Result is i32 (old page count or -1)
                     int result = bridge.exports().emitIreduceI32(rawResult);
                     valueStack.push(result);
                     // Reload memBase from ctxBuffer[224] (may have changed)
-                    int newMemBase = bridge.exports().emitLoadI64(ctxPtr, zero, 224);
+                    int newMemBase =
+                            bridge.exports()
+                                    .emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 224);
                     bridge.exports().defVar(memBaseVar, newMemBase);
                     break;
                 }
@@ -1003,9 +1022,10 @@ final class NativeCompiler {
             case UNREACHABLE:
                 {
                     // Write trap code to ctxBuffer and return (no ud2)
+                    int ctxVal = bridge.exports().useVar(ctxPtrVar);
                     int zero = bridge.exports().emitIconst32(0);
                     int code = bridge.exports().emitIconst32(NativeMachine.TRAP_UNREACHABLE);
-                    bridge.exports().emitStoreI32(ctxPtr, zero, code, 16);
+                    bridge.exports().emitStoreI32(ctxVal, zero, code, 16);
                     if (funcType.returns().isEmpty()) {
                         bridge.exports().emitReturnVoid();
                     } else {
@@ -1044,7 +1064,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, true, false, true, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, b, true, false, true, ctxPtrVar, funcType));
                     break;
                 }
 
@@ -1052,7 +1072,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, false, false, true, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, b, false, false, true, ctxPtrVar, funcType));
                     break;
                 }
 
@@ -1060,7 +1080,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, true, true, true, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, b, true, true, true, ctxPtrVar, funcType));
                     break;
                 }
 
@@ -1068,7 +1088,7 @@ final class NativeCompiler {
                 {
                     int b = valueStack.pop();
                     int a = valueStack.pop();
-                    valueStack.push(emitSafeDiv(a, b, false, true, true, ctxPtr, funcType));
+                    valueStack.push(emitSafeDiv(a, b, false, true, true, ctxPtrVar, funcType));
                     break;
                 }
 
@@ -1995,21 +2015,27 @@ final class NativeCompiler {
                     int zero = bridge.exports().emitIconst32(0);
                     bridge.exports()
                             .emitStoreI32(
-                                    ctxPtr, zero, bridge.exports().emitIconst32(argCount), 32);
+                                    bridge.exports().useVar(ctxPtr),
+                                    zero,
+                                    bridge.exports().emitIconst32(argCount),
+                                    32);
                     for (int i = 0; i < argCount; i++) {
                         int widened = widenToI64(argVals[i], targetType.params().get(i));
-                        bridge.exports().emitStoreI64(ctxPtr, zero, widened, 40 + 8 * i);
+                        bridge.exports()
+                                .emitStoreI64(
+                                        bridge.exports().useVar(ctxPtr), zero, widened, 40 + 8 * i);
                     }
 
                     // Load function pointer from funcTable[funcId]
-                    int funcTablePtr = bridge.exports().emitLoadI64(ctxPtr, zero, 0);
+                    int funcTablePtr =
+                            bridge.exports().emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 0);
                     int funcIdOffset =
                             bridge.exports().emitIconst32(targetFuncId * 8); // byte offset
                     int funcPtr = bridge.exports().emitLoadI64(funcTablePtr, funcIdOffset, 0);
 
                     // Push call args: memBase, ctxPtr, then wasm args
                     bridge.exports().pushCallArg(bridge.exports().useVar(memBaseVar));
-                    bridge.exports().pushCallArg(ctxPtr);
+                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
                     for (int i = 0; i < argCount; i++) {
                         bridge.exports().pushCallArg(argVals[i]);
                     }
@@ -2044,29 +2070,43 @@ final class NativeCompiler {
 
                     // Write CALL_INDIRECT metadata to ctxBuffer
                     bridge.exports()
-                            .emitStoreI32(ctxPtr, zero, bridge.exports().emitIconst32(typeId), 20);
+                            .emitStoreI32(
+                                    bridge.exports().useVar(ctxPtr),
+                                    zero,
+                                    bridge.exports().emitIconst32(typeId),
+                                    20);
                     bridge.exports()
                             .emitStoreI32(
-                                    ctxPtr, zero, bridge.exports().emitIconst32(tableIdx), 24);
-                    bridge.exports().emitStoreI32(ctxPtr, zero, tableElemIdx, 28);
+                                    bridge.exports().useVar(ctxPtr),
+                                    zero,
+                                    bridge.exports().emitIconst32(tableIdx),
+                                    24);
+                    bridge.exports()
+                            .emitStoreI32(bridge.exports().useVar(ctxPtr), zero, tableElemIdx, 28);
                     bridge.exports()
                             .emitStoreI32(
-                                    ctxPtr, zero, bridge.exports().emitIconst32(argCount), 32);
+                                    bridge.exports().useVar(ctxPtr),
+                                    zero,
+                                    bridge.exports().emitIconst32(argCount),
+                                    32);
 
                     // Write args to ctxBuffer (widened to i64)
                     for (int i = 0; i < argCount; i++) {
                         int widened = widenToI64(argVals[i], targetType.params().get(i));
-                        bridge.exports().emitStoreI64(ctxPtr, zero, widened, 40 + 8 * i);
+                        bridge.exports()
+                                .emitStoreI64(
+                                        bridge.exports().useVar(ctxPtr), zero, widened, 40 + 8 * i);
                     }
 
                     // Load trampoline ptr from ctxBuffer[8]
-                    int trampolinePtr = bridge.exports().emitLoadI64(ctxPtr, zero, 8);
+                    int trampolinePtr =
+                            bridge.exports().emitLoadI64(bridge.exports().useVar(ctxPtr), zero, 8);
 
                     // Create SigRef for trampoline: (i64) -> i64
                     int trampolineSig = getOrCreateTrampolineSigRef(sigRefCache);
 
                     // Call trampoline with ctxPtr
-                    bridge.exports().pushCallArg(ctxPtr);
+                    bridge.exports().pushCallArg(bridge.exports().useVar(ctxPtr));
                     int rawResult = bridge.exports().emitCallIndirect(trampolineSig, trampolinePtr);
 
                     // Narrow result and push
