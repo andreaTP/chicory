@@ -30,3 +30,4 @@ scripts/jmh-tmp
 /zig-install
 /zig-source
 /zig-testsuite
+cranelift-compiler/hs_err_pid*.log
