@@ -1056,7 +1056,16 @@ final class NativeCompiler {
                                 frame.mergeBlock, frame.blockType.returns().size(), valueStack);
                     }
                     bridge.exports().switchToBlock(frame.elseBlock);
-                    bridge.exports().emitJump(frame.mergeBlock);
+                    // Implicit else: IF without ELSE requires params == returns.
+                    // Pass dummy zeros for the merge block params.
+                    if (frame.blockType.returns().isEmpty()) {
+                        bridge.exports().emitJump(frame.mergeBlock);
+                    } else {
+                        for (ValType t : frame.blockType.returns()) {
+                            bridge.exports().pushCallArg(emitZero(t));
+                        }
+                        bridge.exports().emitJumpWithArgs(frame.mergeBlock);
+                    }
                 } else {
                     if (!dead) {
                         emitJumpToBlock(
@@ -1099,17 +1108,43 @@ final class NativeCompiler {
         }
     }
 
+    private void emitReturnWithArgs(int[] args, int argCount) {
+        if (argCount == 0) {
+            bridge.exports().emitReturnVoid();
+        } else if (argCount == 1) {
+            bridge.exports().emitReturn(args[0]);
+        } else {
+            for (int i = 0; i < argCount; i++) {
+                bridge.exports().pushCallArg(args[i]);
+            }
+            bridge.exports().emitReturnMulti();
+        }
+    }
+
+    private void emitBrToFunction(EmitContext ctx, ControlFrame funcFrame) {
+        int retCount = funcFrame.blockType.returns().size();
+        if (retCount == 0) {
+            bridge.exports().emitReturnVoid();
+        } else if (retCount == 1) {
+            bridge.exports().emitReturn(ctx.valueStack.pop());
+        } else {
+            int[] retVals = new int[retCount];
+            for (int i = retCount - 1; i >= 0; i--) {
+                retVals[i] = ctx.valueStack.pop();
+            }
+            for (int rv : retVals) {
+                bridge.exports().pushCallArg(rv);
+            }
+            bridge.exports().emitReturnMulti();
+        }
+    }
+
     private void emitBr(
             EmitContext ctx, AnnotatedInstruction ins, Deque<ControlFrame> controlStack) {
         int depth = (int) ins.operands()[0];
         ControlFrame target = getControlFrame(controlStack, depth);
         if (target.kind == ControlFrame.Kind.FUNCTION) {
-            int retCount = target.blockType.returns().size();
-            if (retCount > 0) {
-                bridge.exports().emitReturn(ctx.valueStack.pop());
-            } else {
-                bridge.exports().emitReturnVoid();
-            }
+            emitBrToFunction(ctx, target);
         } else {
             int brTarget = target.branchTarget();
             int argCount = target.branchArgCount();
@@ -1172,11 +1207,7 @@ final class NativeCompiler {
 
             bridge.exports().switchToBlock(hitBlock);
             if (target.kind == ControlFrame.Kind.FUNCTION) {
-                if (argCount > 0) {
-                    bridge.exports().emitReturn(brArgs[0]);
-                } else {
-                    bridge.exports().emitReturnVoid();
-                }
+                emitReturnWithArgs(brArgs, argCount);
             } else {
                 if (argCount == 0) {
                     bridge.exports().emitJump(brTarget);
@@ -1196,11 +1227,7 @@ final class NativeCompiler {
         // Default
         int defTarget = defaultTarget.branchTarget();
         if (defaultTarget.kind == ControlFrame.Kind.FUNCTION) {
-            if (argCount > 0) {
-                bridge.exports().emitReturn(brArgs[0]);
-            } else {
-                bridge.exports().emitReturnVoid();
-            }
+            emitReturnWithArgs(brArgs, argCount);
         } else {
             if (argCount == 0) {
                 bridge.exports().emitJump(defTarget);
@@ -1222,8 +1249,8 @@ final class NativeCompiler {
         for (ControlFrame f : controlStack) {
             funcFrame = f;
         }
-        if (funcFrame != null && !funcFrame.blockType.returns().isEmpty()) {
-            bridge.exports().emitReturn(ctx.valueStack.pop());
+        if (funcFrame != null) {
+            emitBrToFunction(ctx, funcFrame);
         } else {
             bridge.exports().emitReturnVoid();
         }

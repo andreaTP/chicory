@@ -94,26 +94,8 @@
             <wast>return.wast</wast>
             <wast>select.wast</wast>
           </includedWasts>
-          <!-- [RT] = also excluded in runtime-tests
-               [VERIFIER] = Cranelift verifier: dead code after unreachable
-                            in multi-return functions emits wrong-typed return/jump -->
-          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
-            SpecV1BlockTest.test42,
-            SpecV1BrTest.test13, SpecV1BrTest.test29,
-            SpecV1BrIfTest.test25, SpecV1BrIfTest.test26,
-            SpecV1IfTest.test9, SpecV1IfTest.test10, SpecV1IfTest.test11, SpecV1IfTest.test12,
-            SpecV1IfTest.test93, SpecV1IfTest.test94, SpecV1IfTest.test95, SpecV1IfTest.test96,
-            SpecV1IfTest.test97, SpecV1IfTest.test98, SpecV1IfTest.test99, SpecV1IfTest.test100,
-            SpecV1IfTest.test101, SpecV1IfTest.test102, SpecV1IfTest.test103, SpecV1IfTest.test104,
-            SpecV1IfTest.test105, SpecV1IfTest.test106,
-            SpecV1IfTest.test109, SpecV1IfTest.test110, SpecV1IfTest.test111, SpecV1IfTest.test112,
-            SpecV1IfTest.test113, SpecV1IfTest.test114, SpecV1IfTest.test115, SpecV1IfTest.test116,
-            SpecV1IfTest.test117, SpecV1IfTest.test118, SpecV1IfTest.test119, SpecV1IfTest.test120,
-            SpecV1IfTest.test121, SpecV1IfTest.test122, SpecV1IfTest.test123,
-            SpecV1LoopTest.test39,
-            SpecV1MemoryGrowTest.test2, SpecV1MemoryGrowTest.test3,
-            SpecV1MemoryGrowTest.test4, SpecV1MemoryGrowTest.test5,
-            SpecV1MemoryGrowTest.test11, SpecV1MemoryGrowTest.test12</excludedTests>
+          <!-- [RT] = also excluded in runtime-tests -->
+          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>

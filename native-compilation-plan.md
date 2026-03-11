@@ -237,16 +237,34 @@ call_indirect type mismatch, validation errors, etc.)
 
 ## Next steps
 
-### P0 (in progress): two-pass compiler refactoring
+### P0 (in progress): fix remaining excluded tests
 
-Restructure `NativeCompiler` into analyzer + emitters (see Refactor plan below).
-This fixes the remaining 45 verifier failures from polymorphic stack handling.
+Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters) is DONE.
+Remaining failures by category:
+
+1. **Multi-return compilation** (~25 tests: IfTest, LoopTest, BlockTest, BrIfTest)
+   - Cranelift "Too many return values to fit in registers" for >2 returns
+   - Verifier errors in dead code with multi-return blocks
+   - Fix: return multi-values through argsBuffer instead of registers
+
+2. **Multi-return runtime** (BrTest.test13/29, IfTest.test9-12)
+   - `NativeMachine.call()` returns single `long` — AIOOB on `results[1]`
+   - Fix: read multi-return values from argsBuffer after native call
+
+3. **Memory bounds** (MemoryGrowTest.test2-5/11-12)
+   - "Expected exception to be thrown" — no OOB checking
+   - Fix: emit bounds check before memory loads/stores
+
+4. **Wrong values** (IfTest.test99/105)
+   - `expected: <3> but was: <0>` — likely dead code value propagation
+   - Fix: debug specific functions
+
+5. **Global validation** (GlobalTest.test76/77) — excluded, also excluded in runtime-tests
 
 ### P1: increase test coverage
 
 - Full float trunc range check (currently NaN-only, not overflow)
 - Enable more wast files: conversions, call, call_indirect, load, store, etc.
-- Memory bounds checking (currently no bounds checks = SIGSEGV on OOB)
 
 ### P2: future work
 
