@@ -175,6 +175,73 @@ final class NativeCompiler {
             bridge.exports().defVar(localVars[numParams + i], zero);
         }
 
+        // --- Stack depth guard (wasmtime-style) ---
+        // At function entry: read RSP via get_stack_pointer.
+        // If STACK_LIMIT == 0 (first call): store RSP - 512KB as limit.
+        // Otherwise: if RSP < STACK_LIMIT → trap "call stack exhausted".
+        // Cost: 1 load + 1 compare + 1 branch (predicted not-taken).
+        {
+            int sp = bridge.exports().emitGetStackPointer();
+            int zero = bridge.exports().emitIconst32(0);
+            int stackLimit =
+                    bridge.exports()
+                            .emitLoadI64(
+                                    bridge.exports().useVar(ctxPtrVar),
+                                    zero,
+                                    CtxBuffer.STACK_LIMIT);
+
+            // Check if limit needs initialization (== 0)
+            int zeroI64 = bridge.exports().emitIconst64(0, 0);
+            int needsInit = bridge.exports().emitIcmp(0, stackLimit, zeroI64); // EQ
+            int initBlock = bridge.exports().createBlock();
+            int checkBlock = bridge.exports().createBlock();
+            bridge.exports().emitBrif(needsInit, initBlock, checkBlock);
+
+            // Init block: store SP - 512KB as limit, then continue
+            bridge.exports().switchToBlock(initBlock);
+            int reserve = bridge.exports().emitIconst64(524288, 0); // 512KB
+            int newLimit = bridge.exports().emitIsub(sp, reserve);
+            bridge.exports()
+                    .emitStoreI64(
+                            bridge.exports().useVar(ctxPtrVar),
+                            bridge.exports().emitIconst32(0),
+                            newLimit,
+                            CtxBuffer.STACK_LIMIT);
+            bridge.exports().emitJump(checkBlock);
+
+            // Check block: compare SP against limit
+            bridge.exports().switchToBlock(checkBlock);
+            // Re-load limit (may have been just written)
+            int limit2 =
+                    bridge.exports()
+                            .emitLoadI64(
+                                    bridge.exports().useVar(ctxPtrVar),
+                                    bridge.exports().emitIconst32(0),
+                                    CtxBuffer.STACK_LIMIT);
+            int exhausted = bridge.exports().emitIcmp(3, sp, limit2); // LT unsigned
+            int trapBlock = bridge.exports().createBlock();
+            int okBlock = bridge.exports().createBlock();
+            bridge.exports().emitBrif(exhausted, trapBlock, okBlock);
+
+            // Trap block: write trap code and return
+            bridge.exports().switchToBlock(trapBlock);
+            int ctxVal = bridge.exports().useVar(ctxPtrVar);
+            int zeroT = bridge.exports().emitIconst32(0);
+            int code = bridge.exports().emitIconst32(CtxBuffer.TRAP_CALL_STACK_EXHAUSTED);
+            bridge.exports().emitStoreI32(ctxVal, zeroT, code, CtxBuffer.TRAP_CODE);
+            if (multiReturn || funcType.returns().isEmpty()) {
+                if (funcType.returns().isEmpty()) {
+                    bridge.exports().emitReturnVoid();
+                } else {
+                    bridge.exports().emitReturn(bridge.exports().emitIconst64(0, 0));
+                }
+            } else {
+                bridge.exports().emitReturn(emitZero(funcType.returns().get(0)));
+            }
+
+            bridge.exports().switchToBlock(okBlock);
+        }
+
         // --- Create emit context ---
         var valueStack = new NativeValueStack();
         var ctx =
@@ -349,6 +416,11 @@ final class NativeCompiler {
         if (type.equals(ValType.I64)) return bridge.exports().emitIconst64(0, 0);
         if (type.equals(ValType.F32)) return bridge.exports().emitF32const(0);
         if (type.equals(ValType.F64)) return bridge.exports().emitF64const(0, 0);
+        // Reference types use i64 representation
+        int op = type.opcode();
+        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) {
+            return bridge.exports().emitIconst64(0, 0);
+        }
         throw new UnsupportedOperationException("Unsupported type: " + type);
     }
 

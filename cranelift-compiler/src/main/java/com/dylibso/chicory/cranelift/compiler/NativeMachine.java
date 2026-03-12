@@ -462,6 +462,8 @@ final class NativeMachine implements Machine {
             case CtxBuffer.TRAP_TRUNC_OVERFLOW ->
                     new ChicoryException("invalid conversion to integer");
             case CtxBuffer.TRAP_OOB -> new ChicoryException("out of bounds memory access");
+            case CtxBuffer.TRAP_CALL_STACK_EXHAUSTED ->
+                    new ChicoryException("call stack exhausted");
             default -> new ChicoryException("trap: unknown code " + trapCode);
         };
     }

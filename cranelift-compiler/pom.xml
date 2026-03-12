@@ -96,9 +96,7 @@
             <wast>select.wast</wast>
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests -->
-          <!-- assert_exhaustion in fac.wast crashes JVM (no stack depth guard) -->
-          <excludedTests>SpecV1FacTest.test7,
-            SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
+          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>

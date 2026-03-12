@@ -231,6 +231,15 @@ pub extern "C" fn emit_iconst_32(val: i32) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn emit_get_stack_pointer() -> u32 {
+    let v = b().ins().get_stack_pointer(types::I64);
+    let session = s();
+    let id = session.values.len() as u32;
+    session.values.push(v);
+    id
+}
+
+#[no_mangle]
 pub extern "C" fn emit_iconst_64(val_lo: u32, val_hi: u32) -> u32 {
     let val = (val_lo as i64) | ((val_hi as i64) << 32);
     let v = b().ins().iconst(types::I64, val);

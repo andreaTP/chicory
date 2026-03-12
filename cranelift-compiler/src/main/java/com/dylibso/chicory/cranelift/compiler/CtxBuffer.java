@@ -99,6 +99,9 @@ final class CtxBuffer {
     /** Pointer to the separate args buffer (each arg is i64). */
     static final int ARGS_PTR = 40;
 
+    /** Stack pointer limit for call depth guard (i64). */
+    static final int STACK_LIMIT = 48;
+
     // --- Memory and globals ---
 
     /** Pointer to the off-heap globals buffer. */
@@ -121,6 +124,7 @@ final class CtxBuffer {
     static final int TRAP_UNREACHABLE = 3;
     static final int TRAP_TRUNC_OVERFLOW = 4;
     static final int TRAP_OOB = 5;
+    static final int TRAP_CALL_STACK_EXHAUSTED = 6;
 
     /** Returns the byte offset for the i-th call argument within the args buffer. */
     static int argOffset(int i) {
