@@ -99,7 +99,7 @@ final class NativeCompiler {
             try {
                 results[i] = compileFunction(i);
             } catch (Exception e) {
-                System.err.println("Failed to compile function " + i + ": " + e);
+                System.err.println("Failed to compile function " + i + ": " + e.getMessage());
                 results[i] = null;
             }
         }
@@ -114,6 +114,10 @@ final class NativeCompiler {
         // --- Pre-pass: analyze reachability ---
         var analyzer = NativeAnalyzer.analyze(body);
 
+        // Multi-return: functions with >1 return write results to argsBuffer
+        // and return a single i64 (dummy). Single-return uses registers (fast path).
+        boolean multiReturn = funcType.returns().size() > 1;
+
         // --- Setup function ---
         bridge.exports().createFunction();
 
@@ -122,8 +126,13 @@ final class NativeCompiler {
         for (ValType param : funcType.params()) {
             bridge.exports().addParamType(EmitContext.valTypeToBridgeType(param));
         }
-        for (ValType ret : funcType.returns()) {
-            bridge.exports().addReturnType(EmitContext.valTypeToBridgeType(ret));
+        if (multiReturn) {
+            // Multi-return: return single i64 dummy (actual values in argsBuffer)
+            bridge.exports().addReturnType(CraneliftBridge.TYPE_I64);
+        } else {
+            for (ValType ret : funcType.returns()) {
+                bridge.exports().addReturnType(EmitContext.valTypeToBridgeType(ret));
+            }
         }
 
         bridge.exports().buildFunction();
@@ -178,7 +187,8 @@ final class NativeCompiler {
                         localVars,
                         memBaseVar,
                         ctxPtrVar,
-                        new HashMap<>());
+                        new HashMap<>(),
+                        multiReturn);
 
         // --- Emission loop ---
         Deque<ControlFrame> controlStack = new ArrayDeque<>();
@@ -1141,11 +1151,23 @@ final class NativeCompiler {
                                 frame.mergeBlock, frame.blockType.returns().size(), valueStack);
                     }
                     bridge.exports().switchToBlock(frame.elseBlock);
-                    // Implicit else: IF without ELSE requires params == returns.
-                    // Pass dummy zeros for the merge block params.
-                    if (frame.blockType.returns().isEmpty()) {
+                    // Implicit else: pass block params through to merge.
+                    // For IF without ELSE, params == returns per Wasm spec.
+                    if (frame.elseParamIds != null && frame.elseParamIds.length > 0) {
+                        // Use else block's own param values
+                        if (frame.elseParamIds.length == 1) {
+                            bridge.exports()
+                                    .emitJumpWithArg(frame.mergeBlock, frame.elseParamIds[0]);
+                        } else {
+                            for (int pid : frame.elseParamIds) {
+                                bridge.exports().pushCallArg(pid);
+                            }
+                            bridge.exports().emitJumpWithArgs(frame.mergeBlock);
+                        }
+                    } else if (frame.blockType.returns().isEmpty()) {
                         bridge.exports().emitJump(frame.mergeBlock);
                     } else {
+                        // No else params (paramless IF) — use dummy zeros
                         for (ValType t : frame.blockType.returns()) {
                             bridge.exports().pushCallArg(emitZero(t));
                         }
@@ -1177,32 +1199,34 @@ final class NativeCompiler {
         var valueStack = ctx.valueStack;
         if (retCount == 0) {
             bridge.exports().emitReturnVoid();
-        } else if (retCount == 1 && !valueStack.isEmpty()) {
+        } else if (!ctx.multiReturn && retCount == 1 && !valueStack.isEmpty()) {
             bridge.exports().emitReturn(valueStack.pop());
-        } else if (retCount > 1 && valueStack.size() >= retCount) {
+        } else if (retCount >= 1 && valueStack.size() >= retCount) {
             int[] retVals = new int[retCount];
             for (int ri = retCount - 1; ri >= 0; ri--) {
                 retVals[ri] = valueStack.pop();
             }
-            for (int rv : retVals) {
-                bridge.exports().pushCallArg(rv);
+            if (ctx.multiReturn) {
+                ctx.emitWriteReturnsToArgsBuffer(funcType.returns(), retVals);
+                bridge.exports().emitReturn(bridge.exports().emitIconst64(0, 0));
+            } else {
+                bridge.exports().emitReturn(retVals[0]);
             }
-            bridge.exports().emitReturnMulti();
         } else {
             ctx.emitReturnForFuncType();
         }
     }
 
-    private void emitReturnWithArgs(int[] args, int argCount) {
+    private void emitReturnWithArgs(EmitContext ctx, int[] args, int argCount) {
         if (argCount == 0) {
             bridge.exports().emitReturnVoid();
-        } else if (argCount == 1) {
+        } else if (!ctx.multiReturn && argCount == 1) {
             bridge.exports().emitReturn(args[0]);
+        } else if (ctx.multiReturn) {
+            ctx.emitWriteReturnsToArgsBuffer(ctx.funcType.returns(), args);
+            bridge.exports().emitReturn(bridge.exports().emitIconst64(0, 0));
         } else {
-            for (int i = 0; i < argCount; i++) {
-                bridge.exports().pushCallArg(args[i]);
-            }
-            bridge.exports().emitReturnMulti();
+            bridge.exports().emitReturn(args[0]);
         }
     }
 
@@ -1210,17 +1234,19 @@ final class NativeCompiler {
         int retCount = funcFrame.blockType.returns().size();
         if (retCount == 0) {
             bridge.exports().emitReturnVoid();
-        } else if (retCount == 1) {
+        } else if (!ctx.multiReturn && retCount == 1) {
             bridge.exports().emitReturn(ctx.valueStack.pop());
         } else {
             int[] retVals = new int[retCount];
             for (int i = retCount - 1; i >= 0; i--) {
                 retVals[i] = ctx.valueStack.pop();
             }
-            for (int rv : retVals) {
-                bridge.exports().pushCallArg(rv);
+            if (ctx.multiReturn) {
+                ctx.emitWriteReturnsToArgsBuffer(funcFrame.blockType.returns(), retVals);
+                bridge.exports().emitReturn(bridge.exports().emitIconst64(0, 0));
+            } else {
+                bridge.exports().emitReturn(retVals[0]);
             }
-            bridge.exports().emitReturnMulti();
         }
     }
 
@@ -1292,7 +1318,7 @@ final class NativeCompiler {
 
             bridge.exports().switchToBlock(hitBlock);
             if (target.kind == ControlFrame.Kind.FUNCTION) {
-                emitReturnWithArgs(brArgs, argCount);
+                emitReturnWithArgs(ctx, brArgs, argCount);
             } else {
                 if (argCount == 0) {
                     bridge.exports().emitJump(brTarget);
@@ -1312,7 +1338,7 @@ final class NativeCompiler {
         // Default
         int defTarget = defaultTarget.branchTarget();
         if (defaultTarget.kind == ControlFrame.Kind.FUNCTION) {
-            emitReturnWithArgs(brArgs, argCount);
+            emitReturnWithArgs(ctx, brArgs, argCount);
         } else {
             if (argCount == 0) {
                 bridge.exports().emitJump(defTarget);

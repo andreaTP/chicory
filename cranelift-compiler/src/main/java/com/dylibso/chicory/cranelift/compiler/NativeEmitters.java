@@ -518,9 +518,29 @@ final class NativeEmitters {
             ctx.bridge.exports().pushCallArg(argVals[i]);
         }
 
-        int rawResult = ctx.bridge.exports().emitCallIndirect(sigRef, funcPtr);
+        // For multi-return callees, the SigRef must match the actual native
+        // signature (single i64 return), not the Wasm signature.
+        boolean calleeMultiReturn = targetType.returns().size() > 1;
+        int actualSigRef =
+                calleeMultiReturn ? ctx.getOrCreateMultiReturnSigRef(targetType) : sigRef;
 
-        if (!targetType.returns().isEmpty()) {
+        int rawResult = ctx.bridge.exports().emitCallIndirect(actualSigRef, funcPtr);
+
+        if (calleeMultiReturn) {
+            // Read return values from argsBuffer
+            int zero2 = ctx.bridge.exports().emitIconst32(0);
+            int argsPtr2 =
+                    ctx.bridge
+                            .exports()
+                            .emitLoadI64(
+                                    ctx.bridge.exports().useVar(ctx.ctxPtrVar),
+                                    zero2,
+                                    CtxBuffer.ARGS_PTR);
+            for (int i = 0; i < targetType.returns().size(); i++) {
+                int raw = ctx.bridge.exports().emitLoadI64(argsPtr2, zero2, CtxBuffer.argOffset(i));
+                ctx.valueStack.push(ctx.narrowFromI64ForType(raw, targetType.returns().get(i)));
+            }
+        } else if (!targetType.returns().isEmpty()) {
             ctx.valueStack.push(rawResult);
         }
     }

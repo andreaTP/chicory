@@ -22,6 +22,7 @@ final class EmitContext {
     final int memBaseVar;
     final int ctxPtrVar;
     final Map<String, Integer> sigRefCache;
+    final boolean multiReturn;
 
     EmitContext(
             CraneliftBridge bridge,
@@ -32,7 +33,8 @@ final class EmitContext {
             int[] localVars,
             int memBaseVar,
             int ctxPtrVar,
-            Map<String, Integer> sigRefCache) {
+            Map<String, Integer> sigRefCache,
+            boolean multiReturn) {
         this.bridge = bridge;
         this.valueStack = valueStack;
         this.module = module;
@@ -42,6 +44,7 @@ final class EmitContext {
         this.memBaseVar = memBaseVar;
         this.ctxPtrVar = ctxPtrVar;
         this.sigRefCache = sigRefCache;
+        this.multiReturn = multiReturn;
     }
 
     // --- Helpers used by emitters ---
@@ -67,13 +70,28 @@ final class EmitContext {
     void emitReturnForFuncType() {
         if (funcType.returns().isEmpty()) {
             bridge.exports().emitReturnVoid();
-        } else if (funcType.returns().size() == 1) {
+        } else if (!multiReturn) {
             bridge.exports().emitReturn(emitZero(funcType.returns().get(0)));
         } else {
-            for (ValType rt : funcType.returns()) {
-                bridge.exports().pushCallArg(emitZero(rt));
-            }
-            bridge.exports().emitReturnMulti();
+            // Multi-return: write zeros to argsBuffer, return dummy i64
+            emitWriteReturnsToArgsBuffer(funcType.returns(), null);
+            bridge.exports().emitReturn(bridge.exports().emitIconst64(0, 0));
+        }
+    }
+
+    /**
+     * Write return values to argsBuffer (widened to i64).
+     * If vals is null, writes zeros.
+     */
+    void emitWriteReturnsToArgsBuffer(java.util.List<ValType> types, int[] vals) {
+        int zero = bridge.exports().emitIconst32(0);
+        int argsPtr =
+                bridge.exports()
+                        .emitLoadI64(bridge.exports().useVar(ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        for (int i = 0; i < types.size(); i++) {
+            int val = (vals != null) ? vals[i] : emitZero(types.get(i));
+            int widened = widenToI64ForType(val, types.get(i));
+            bridge.exports().emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
         }
     }
 
@@ -166,6 +184,24 @@ final class EmitContext {
         for (ValType ret : ft.returns()) {
             bridge.exports().sigAddReturn(valTypeToBridgeType(ret));
         }
+        int sigRef = bridge.exports().endSig();
+        sigRefCache.put(key, sigRef);
+        return sigRef;
+    }
+
+    int getOrCreateMultiReturnSigRef(FunctionType ft) {
+        String key = "__mr__" + ft.toString();
+        Integer cached = sigRefCache.get(key);
+        if (cached != null) return cached;
+
+        bridge.exports().beginSig();
+        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // memBase
+        bridge.exports().sigAddParam(CraneliftBridge.TYPE_I64); // ctxPtr
+        for (ValType param : ft.params()) {
+            bridge.exports().sigAddParam(valTypeToBridgeType(param));
+        }
+        // Multi-return: single i64 dummy return (actual values in argsBuffer)
+        bridge.exports().sigAddReturn(CraneliftBridge.TYPE_I64);
         int sigRef = bridge.exports().endSig();
         sigRefCache.put(key, sigRef);
         return sigRef;
