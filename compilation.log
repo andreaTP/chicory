@@ -1,0 +1,551 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hotspot_log version='160 1' process='1371107' time_ms='1770212475357'>
+<vm_version>
+<name>
+OpenJDK 64-Bit Server VM
+</name>
+<release>
+19.0.1+10
+</release>
+<info>
+OpenJDK 64-Bit Server VM (19.0.1+10) for linux-amd64 JRE (19.0.1+10), built on 2022-10-18T00:00:00Z by &quot;temurin&quot; with gcc 11.2.0
+</info>
+</vm_version>
+<vm_arguments>
+<args>
+-XX:-TieredCompilation -XX:+UnlockDiagnosticVMOptions -XX:+PrintCompilation -XX:+LogCompilation -XX:LogFile=compilation.log </args>
+<command>
+MinimalReproducer
+</command>
+<launcher>
+SUN_STANDARD
+</launcher>
+<properties>
+java.vm.specification.name=Java Virtual Machine Specification
+java.vm.version=19.0.1+10
+java.vm.name=OpenJDK 64-Bit Server VM
+jdk.debug=release
+sun.boot.library.path=/home/andreatp/.sdkman/candidates/java/19.0.1-tem/lib
+java.library.path=/tmp/.mount_CursoreurHWc/usr/lib/:/tmp/.mount_CursoreurHWc/usr/lib32/:/tmp/.mount_CursoreurHWc/usr/lib64/:/tmp/.mount_CursoreurHWc/lib/:/tmp/.mount_CursoreurHWc/lib/i386-linux-gnu/:/tmp/.mount_CursoreurHWc/lib/x86_64-linux-gnu/:/tmp/.mount_CursoreurHWc/lib/aarch64-linux-gnu/:/tmp/.mount_CursoreurHWc/lib32/:/tmp/.mount_CursoreurHWc/lib64/::/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib
+java.home=/home/andreatp/.sdkman/candidates/java/19.0.1-tem
+java.class.path=.
+java.vm.info=mixed mode, sharing
+java.vm.specification.vendor=Oracle Corporation
+java.vm.specification.version=19
+java.vm.vendor=Eclipse Adoptium
+sun.java.command=MinimalReproducer
+sun.java.launcher=SUN_STANDARD
+</properties>
+</vm_arguments>
+<tty>
+<writer thread='1371110'/>
+<blob name='MethodHandlesAdapterBlob' size='4224'>
+<sect index='1' size='4224' free='3842'/>
+</blob>
+<writer thread='1371122'/>
+<thread_logfile thread='1371122' filename='/tmp/hs_c1371122_pid1371107.log'/>
+<writer thread='1371110'/>
+<task_queued compile_id='1' method='MinimalReproducer testCompareUnsigned (I)V' bytes='61' count='6784' iicount='6784' stamp='0.026' comment='tiered' hot_count='6784'/>
+<task_queued compile_id='2' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='6912' iicount='6912' stamp='0.026' comment='tiered' hot_count='6912'/>
+<writer thread='1371122'/>
+     25    1             MinimalReproducer::testCompareUnsigned (61 bytes)
+<writer thread='1371110'/>
+<task_queued compile_id='3' method='java.lang.Integer compare (II)I' bytes='20' count='6912' iicount='6912' stamp='0.026' comment='tiered' hot_count='6912'/>
+<writer thread='1371122'/>
+<nmethod compile_id='1' compiler='c2' entry='0x00007f00d0c83da0' size='696' address='0x00007f00d0c83c10' relocation_offset='352' insts_offset='400' stub_offset='528' scopes_data_offset='568' scopes_pcs_offset='608' dependencies_offset='672' nul_chk_table_offset='680' oops_offset='552' metadata_offset='560' method='MinimalReproducer testCompareUnsigned (I)V' bytes='61' count='13100' iicount='13102' stamp='0.026'/>
+     26    2             java.lang.Integer::compareUnsigned (12 bytes)
+<writer thread='1371110'/>
+<task_queued compile_id='4' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='21504' iicount='1' osr_bci='21' stamp='0.027' comment='tiered' hot_count='21504'/>
+<writer thread='1371122'/>
+<nmethod compile_id='2' compiler='c2' entry='0x00007f00d0c83aa0' size='680' address='0x00007f00d0c83910' relocation_offset='352' insts_offset='400' stub_offset='528' scopes_data_offset='568' scopes_pcs_offset='608' dependencies_offset='672' metadata_offset='552' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='13128' iicount='13128' stamp='0.027'/>
+     26    3             java.lang.Integer::compare (20 bytes)
+<nmethod compile_id='3' compiler='c2' entry='0x00007f00d0c835a0' size='664' address='0x00007f00d0c83410' relocation_offset='352' insts_offset='400' stub_offset='528' scopes_data_offset='560' scopes_pcs_offset='592' dependencies_offset='656' metadata_offset='552' method='java.lang.Integer compare (II)I' bytes='20' count='13128' iicount='13128' stamp='0.027'/>
+     27    4 %           MinimalReproducer::main @ 21 (301 bytes)
+<nmethod compile_id='4' compile_kind='osr' compiler='c2' entry='0x00007f00d0c86a00' size='864' address='0x00007f00d0c86890' relocation_offset='352' insts_offset='368' stub_offset='656' scopes_data_offset='696' scopes_pcs_offset='760' dependencies_offset='840' nul_chk_table_offset='848' oops_offset='680' metadata_offset='688' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='99920' iicount='1' stamp='0.029'/>
+<writer thread='1371110'/>
+<task_queued compile_id='5' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='101376' iicount='1' osr_bci='39' stamp='0.029' comment='tiered' hot_count='101376'/>
+<writer thread='1371122'/>
+     29    5 %           MinimalReproducer::main @ 39 (301 bytes)
+<nmethod compile_id='5' compile_kind='osr' compiler='c2' entry='0x00007f00d0c86680' size='864' address='0x00007f00d0c86510' relocation_offset='352' insts_offset='368' stub_offset='656' scopes_data_offset='696' scopes_pcs_offset='760' dependencies_offset='840' nul_chk_table_offset='848' oops_offset='680' metadata_offset='688' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='160000' iicount='1' stamp='0.031'/>
+<writer thread='1371110'/>
+<uncommon_trap thread='1371110' reason='unstable_if' action='reinterpret' debug_id='0' compile_id='2' compiler='c2' stamp='0.032'>
+<jvms bci='2' method='java.lang.Integer compare (II)I' bytes='20' count='13128' iicount='13128'/>
+<jvms bci='8' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='13128' iicount='13128'/>
+</uncommon_trap>
+<make_not_entrant thread='1371110' compile_id='2' compiler='c2' stamp='0.032'/>
+     31    2             java.lang.Integer::compareUnsigned (12 bytes)   made not entrant
+<task_queued compile_id='6' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='160768' iicount='1' osr_bci='149' stamp='0.032' comment='tiered' hot_count='160768'/>
+<writer thread='1371122'/>
+     32    6 %           MinimalReproducer::main @ 149 (301 bytes)
+<writer thread='1371110'/>
+<task_queued compile_id='7' method='java.lang.Integer toUnsignedLong (I)J' bytes='7' count='6784' iicount='6784' stamp='0.032' comment='tiered' hot_count='6784'/>
+<task_queued compile_id='8' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='18304' iicount='18304' decompiles='1' stamp='0.033' comment='tiered' hot_count='18304'/>
+<writer thread='1371122'/>
+<nmethod compile_id='6' compile_kind='osr' compiler='c2' entry='0x00007f00d0c86180' size='1264' address='0x00007f00d0c86010' relocation_offset='352' insts_offset='368' stub_offset='1040' scopes_data_offset='1080' scopes_pcs_offset='1176' dependencies_offset='1256' oops_offset='1064' metadata_offset='1072' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='178495' iicount='1' stamp='0.035'/>
+     34    8             java.lang.Integer::compareUnsigned (12 bytes)
+<writer thread='1371110'/>
+<task_queued compile_id='9' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='179200' iicount='1' stamp='0.035' comment='tiered' hot_count='1'/>
+<uncommon_trap thread='1371110' reason='unstable_if' action='reinterpret' debug_id='0' compile_id='6' compile_kind='osr' compiler='c2' stamp='0.035'>
+<jvms bci='153' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='179200' iicount='1'/>
+</uncommon_trap>
+<make_not_entrant thread='1371110' compile_id='6' compile_kind='osr' compiler='c2' stamp='0.035'/>
+     34    6 %           MinimalReproducer::main @ 149 (301 bytes)   made not entrant
+<writer thread='1371122'/>
+<nmethod compile_id='8' compiler='c2' entry='0x00007f00d0c85e80' size='616' address='0x00007f00d0c85d10' relocation_offset='352' insts_offset='368' stub_offset='496' scopes_data_offset='536' scopes_pcs_offset='560' dependencies_offset='608' metadata_offset='520' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='32329' iicount='32329' decompiles='1' stamp='0.035'/>
+     34    7             java.lang.Integer::toUnsignedLong (7 bytes)
+<nmethod compile_id='7' compiler='c2' entry='0x00007f00d0c85b80' size='504' address='0x00007f00d0c85a10' relocation_offset='352' insts_offset='368' stub_offset='432' scopes_data_offset='456' scopes_pcs_offset='464' dependencies_offset='496' method='java.lang.Integer toUnsignedLong (I)J' bytes='7' count='38400' iicount='38400' stamp='0.035'/>
+     35    9             MinimalReproducer::main (301 bytes)
+<writer thread='1371110'/>
+<statistics type='deoptimization'>
+Deoptimization traps recorded:
+     2 (100.0%) total
+         unstable_if/reinterpret/if_icmpge: 2 (100.0%)
+</statistics>
+<writer thread='1371116'/>
+<destroy_vm stamp='0.035'/>
+<tty_done stamp='0.036'/>
+</tty>
+<compilation_log thread='1371122'>
+<start_compile_thread name='C2 CompilerThread0' thread='1371122' process='1371107' stamp='0.020'/>
+<task compile_id='1' method='MinimalReproducer testCompareUnsigned (I)V' bytes='61' count='6912' iicount='6912' stamp='0.026'>
+<type id='1205' name='void'/>
+<type id='1203' name='int'/>
+<klass id='1354' name='MinimalReproducer' flags='1'/>
+<method id='1355' holder='1354' name='testCompareUnsigned' return='1205' arguments='1203' flags='10' bytes='61' iicount='6980'/>
+<parse method='1355' uses='6980.000000' stamp='0.026'>
+<bc code='184' bci='20'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1357' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' iicount='7298'/>
+<call method='1357' count='5391' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1357' uses='6957.000000' stamp='0.026'>
+<bc code='184' bci='8'/>
+<method id='1358' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' iicount='8246'/>
+<call method='1358' count='6677' prof_factor='0.953275' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1358' uses='6954.000000' stamp='0.026'>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='8239' not_taken='0' cnt='8239.000000' prob='always'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='8239' not_taken='0' cnt='8239.000000' prob='always'/>
+<parse_done stamp='0.026'/>
+</parse>
+<parse_done stamp='0.026'/>
+</parse>
+<bc code='158' bci='25'/>
+<branch target_bci='39' taken='0' not_taken='6955' cnt='6955.000000' prob='never'/>
+<bc code='79' bci='35'/>
+<uncommon_trap bci='35' reason='null_check' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='35' reason='range_check' action='make_not_entrant' debug_id='0' comment='range_check'/>
+<parse_done stamp='0.026'/>
+</parse>
+<regalloc attempts='1' success='1'/>
+<code_cache total_blobs='259' nmethods='1' adapters='206' free_code_cache='49781888'/>
+<task_done success='1' nmsize='152' count='13128' inlined_bytes='32' stamp='0.026'/>
+</task>
+<task compile_id='2' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='13128' iicount='13128' stamp='0.026'>
+<type id='1203' name='int'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1354' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' iicount='13128'/>
+<parse method='1354' uses='13128.000000' stamp='0.027'>
+<bc code='184' bci='8'/>
+<method id='1356' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' iicount='13128'/>
+<call method='1356' count='11465' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1356' uses='13129.000000' stamp='0.027'>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<uncommon_trap bci='2' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken always'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<uncommon_trap bci='11' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken always'/>
+<parse_done stamp='0.027'/>
+</parse>
+<parse_done stamp='0.027'/>
+</parse>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='260' nmethods='2' adapters='206' free_code_cache='49781120'/>
+<task_done success='1' nmsize='152' count='13128' inlined_bytes='20' stamp='0.027'/>
+</task>
+<task compile_id='3' method='java.lang.Integer compare (II)I' bytes='20' count='13128' iicount='13128' stamp='0.027'>
+<type id='1203' name='int'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1354' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' iicount='13128'/>
+<parse method='1354' uses='13128.000000' stamp='0.027'>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<uncommon_trap bci='2' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken always'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<uncommon_trap bci='11' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken always'/>
+<parse_done stamp='0.027'/>
+</parse>
+<regalloc attempts='1' success='1'/>
+<code_cache total_blobs='261' nmethods='3' adapters='206' free_code_cache='49779840'/>
+<task_done success='1' nmsize='152' count='13128' stamp='0.027'/>
+</task>
+<task compile_id='4' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='35088' iicount='1' osr_bci='21' stamp='0.027'>
+<type id='1205' name='void'/>
+<klass id='1355' name='[Ljava.lang.String;' flags='1041'/>
+<klass id='1354' name='MinimalReproducer' flags='1'/>
+<method id='1356' holder='1354' name='main' return='1205' arguments='1355' flags='9' bytes='301' iicount='1'/>
+<klass id='1359' name='java.lang.System' unloaded='1'/>
+<uncommon_trap method='1356' bci='55' reason='unloaded' action='reinterpret' index='16' debug_id='0' klass='1359'/>
+<parse method='1356' uses='1.000000' osr_bci='21' stamp='0.027'>
+<uncommon_trap method='1356' bci='55' reason='unloaded' action='reinterpret' index='16' debug_id='0' klass='1359'/>
+<uncommon_trap bci='21' reason='predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='21' reason='profile_predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='21' reason='loop_limit_check' action='maybe_recompile' debug_id='0'/>
+<bc code='162' bci='24'/>
+<branch target_bci='37' taken='0' not_taken='26657' cnt='26657.000000' prob='never'/>
+<uncommon_trap bci='24' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken never'/>
+<bc code='184' bci='28'/>
+<type id='1203' name='int'/>
+<method id='1360' holder='1354' name='testCompareUnsigned' return='1205' arguments='1203' flags='10' bytes='61' compile_id='1' compiler='c2' iicount='13128'/>
+<call method='1360' count='26657' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1360' uses='26657.000000' stamp='0.027'>
+<bc code='184' bci='20'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1361' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' compile_id='2' compiler='c2' iicount='13128'/>
+<call method='1361' count='11465' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1361' uses='13129.000000' stamp='0.027'>
+<bc code='184' bci='8'/>
+<method id='1363' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' compile_id='3' compiler='c2' iicount='13128'/>
+<call method='1363' count='11465' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1363' uses='13129.000000' stamp='0.028'>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<parse_done stamp='0.028'/>
+</parse>
+<parse_done stamp='0.028'/>
+</parse>
+<bc code='158' bci='25'/>
+<branch target_bci='39' taken='0' not_taken='13129' cnt='13129.000000' prob='never'/>
+<bc code='79' bci='35'/>
+<uncommon_trap bci='35' reason='null_check' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='35' reason='range_check' action='make_not_entrant' debug_id='0' comment='range_check'/>
+<parse_done stamp='0.028'/>
+</parse>
+<parse_done stamp='0.028'/>
+</parse>
+<loop_tree>
+<loop idx='228' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='228' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='277' >
+<loop idx='346' >
+</loop>
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='368' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='390' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='408' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='408' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='262' nmethods='4' adapters='206' free_code_cache='49778944'/>
+<task_done success='1' nmsize='312' count='1' backedge_count='100724' inlined_bytes='93' stamp='0.029'/>
+</task>
+<task compile_id='5' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='101695' iicount='1' osr_bci='39' stamp='0.029'>
+<type id='1205' name='void'/>
+<klass id='1355' name='[Ljava.lang.String;' flags='1041'/>
+<klass id='1354' name='MinimalReproducer' flags='1'/>
+<method id='1356' holder='1354' name='main' return='1205' arguments='1355' flags='9' bytes='301' iicount='1'/>
+<klass id='1359' name='java.lang.System' unloaded='1'/>
+<uncommon_trap method='1356' bci='55' reason='unloaded' action='reinterpret' index='16' debug_id='0' klass='1359'/>
+<parse method='1356' uses='1.000000' osr_bci='39' stamp='0.029'>
+<uncommon_trap method='1356' bci='55' reason='unloaded' action='reinterpret' index='16' debug_id='0' klass='1359'/>
+<uncommon_trap bci='39' reason='predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='39' reason='profile_predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='39' reason='loop_limit_check' action='maybe_recompile' debug_id='0'/>
+<bc code='162' bci='42'/>
+<branch target_bci='55' taken='0' not_taken='43048' cnt='43048.000000' prob='never'/>
+<uncommon_trap bci='42' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken never'/>
+<bc code='184' bci='46'/>
+<type id='1203' name='int'/>
+<method id='1360' holder='1354' name='testCompareUnsigned' return='1205' arguments='1203' flags='10' bytes='61' compile_id='1' compiler='c2' iicount='13128'/>
+<call method='1360' count='43048' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1360' uses='43048.000000' stamp='0.030'>
+<bc code='184' bci='20'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1361' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' compile_id='2' compiler='c2' iicount='13128'/>
+<call method='1361' count='11465' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1361' uses='13129.000000' stamp='0.030'>
+<bc code='184' bci='8'/>
+<method id='1363' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' compile_id='3' compiler='c2' iicount='13128'/>
+<call method='1363' count='11465' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1363' uses='13129.000000' stamp='0.030'>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<parse_done stamp='0.030'/>
+</parse>
+<parse_done stamp='0.030'/>
+</parse>
+<bc code='158' bci='25'/>
+<branch target_bci='39' taken='0' not_taken='13129' cnt='13129.000000' prob='never'/>
+<bc code='79' bci='35'/>
+<uncommon_trap bci='35' reason='null_check' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='35' reason='range_check' action='make_not_entrant' debug_id='0' comment='range_check'/>
+<parse_done stamp='0.030'/>
+</parse>
+<parse_done stamp='0.030'/>
+</parse>
+<loop_tree>
+<loop idx='228' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='228' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='277' >
+<loop idx='346' >
+</loop>
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='368' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='390' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='408' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='312' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='408' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='286' inner_loop='1' >
+</loop>
+</loop_tree>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='263' nmethods='5' adapters='206' free_code_cache='49778048'/>
+<task_done success='1' nmsize='312' count='1' backedge_count='160000' inlined_bytes='93' stamp='0.031'/>
+</task>
+<task compile_id='6' compile_kind='osr' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='160862' iicount='1' osr_bci='149' stamp='0.032'>
+<type id='1205' name='void'/>
+<klass id='1355' name='[Ljava.lang.String;' flags='1041'/>
+<klass id='1354' name='MinimalReproducer' flags='1'/>
+<method id='1356' holder='1354' name='main' return='1205' arguments='1355' flags='9' bytes='301' iicount='1'/>
+<uncommon_trap method='1356' bci='248' reason='uninitialized' action='reinterpret' debug_id='0'/>
+<uncommon_trap method='1356' bci='98' reason='uninitialized' action='reinterpret' debug_id='0'/>
+<parse method='1356' uses='1.000000' osr_bci='149' stamp='0.032'>
+<uncommon_trap method='1356' bci='248' reason='uninitialized' action='reinterpret' debug_id='0'/>
+<uncommon_trap bci='149' reason='predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='149' reason='profile_predicate' action='maybe_recompile' debug_id='0'/>
+<uncommon_trap bci='149' reason='loop_limit_check' action='maybe_recompile' debug_id='0'/>
+<bc code='162' bci='153'/>
+<branch target_bci='292' taken='0' not_taken='1183' cnt='1183.000000' prob='never'/>
+<uncommon_trap bci='153' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken never'/>
+<bc code='184' bci='182'/>
+<type id='1203' name='int'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1365' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' iicount='14533'/>
+<call method='1365' count='1183' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1365' uses='1183.000000' stamp='0.032'>
+<bc code='184' bci='8'/>
+<method id='1361' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' compile_id='3' compiler='c2' iicount='13128'/>
+<call method='1361' count='14160' prof_factor='0.081401' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1361' uses='1183.000000' stamp='0.032'>
+<observe trap='unstable_if' count='1' total='1'/>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='1' cnt='13130.000000' prob='                1.00'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<parse_done stamp='0.032'/>
+</parse>
+<parse_done stamp='0.032'/>
+</parse>
+<bc code='184' bci='189'/>
+<type id='1204' name='long'/>
+<method id='1366' holder='1330' name='toUnsignedLong' return='1204' arguments='1203' flags='9' bytes='7' iicount='2819'/>
+<call method='1366' count='1183' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1366' uses='1183.000000' stamp='0.032'>
+<parse_done stamp='0.032'/>
+</parse>
+<bc code='184' bci='196'/>
+<call method='1366' count='1183' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1366' uses='1183.000000' stamp='0.032'>
+<parse_done stamp='0.032'/>
+</parse>
+<bc code='158' bci='206'/>
+<branch target_bci='213' taken='0' not_taken='1183' cnt='1183.000000' prob='never'/>
+<uncommon_trap bci='206' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken never'/>
+<bc code='159' bci='232'/>
+<branch target_bci='286' taken='1183' not_taken='0' cnt='1183.000000' prob='always'/>
+<parse_done stamp='0.032'/>
+</parse>
+<loop_tree>
+<loop idx='216' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='277' >
+<loop idx='368' >
+</loop>
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='328' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='404' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='291' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='328' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='483' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='291' inner_loop='1' >
+</loop>
+</loop_tree>
+<loop_tree>
+<loop idx='328' inner_loop='1' >
+</loop>
+<loop idx='277' >
+<loop idx='483' inner_loop='1' >
+</loop>
+</loop>
+<loop idx='291' inner_loop='1' >
+</loop>
+</loop_tree>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='264' nmethods='6' adapters='206' free_code_cache='49776768'/>
+<task_done success='1' nmsize='696' count='1' backedge_count='178675' inlined_bytes='46' stamp='0.035'/>
+</task>
+<task compile_id='8' method='java.lang.Integer compareUnsigned (II)I' bytes='12' count='31855' iicount='31857' decompiles='1' stamp='0.035'>
+<type id='1203' name='int'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1354' holder='1330' name='compareUnsigned' return='1203' arguments='1203 1203' flags='9' bytes='12' iicount='32082'/>
+<parse method='1354' uses='32082.000000' stamp='0.035'>
+<bc code='184' bci='8'/>
+<method id='1356' holder='1330' name='compare' return='1203' arguments='1203 1203' flags='9' bytes='20' compile_id='3' compiler='c2' iicount='13128'/>
+<call method='1356' count='30440' prof_factor='1.000000' inline='1'/>
+<inline_success reason='inline (hot)'/>
+<parse method='1356' uses='32080.000000' stamp='0.035'>
+<observe trap='unstable_if' count='1' total='1'/>
+<bc code='162' bci='2'/>
+<branch target_bci='9' taken='13129' not_taken='1' cnt='13130.000000' prob='                1.00'/>
+<bc code='160' bci='11'/>
+<branch target_bci='18' taken='13129' not_taken='0' cnt='13129.000000' prob='always'/>
+<uncommon_trap bci='11' reason='unstable_if' action='reinterpret' debug_id='0' comment='taken always'/>
+<parse_done stamp='0.035'/>
+</parse>
+<parse_done stamp='0.035'/>
+</parse>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='265' nmethods='7' adapters='206' free_code_cache='49776000'/>
+<task_done success='1' nmsize='152' count='32329' inlined_bytes='20' stamp='0.035'/>
+</task>
+<task compile_id='7' method='java.lang.Integer toUnsignedLong (I)J' bytes='7' count='38400' iicount='38400' stamp='0.035'>
+<type id='1204' name='long'/>
+<type id='1203' name='int'/>
+<klass id='1330' name='java.lang.Integer' flags='17'/>
+<method id='1354' holder='1330' name='toUnsignedLong' return='1204' arguments='1203' flags='9' bytes='7' iicount='38400'/>
+<parse method='1354' uses='38400.000000' stamp='0.035'>
+<parse_done stamp='0.035'/>
+</parse>
+<regalloc attempts='0' success='1'/>
+<code_cache total_blobs='266' nmethods='8' adapters='206' free_code_cache='49775232'/>
+<task_done success='1' nmsize='88' count='38400' stamp='0.035'/>
+</task>
+<fragment>
+<![CDATA[
+<task compile_id='9' method='MinimalReproducer main ([Ljava/lang/String;)V' bytes='301' count='1' backedge_count='179200' iicount='1' decompiles='1' unstable_if_traps='1' stamp='0.035'>
+<type id='1205' name='void'/>
+<klass id='1355' name='[Ljava.lang.String;' flags='1041'/>
+<klass id='1354' name='MinimalReproducer' flags='1'/>
+<method id='1356' holder='1354' name='main' return='1205' arguments='1355' flags='9' bytes='301' iicount='1'/>
+<uncommon_trap method='1356' bci='248' reason='uninitialized' action='reinterpret' debug_id='0'/>
+<uncommon_trap method='1356' bci='98' reason='uninitialized' action='reinterpret' debug_id='0'/>
+]]>
+</fragment>
+</compilation_log>
+<hotspot_log_done stamp='0.037'/>
+</hotspot_log>

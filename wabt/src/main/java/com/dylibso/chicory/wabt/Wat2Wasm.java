@@ -55,21 +55,12 @@ public final class Wat2Wasm {
         try (ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
                 ByteArrayOutputStream stderrStream = new ByteArrayOutputStream()) {
 
-            try (FileSystem fs =
-                    ZeroFs.newFileSystem(
-                            Configuration.unix().toBuilder().setAttributeViews("unix").build())) {
-
-                Path target = fs.getPath("tmp");
-                java.nio.file.Files.createDirectory(target);
-                Path path = target.resolve(fileName);
-                copy(is, path, StandardCopyOption.REPLACE_EXISTING);
-
                 WasiOptions wasiOpts =
                         WasiOptions.builder()
+                                .withStdin(is)
                                 .withStdout(stdoutStream)
                                 .withStderr(stderrStream)
-                                .withDirectory(target.toString(), target)
-                                .withArguments(List.of("wat2wasm", path.toString(), "--output=-"))
+                                .withArguments(List.of("wat2wasm", "-", "--output=-"))
                                 .build();
 
                 try (var wasi =
@@ -90,9 +81,8 @@ public final class Wat2Wasm {
                 }
 
                 return stdoutStream.toByteArray();
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 }

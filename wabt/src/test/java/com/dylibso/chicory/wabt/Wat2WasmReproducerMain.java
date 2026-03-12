@@ -28,7 +28,7 @@ public final class Wat2WasmReproducerMain {
                     .append(" (export \"func_").append(func).append("\")\n");
             if (func != 1) {
                 sb.append("\n");
-                sb.append("    call $func_0\n");
+                sb.append("    call $func_").append(func - 1).append("\n");
             }
             sb.append("  )\n");
         }
@@ -72,7 +72,7 @@ public final class Wat2WasmReproducerMain {
     }
 
     public static void main(String[] args) throws Exception {
-        int funcCount = 1500;
+        int funcCount = 15000;
 
         String wat = createBigWat(funcCount);
         System.out.println("WAT size (chars): " + wat.length());

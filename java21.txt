@@ -1,0 +1,2567 @@
+=== TestUnsignedComparison Operations ===
+
+--- Integer Variable Comparisons (x + INT_MIN <op> y + INT_MIN) ---
+x=0x00000000 (idx=0), y=0x00000000 (idx=0):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000 (idx=0), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000 (idx=0), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000001 (idx=1), y=0x00000001 (idx=1):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000001 (idx=1), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000002 (idx=2), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000002 (idx=2), y=0x00000002 (idx=2):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000002 (idx=2), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000003 (idx=3), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000003 (idx=3), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000003 (idx=3), y=0x00000003 (idx=3):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000003 (idx=3), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000000 (idx=4), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000000 (idx=4), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000000 (idx=4), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000000 (idx=4), y=0x80000000 (idx=4):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000000 (idx=4), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000001 (idx=5), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x80000001 (idx=5):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000001 (idx=5), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000001 (idx=5), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000001 (idx=5), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000001 (idx=5), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000002 (idx=6), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x80000002 (idx=6):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000002 (idx=6), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000002 (idx=6), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000002 (idx=6), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000003 (idx=7), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0x80000003 (idx=7):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000003 (idx=7), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0xFFFFFFFE (idx=8):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), y=0xFFFFFFFF (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x00000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x00000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x00000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x00000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x80000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x80000001 (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x80000002 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0x80000003 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0xFFFFFFFE (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), y=0xFFFFFFFF (idx=9):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+--- Integer Constant Comparisons (x + INT_MIN <op> INT_CONST) ---
+x=0x00000000 (idx=0), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000001 (idx=1), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000002 (idx=2), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000003 (idx=3), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000000 (idx=4), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000001 (idx=5), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x80000002 (idx=6), CONST_INDEX=6:
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x80000003 (idx=7), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFE (idx=8), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFF (idx=9), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+--- Long Variable Comparisons (x + LONG_MIN <op> y + LONG_MIN) ---
+x=0x0000000000000000 (idx=0), y=0x0000000000000000 (idx=0):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000000 (idx=0), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000000 (idx=0), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000000000001 (idx=1):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000000000002 (idx=2):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000000000003 (idx=3):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000080000000 (idx=4):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000080000000 (idx=4), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x00000000FFFFFFFF (idx=5):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x0000000100000000 (idx=6):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x0000000100000000 (idx=6), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x8000000000000000 (idx=7):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000000 (idx=7), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x8000000000000001 (idx=8):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000001 (idx=8), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000001 (idx=8), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000001 (idx=8), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000001 (idx=8), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x8000000000000002 (idx=9):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000002 (idx=9), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000002 (idx=9), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000002 (idx=9), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x8000000000000003 (idx=10):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000003 (idx=10), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000000000003 (idx=10), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0x8000000080000000 (idx=11):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x8000000080000000 (idx=11), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000000000000 (idx=0):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000000000001 (idx=1):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000000000002 (idx=2):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000000000003 (idx=3):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000080000000 (idx=4):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x00000000FFFFFFFF (idx=5):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x0000000100000000 (idx=6):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x8000000000000000 (idx=7):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x8000000000000001 (idx=8):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x8000000000000002 (idx=9):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x8000000000000003 (idx=10):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0x8000000080000000 (idx=11):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0xFFFFFFFFFFFFFFFE (idx=12):
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), y=0xFFFFFFFFFFFFFFFF (idx=13):
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+--- Long Constant Comparisons (x + LONG_MIN <op> LONG_CONST) ---
+x=0x0000000000000000 (idx=0), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000001 (idx=1), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000002 (idx=2), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000000000003 (idx=3), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000080000000 (idx=4), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x00000000FFFFFFFF (idx=5), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT:  true (expected  true) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE: false (expected false) ✓
+
+x=0x0000000100000000 (idx=6), CONST_INDEX=6:
+  EQ:  true (expected  true) ✓
+  NE: false (expected false) ✓
+  LT: false (expected false) ✓
+  LE:  true (expected  true) ✓
+  GT: false (expected false) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000000 (idx=7), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000001 (idx=8), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000002 (idx=9), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000000000003 (idx=10), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0x8000000080000000 (idx=11), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFE (idx=12), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+x=0xFFFFFFFFFFFFFFFF (idx=13), CONST_INDEX=6:
+  EQ: false (expected false) ✓
+  NE:  true (expected  true) ✓
+  LT: false (expected false) ✓
+  LE: false (expected false) ✓
+  GT:  true (expected  true) ✓
+  GE:  true (expected  true) ✓
+
+=== All operations completed ===

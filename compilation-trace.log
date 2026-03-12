@@ -1,0 +1,16 @@
+Phase 1: Warm up to trigger C1 compilation...
+     25    1             MinimalReproducer::testCompareUnsigned (61 bytes)
+Phase 2: Trigger C2 compilation (should see 'made not entrant' then tier 8)...
+     26    2             java.lang.Integer::compareUnsigned (12 bytes)
+     26    3             java.lang.Integer::compare (20 bytes)
+     27    4 %           MinimalReproducer::main @ 37 (325 bytes)
+Phase 3: Force multiple recompilation cycles...
+     29    5 %           MinimalReproducer::main @ 63 (325 bytes)
+     31    6             MinimalReproducer::main (325 bytes)
+     31    5 %           MinimalReproducer::main @ 63 (325 bytes)   made not entrant
+Testing critical cases after C2 compilation...
+     31    2             java.lang.Integer::compareUnsigned (12 bytes)   made not entrant
+Testing in hot loop after C2 compilation (should trigger recompilation)...
+     37    8             java.lang.Integer::compareUnsigned (12 bytes)
+     38    9 %           MinimalReproducer::main @ 173 (325 bytes)
+All tests passed

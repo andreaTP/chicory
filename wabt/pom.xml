@@ -70,7 +70,7 @@
             </goals>
             <configuration>
               <name>com.dylibso.chicory.wabt.Wat2WasmModule</name>
-              <wasmFile>src/main/resources/wat2wasm</wasmFile>
+              <wasmFile>/home/andreatp/workspace/chicory4/wabt/src/main/resources/wat2wasm</wasmFile>
             </configuration>
           </execution>
         </executions>

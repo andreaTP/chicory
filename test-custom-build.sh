@@ -74,21 +74,7 @@ if mvn -q -pl wabt exec:java \
 
     echo "RESULT:" >> bisect.log
     cat /tmp/reproducer-jdk17.log >> bisect.log
-    
-    if grep -q "Conversion succeeded" /tmp/reproducer-jdk17.log; then
-        echo ""
-        echo "✓✓✓ TEST PASSED"
-        echo "   Bug is NOT present (or not triggered)"
-        echo "   This is unexpected for Java 17.0.18"
-        exit 0
-    else
-        echo ""
-        echo "✗✗✗ TEST FAILED - Bug is PRESENT"
-        echo "   This confirms the bug exists in this JDK build"
-        exit 1
-    fi
-else
-    echo ""
+
     if grep -q "out of bounds memory access" /tmp/reproducer-jdk17.log; then
         echo "✗✗✗ TEST FAILED - Bug REPRODUCED!"
         echo "   Error: out of bounds memory access"
@@ -102,4 +88,10 @@ else
         tail -10 /tmp/reproducer-jdk17.log
         exit 1
     fi
+else
+    echo ""
+    echo ""
+    echo "✓✓✓ TEST PASSED"
+    echo "   Bug NOT triggered"
+    exit 0
 fi
