@@ -238,8 +238,8 @@ call_indirect type mismatch, validation errors, etc.)
 
 ### P0: increase test coverage
 
-**Current: 15787 tests, 0 failures, 0 errors, 4 skipped (GlobalTest 76/77, MemoryTest 6/7 — multi-memory).**
-37 wast files included (incl. call_indirect.wast).
+**Current: 21119 tests, 0 failures, 0 errors, 4 skipped (GlobalTest 76/77, MemoryTest 6/7 — multi-memory).**
+76 wast files included. All non-simd, non-linking wasts pass.
 
 Done (2026-03-11 session):
 - Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
@@ -276,9 +276,25 @@ Known issues:
 - br_table compilation too heavy for large tables (excluded)
 - Global validation (GlobalTest 76/77 — skipped, also in runtime-tests)
 
-### P1: increase test coverage
+### Next priority: bulk memory + elem + conversions
 
-- Full float trunc range check (currently NaN-only, not overflow)
+Excluded wasts with happy-path failures (not linking/validation-only):
+- **bulk.wast** — bulk memory ops (memory.copy/fill/init, data.drop)
+- **elem.wast** — element segment operations
+- **memory_copy.wast, memory_fill.wast, memory_init.wast** — bulk memory
+- **conversions.wast** — float trunc overflow (NaN-only check, not range)
+- **data.wast** — data segment operations
+- **address.wast, align.wast** — memory access patterns (likely OOB-related)
+- **start.wast** — start function execution
+
+Excluded wasts requiring multi-module/linking support:
+- **imports.wast, linking.wast** — cross-module linking
+- **table_grow.wast** — has linking tests (register/instantiate)
+
+Excluded wasts that are validation/parse-only:
+- **binary.wast, binary-leb128.wast** — binary format validation
+- **obsolete-keywords.wast** — parse-level rejection
+- **br_table.wast** — compilation too heavy for large tables
 - Enable more wast files: conversions, call, call_indirect, load, store, etc.
 
 ### P1.5: NativeTable — fully native table operations
