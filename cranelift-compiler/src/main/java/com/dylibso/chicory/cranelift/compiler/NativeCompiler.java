@@ -1269,6 +1269,38 @@ final class NativeCompiler {
         int depth = (int) ins.operands()[0];
         int condition = ctx.valueStack.pop();
         ControlFrame target = getControlFrame(controlStack, depth);
+
+        if (target.kind == ControlFrame.Kind.FUNCTION) {
+            // BR_IF targeting function = conditional return
+            int returnBlock = bridge.exports().createBlock();
+            int fallthroughBlock = bridge.exports().createBlock();
+            int argCount = target.branchArgCount();
+
+            if (argCount > 0) {
+                int[] args = new int[argCount];
+                for (int i = argCount - 1; i >= 0; i--) {
+                    args[i] = ctx.valueStack.pop();
+                }
+                for (int a : args) {
+                    bridge.exports().pushCallArg(a);
+                }
+                bridge.exports().emitBrifWithJumpArgs(condition, returnBlock, fallthroughBlock);
+                // Push args back for fallthrough
+                for (int a : args) {
+                    ctx.valueStack.push(a);
+                }
+                // Return block: emit return with args
+                bridge.exports().switchToBlock(returnBlock);
+                emitReturnWithArgs(ctx, args, argCount);
+            } else {
+                bridge.exports().emitBrif(condition, returnBlock, fallthroughBlock);
+                bridge.exports().switchToBlock(returnBlock);
+                bridge.exports().emitReturnVoid();
+            }
+            bridge.exports().switchToBlock(fallthroughBlock);
+            return;
+        }
+
         int brTarget = target.branchTarget();
         int fallthroughBlock = bridge.exports().createBlock();
         int argCount = target.branchArgCount();
