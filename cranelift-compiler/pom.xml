@@ -72,18 +72,22 @@
             <wast>br.wast</wast>
             <wast>br_if.wast</wast>
             <wast>const.wast</wast>
+            <wast>conversions.wast</wast>
             <wast>f32.wast</wast>
             <wast>f32_bitwise.wast</wast>
             <wast>f32_cmp.wast</wast>
             <wast>f64.wast</wast>
             <wast>f64_bitwise.wast</wast>
             <wast>f64_cmp.wast</wast>
+            <wast>fac.wast</wast>
             <wast>float_literals.wast</wast>
             <wast>global.wast</wast>
             <wast>i32.wast</wast>
             <wast>i64.wast</wast>
             <wast>if.wast</wast>
+            <wast>int_exprs.wast</wast>
             <wast>int_literals.wast</wast>
+            <wast>labels.wast</wast>
             <wast>local_get.wast</wast>
             <wast>local_set.wast</wast>
             <wast>local_tee.wast</wast>
@@ -93,6 +97,7 @@
             <wast>nop.wast</wast>
             <wast>return.wast</wast>
             <wast>select.wast</wast>
+            <wast>switch.wast</wast>
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests -->
           <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
@@ -106,13 +111,11 @@
             <wast>call.wast</wast>
             <wast>call_indirect.wast</wast>
             <wast>comments.wast</wast>
-            <wast>conversions.wast</wast>
             <wast>custom.wast</wast>
             <wast>data.wast</wast>
             <wast>elem.wast</wast>
             <wast>endianness.wast</wast>
             <wast>exports.wast</wast>
-            <wast>fac.wast</wast>
             <wast>float_exprs.wast</wast>
             <wast>float_memory.wast</wast>
             <wast>float_misc.wast</wast>
@@ -121,8 +124,6 @@
             <wast>func_ptrs.wast</wast>
             <wast>imports.wast</wast>
             <wast>inline-module.wast</wast>
-            <wast>int_exprs.wast</wast>
-            <wast>labels.wast</wast>
             <wast>left-to-right.wast</wast>
             <wast>linking.wast</wast>
             <wast>load.wast</wast>
@@ -199,7 +200,6 @@
             <wast>stack.wast</wast>
             <wast>start.wast</wast>
             <wast>store.wast</wast>
-            <wast>switch.wast</wast>
             <wast>table-sub.wast</wast>
             <wast>table.wast</wast>
             <wast>table_copy.wast</wast>
