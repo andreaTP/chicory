@@ -262,11 +262,54 @@ final class NativeEmitters {
         ctx.valueStack.push(ctx.bridge.exports().emitI32WrapI64(ctx.valueStack.pop()));
     }
 
+    // --- Memory bounds check ---
+
+    private static final int[] LOAD_ACCESS_SIZE = {4, 8, 4, 8, 1, 1, 2, 2, 1, 1, 2, 2, 4, 4};
+    private static final int[] STORE_ACCESS_SIZE = {4, 8, 4, 8, 1, 2, 1, 2, 4};
+
+    /**
+     * Emit a bounds check: if addr + offset + accessSize > memPages * 65536,
+     * trap with OOB. Single compare + branch, predicted not-taken.
+     */
+    private static void emitBoundsCheck(EmitContext ctx, int addr, int offset, int accessSize) {
+        // Compute effective end address as i64 to avoid i32 overflow
+        int addr64 = ctx.bridge.exports().emitUextendI64(addr);
+        int end =
+                ctx.bridge
+                        .exports()
+                        .emitIadd(
+                                addr64, ctx.bridge.exports().emitIconst64(offset + accessSize, 0));
+
+        // Load memory size in bytes: memPages * 65536
+        int zero = ctx.bridge.exports().emitIconst32(0);
+        int memPages =
+                ctx.bridge
+                        .exports()
+                        .emitLoadI32(
+                                ctx.bridge.exports().useVar(ctx.ctxPtrVar),
+                                zero,
+                                CtxBuffer.MEMORY_PAGES);
+        int memPages64 = ctx.bridge.exports().emitUextendI64(memPages);
+        int memSize =
+                ctx.bridge.exports().emitIshl(memPages64, ctx.bridge.exports().emitIconst64(16, 0));
+
+        // if end > memSize → trap
+        int oob = ctx.bridge.exports().emitIcmp(5, end, memSize); // GT unsigned
+        int trapBlock = ctx.bridge.exports().createBlock();
+        int okBlock = ctx.bridge.exports().createBlock();
+        ctx.bridge.exports().emitBrif(oob, trapBlock, okBlock);
+
+        fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_OOB);
+
+        ctx.bridge.exports().switchToBlock(okBlock);
+    }
+
     // --- Memory loads ---
 
     static void emitLoad(EmitContext ctx, AnnotatedInstruction ins, int loadType) {
         int addr = ctx.valueStack.pop();
         int offset = (int) ins.operands()[1];
+        emitBoundsCheck(ctx, addr, offset, LOAD_ACCESS_SIZE[loadType]);
         int memBase = ctx.bridge.exports().useVar(ctx.memBaseVar);
         int result =
                 switch (loadType) {
@@ -295,6 +338,7 @@ final class NativeEmitters {
         int value = ctx.valueStack.pop();
         int addr = ctx.valueStack.pop();
         int offset = (int) ins.operands()[1];
+        emitBoundsCheck(ctx, addr, offset, STORE_ACCESS_SIZE[storeType]);
         int memBase = ctx.bridge.exports().useVar(ctx.memBaseVar);
         switch (storeType) {
             case 0 -> ctx.bridge.exports().emitStoreI32(memBase, addr, value, offset);

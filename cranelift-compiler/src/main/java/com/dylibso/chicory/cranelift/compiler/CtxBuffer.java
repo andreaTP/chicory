@@ -120,6 +120,7 @@ final class CtxBuffer {
     static final int TRAP_INT_OVERFLOW = 2;
     static final int TRAP_UNREACHABLE = 3;
     static final int TRAP_TRUNC_OVERFLOW = 4;
+    static final int TRAP_OOB = 5;
 
     /** Returns the byte offset for the i-th call argument within the args buffer. */
     static int argOffset(int i) {
