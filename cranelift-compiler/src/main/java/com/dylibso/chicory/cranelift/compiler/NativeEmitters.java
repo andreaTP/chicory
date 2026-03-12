@@ -725,12 +725,15 @@ final class NativeEmitters {
 
         int elemOffset = b.emitImul(index, b.emitIconst32(4));
         int ref = b.emitLoadI32(tablePtr, elemOffset, CtxBuffer.TABLE_REFS_OFFSET);
-        ctx.valueStack.push(ref);
+        // Table stores i32 refs, but ref types are i64 on the value stack.
+        // Sign-extend so REF_NULL_VALUE (-1 as i32) stays -1 as i64.
+        ctx.valueStack.push(b.emitSextendI64(ref));
     }
 
     static void emitTableSet(EmitContext ctx, AnnotatedInstruction ins) {
         int tableIdx = (int) ins.operands()[0];
-        int value = ctx.valueStack.pop();
+        // Value is i64 on stack (ref type), narrow to i32 for table storage
+        int value = ctx.bridge.exports().emitIreduceI32(ctx.valueStack.pop());
         int index = ctx.valueStack.pop();
         var b = ctx.bridge.exports();
         int zero = b.emitIconst32(0);
@@ -762,7 +765,8 @@ final class NativeEmitters {
     static void emitTableGrow(EmitContext ctx, AnnotatedInstruction ins) {
         int tableIdx = (int) ins.operands()[0];
         int delta = ctx.valueStack.pop();
-        int fillValue = ctx.valueStack.pop();
+        // Fill value is i64 (ref type on stack), narrow to i32 for table storage
+        int fillValue = ctx.bridge.exports().emitIreduceI32(ctx.valueStack.pop());
         var b = ctx.bridge.exports();
         int zero = b.emitIconst32(0);
 
@@ -824,7 +828,8 @@ final class NativeEmitters {
     static void emitTableFill(EmitContext ctx, AnnotatedInstruction ins) {
         int tableIdx = (int) ins.operands()[0];
         int size = ctx.valueStack.pop();
-        int fillValue = ctx.valueStack.pop();
+        // Fill value is i64 (ref type on stack), narrow to i32 for table storage
+        int fillValue = ctx.bridge.exports().emitIreduceI32(ctx.valueStack.pop());
         int offset = ctx.valueStack.pop();
         var b = ctx.bridge.exports();
         int zero = b.emitIconst32(0);
@@ -960,21 +965,26 @@ final class NativeEmitters {
     // --- Reference type operations ---
 
     static void emitRefNull(EmitContext ctx) {
-        // Push REF_NULL_VALUE (-1 as i32)
-        ctx.valueStack.push(ctx.bridge.exports().emitIconst32(-1));
+        // Ref types are i64 on the value stack. REF_NULL_VALUE = -1.
+        // Sign-extend so -1 as i32 → -1 as i64 (matching Java's (long)(int)-1).
+        var b = ctx.bridge.exports();
+        ctx.valueStack.push(b.emitSextendI64(b.emitIconst32(-1)));
     }
 
     static void emitRefIsNull(EmitContext ctx) {
         var b = ctx.bridge.exports();
         int val = ctx.valueStack.pop();
-        int refNull = b.emitIconst32(-1);
-        // Compare val == REF_NULL_VALUE, result is i32 (0 or 1)
-        int isNull = b.emitIcmp(0, b.emitUextendI64(val), b.emitUextendI64(refNull)); // EQ
+        // val is i64 (ref type), compare against REF_NULL_VALUE (-1 as i64)
+        int refNull = b.emitSextendI64(b.emitIconst32(-1));
+        int isNull = b.emitIcmp(0, val, refNull); // EQ, both i64
         ctx.valueStack.push(isNull);
     }
 
     static void emitRefFunc(EmitContext ctx, AnnotatedInstruction ins) {
         int funcIdx = (int) ins.operands()[0];
-        ctx.valueStack.push(ctx.bridge.exports().emitIconst32(funcIdx));
+        // Ref types are i64 on the value stack. FuncIds are non-negative,
+        // so sign-extend and uextend give the same result.
+        var b = ctx.bridge.exports();
+        ctx.valueStack.push(b.emitSextendI64(b.emitIconst32(funcIdx)));
     }
 }

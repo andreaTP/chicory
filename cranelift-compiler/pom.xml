@@ -116,7 +116,6 @@
             <wast>table_copy.wast</wast>
             <wast>table_fill.wast</wast>
             <wast>table_get.wast</wast>
-            <wast>table_grow.wast</wast>
             <wast>table_init.wast</wast>
             <wast>table_set.wast</wast>
             <wast>table_size.wast</wast>
@@ -216,15 +215,7 @@
             <wast>simd_store8_lane.wast</wast>
             <wast>skip-stack-guard-page.wast</wast>
             <wast>start.wast</wast>
-            <wast>table-sub.wast</wast>
-            <wast>table.wast</wast>
-            <wast>table_copy.wast</wast>
-            <wast>table_fill.wast</wast>
-            <wast>table_get.wast</wast>
             <wast>table_grow.wast</wast>
-            <wast>table_init.wast</wast>
-            <wast>table_set.wast</wast>
-            <wast>table_size.wast</wast>
             <wast>token.wast</wast>
             <wast>type.wast</wast>
             <wast>unreached-invalid.wast</wast>

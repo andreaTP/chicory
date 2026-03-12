@@ -57,6 +57,10 @@ final class EmitContext {
         if (type.equals(ValType.I64)) return bridge.exports().emitIconst64(0, 0);
         if (type.equals(ValType.F32)) return bridge.exports().emitF32const(0);
         if (type.equals(ValType.F64)) return bridge.exports().emitF64const(0, 0);
+        int op = type.opcode();
+        if (op == ValType.ID.RefNull || op == ValType.ID.Ref) {
+            return bridge.exports().emitIconst64(0, 0);
+        }
         throw new UnsupportedOperationException("Unsupported type: " + type);
     }
 
