@@ -122,8 +122,6 @@ cranelift-compiler/                     Native compiler + spec tests
 
 - **NativeMemory shortcomings** — leaks, no bounds checking (SIGSEGV on OOB)
 - **Float trunc overflow check** — only NaN check implemented, not range check
-- **Multi-return via argsBuffer** — functions with >2 returns need argsBuffer path
-- **Multi-return in NativeMachine.call()** — read results from argsBuffer
 
 ### Current opcode support
 
@@ -240,35 +238,25 @@ call_indirect type mismatch, validation errors, etc.)
 
 ### P0 (in progress): fix remaining test failures
 
-Two-pass compiler refactoring DONE. IF block params DONE. Multi-return
-BR/RETURN/BR_TABLE DONE. Verifier errors for dead code blocks DONE.
-11 previously-excluded tests now passing, 0 regressions.
+**Current: 14023 tests, 6 failures, 0 errors, 2 skipped.**
+39 of 45 previously-excluded tests now passing, 0 regressions.
 
-**Current: 14023 tests, 8 failures, 26 errors, 2 skipped.**
+Done:
+- Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
+- IF block params (thenBlock/elseBlock with trampoline)
+- Multi-return via argsBuffer (single-return fast path, argsBuffer fallback)
+- Multi-return in NativeMachine.call() (read from argsBuffer)
+- BR_IF targeting function frame (conditional return)
+- Dead code verifier errors (unified emitEnd with scopeRestore)
 
-Remaining 34 failures (all were in old excluded list):
+Remaining 6 failures:
 
-1. **Multi-return** (24 tests: compilation + runtime)
-   - Cranelift "Too many return values" for functions with >2 returns
-   - `NativeMachine.call()` returns single `long` — AIOOB on `results[1]`
-   - func 50 (IfTest 117-122): stack underflow in dead code after
-     multi-return block
-   - **Approach**: keep the fast path for single-return functions (return
-     in register, no argsBuffer overhead). For multi-return (>1), write
-     return values to argsBuffer and have `NativeMachine.call()` read
-     them back. This avoids the Cranelift register limit while keeping
-     the common single-return case zero-overhead.
-
-3. **Memory bounds** (6 tests: MemoryGrowTest 2-5/11-12)
+1. **Memory bounds** (6 tests: MemoryGrowTest 2-5/11-12)
    - "Expected exception" — no OOB checking on memory access
-   - Fix: emit bounds check before loads/stores
+   - Fix: emit bounds check before loads/stores (compare addr+offset+size
+     against memPages*65536, branch to trap block on overflow)
 
-4. **Wrong values** (2 tests: IfTest 99/105)
-   - `expected: <3> but was: <0>` — cascading from func 41/50 compile
-     failure making module instance null
-   - Will be fixed when compilation failures are resolved
-
-5. **Global validation** (2 tests: GlobalTest 76/77)
+2. **Global validation** (2 tests: GlobalTest 76/77)
    - Skipped — also excluded in runtime-tests
 
 ### P1: increase test coverage
