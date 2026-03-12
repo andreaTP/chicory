@@ -1,8 +1,6 @@
 package com.dylibso.chicory.testing;
 
 import com.dylibso.chicory.corpus.CorpusResources;
-import com.dylibso.chicory.cranelift.compiler.NativeMachineFactory;
-import com.dylibso.chicory.cranelift.compiler.NativeMemory;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Store;
@@ -70,10 +68,6 @@ public class TestModule {
 
     public Instance instantiate(Store s) {
         ImportValues importValues = s.toImportValues();
-        return Instance.builder(module)
-                .withImportValues(importValues)
-                .withMachineFactory(NativeMachineFactory::compile)
-                .withMemoryFactory(NativeMemory::new)
-                .build();
+        return NativeInstanceBuilder.builder(module).withImportValues(importValues).build();
     }
 }

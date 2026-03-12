@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.dylibso.chicory.runtime.ImportFunction;
 import com.dylibso.chicory.runtime.ImportValues;
-import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.testing.NativeInstanceBuilder;
 import com.dylibso.chicory.wabt.Wat2Wasm;
 import com.dylibso.chicory.wasm.ChicoryException;
 import com.dylibso.chicory.wasm.Parser;
@@ -28,8 +28,7 @@ public class CallTest {
                         + ")";
 
         var module = Parser.parse(Wat2Wasm.parse(wat));
-        var instance =
-                Instance.builder(module).withMachineFactory(NativeMachineFactory::compile).build();
+        var instance = NativeInstanceBuilder.builder(module).build();
 
         var callAdd = instance.export("call_add");
         long[] result = callAdd.apply(17, 25);
@@ -55,9 +54,8 @@ public class CallTest {
                                 java.util.List.of(ValType.I32), java.util.List.of(ValType.I32)),
                         (inst, args) -> new long[] {args[0] * 2});
         var instance =
-                Instance.builder(module)
+                NativeInstanceBuilder.builder(module)
                         .withImportValues(ImportValues.builder().addFunction(importFunc).build())
-                        .withMachineFactory(NativeMachineFactory::compile)
                         .build();
 
         var callDouble = instance.export("call_double");
@@ -87,9 +85,8 @@ public class CallTest {
                             return new long[0];
                         });
         var instance =
-                Instance.builder(module)
+                NativeInstanceBuilder.builder(module)
                         .withImportValues(ImportValues.builder().addFunction(importFunc).build())
-                        .withMachineFactory(NativeMachineFactory::compile)
                         .build();
 
         var callLog = instance.export("call_log");
@@ -107,8 +104,7 @@ public class CallTest {
                     + " (local.get $a) (local.get $b) (i32.const 0))  ))";
 
         var module = Parser.parse(Wat2Wasm.parse(wat));
-        var instance =
-                Instance.builder(module).withMachineFactory(NativeMachineFactory::compile).build();
+        var instance = NativeInstanceBuilder.builder(module).build();
 
         var test = instance.export("test");
         long[] result = test.apply(17, 25);
@@ -125,8 +121,7 @@ public class CallTest {
                     + " (local.get $a) (local.get $b) (i32.const 1))  ))";
 
         var module = Parser.parse(Wat2Wasm.parse(wat));
-        var instance =
-                Instance.builder(module).withMachineFactory(NativeMachineFactory::compile).build();
+        var instance = NativeInstanceBuilder.builder(module).build();
 
         var test = instance.export("test");
         assertThrows(ChicoryException.class, () -> test.apply(17, 25));
@@ -148,8 +143,7 @@ public class CallTest {
                         + ")";
 
         var module = Parser.parse(Wat2Wasm.parse(wat));
-        var instance =
-                Instance.builder(module).withMachineFactory(NativeMachineFactory::compile).build();
+        var instance = NativeInstanceBuilder.builder(module).build();
 
         var test = instance.export("test");
         long[] result = test.apply(10);

@@ -2,7 +2,7 @@ package com.dylibso.chicory.cranelift.compiler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.testing.NativeInstanceBuilder;
 import com.dylibso.chicory.wabt.Wat2Wasm;
 import com.dylibso.chicory.wasm.Parser;
 import org.junit.jupiter.api.Test;
@@ -19,8 +19,7 @@ public class AddTest {
                         + ")";
 
         var module = Parser.parse(Wat2Wasm.parse(wat));
-        var instance =
-                Instance.builder(module).withMachineFactory(NativeMachineFactory::compile).build();
+        var instance = NativeInstanceBuilder.builder(module).build();
 
         var add = instance.export("add");
         long[] result = add.apply(17, 25);

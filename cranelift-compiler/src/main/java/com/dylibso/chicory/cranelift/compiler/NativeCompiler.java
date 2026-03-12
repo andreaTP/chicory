@@ -1032,6 +1032,43 @@ final class NativeCompiler {
                 emitReturn(ctx, controlStack);
                 break;
 
+            // --- Table operations ---
+            case TABLE_GET:
+                NativeEmitters.emitTableGet(ctx, ins);
+                break;
+            case TABLE_SET:
+                NativeEmitters.emitTableSet(ctx, ins);
+                break;
+            case TABLE_SIZE:
+                NativeEmitters.emitTableSize(ctx, ins);
+                break;
+            case TABLE_GROW:
+                NativeEmitters.emitTableGrow(ctx, ins);
+                break;
+            case TABLE_FILL:
+                NativeEmitters.emitTableFill(ctx, ins);
+                break;
+            case TABLE_COPY:
+                NativeEmitters.emitTableCopy(ctx, ins);
+                break;
+            case TABLE_INIT:
+                NativeEmitters.emitTableInit(ctx, ins);
+                break;
+            case ELEM_DROP:
+                NativeEmitters.emitElemDrop(ctx, ins);
+                break;
+
+            // --- Reference types ---
+            case REF_NULL:
+                NativeEmitters.emitRefNull(ctx);
+                break;
+            case REF_IS_NULL:
+                NativeEmitters.emitRefIsNull(ctx);
+                break;
+            case REF_FUNC:
+                NativeEmitters.emitRefFunc(ctx, ins);
+                break;
+
             default:
                 throw new UnsupportedOperationException(
                         "Opcode not yet supported: " + ins.opcode());

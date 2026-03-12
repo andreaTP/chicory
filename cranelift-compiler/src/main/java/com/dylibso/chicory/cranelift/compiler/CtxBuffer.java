@@ -43,8 +43,10 @@ package com.dylibso.chicory.cranelift.compiler;
  * 216     i32    memoryPages       Current memory page count
  * 220     ---    (padding)
  * 224     i64    memBaseAddr       Current memory base address
+ * 232     i64    tablePtrs        Pointer to array of table buffer pointers
+ * 240     i64    funcTypesPtr     Pointer to funcTypes array (i32 per func)
  * ──────  ─────  ────────────────  ──────────────────────────────────────────
- * Total: 232 bytes used, 256 allocated (CTX_SIZE)
+ * Total: 248 bytes used, 256 allocated (CTX_SIZE)
  *
  * Args buffer (separate allocation, pointed to by argsPtr):
  *   [0]    i64   arg0
@@ -59,7 +61,7 @@ final class CtxBuffer {
     private CtxBuffer() {}
 
     /** Total allocated size of the context buffer. */
-    static final int CTX_SIZE = 256;
+    static final int CTX_SIZE = 256; // fields up to offset 248, padded to 256
 
     /** Number of i64 slots in the args buffer. */
     static final int ARGS_BUFFER_CAPACITY = 1024;
@@ -116,6 +118,12 @@ final class CtxBuffer {
     /** Current memory base address (i64). */
     static final int MEM_BASE_ADDR = 224;
 
+    /** Pointer to array of table buffer pointers (one i64 per table). */
+    static final int TABLE_PTRS = 232;
+
+    /** Pointer to funcTypes array (one i32 typeIdx per function). */
+    static final int FUNC_TYPES_PTR = 240;
+
     // --- Trap codes (values written to TRAP_CODE offset) ---
 
     static final int TRAP_NONE = 0;
@@ -125,6 +133,22 @@ final class CtxBuffer {
     static final int TRAP_TRUNC_OVERFLOW = 4;
     static final int TRAP_OOB = 5;
     static final int TRAP_CALL_STACK_EXHAUSTED = 6;
+    static final int TRAP_TABLE_OOB = 7;
+    static final int TRAP_UNDEFINED_ELEMENT = 8;
+    static final int TRAP_INDIRECT_CALL_TYPE_MISMATCH = 9;
+    static final int TRAP_UNINITIALIZED_ELEMENT = 10;
+
+    // --- NativeTable buffer layout ---
+    // Each table buffer: [size:i32 @ 0][max:i32 @ 4][refs:i32... @ 8]
+
+    /** Offset of the i32 size field in a table buffer. */
+    static final int TABLE_SIZE_OFFSET = 0;
+
+    /** Offset of the i32 max field in a table buffer. */
+    static final int TABLE_MAX_OFFSET = 4;
+
+    /** Offset of the first i32 ref entry in a table buffer. */
+    static final int TABLE_REFS_OFFSET = 8;
 
     /** Returns the byte offset for the i-th call argument within the args buffer. */
     static int argOffset(int i) {

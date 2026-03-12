@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -57,6 +58,7 @@ public class Instance {
     private final WasmModule module;
     private final Machine machine;
     private final FunctionBody[] functions;
+    private final GlobalFactory globalFactory;
     private final Memory[] memories;
     private final DataSegment[] dataSegments;
     private final Global[] globalInitializers;
@@ -88,6 +90,8 @@ public class Instance {
             TagType[] tags,
             Map<String, Export> exports,
             Function<Instance, Machine> machineFactory,
+            BiFunction<Table, Integer, TableInstance> tableFactory,
+            GlobalFactory globalFactory,
             boolean initialize,
             boolean start,
             ExecutionListener listener) {
@@ -110,6 +114,7 @@ public class Instance {
         }
         this.exports = exports;
         this.listener = listener;
+        this.globalFactory = globalFactory;
         this.fluentExports = new Exports(this);
 
         this.exnRefs = new HashMap<>();
@@ -118,7 +123,11 @@ public class Instance {
         for (int i = 0; i < tables.length; i++) {
             long rawValue = computeConstantValue(this, tables[i].initialize())[0];
             var initValue = OpcodeImpl.boxForTable(rawValue, this);
-            this.tables[i] = new TableInstance(tables[i], initValue);
+            if (tableFactory != null) {
+                this.tables[i] = tableFactory.apply(tables[i], initValue);
+            } else {
+                this.tables[i] = new TableInstance(tables[i], initValue);
+            }
         }
 
         if (initialize) {
@@ -132,12 +141,21 @@ public class Instance {
         for (var i = 0; i < globalInitializers.length; i++) {
             var g = globalInitializers[i];
             var values = computeConstantValue(this, g.initInstructions());
-            globals[i] =
-                    new GlobalInstance(
-                            values[0],
-                            (values.length > 1) ? values[1] : 0,
-                            g.valueType(),
-                            g.mutabilityType());
+            if (globalFactory != null) {
+                globals[i] =
+                        globalFactory.create(
+                                values[0],
+                                (values.length > 1) ? values[1] : 0,
+                                g.valueType(),
+                                g.mutabilityType());
+            } else {
+                globals[i] =
+                        new GlobalInstance(
+                                values[0],
+                                (values.length > 1) ? values[1] : 0,
+                                g.valueType(),
+                                g.mutabilityType());
+            }
             globals[i].setInstance(this);
         }
 
@@ -483,6 +501,8 @@ public class Instance {
         private boolean start = true;
         private MemoryLimits memoryLimits;
         private Function<MemoryLimits, Memory> memoryFactory;
+        private BiFunction<Table, Integer, TableInstance> tableFactory;
+        private GlobalFactory globalFactory;
         private ExecutionListener listener;
         private ImportValues importValues;
         private Function<Instance, Machine> machineFactory;
@@ -508,6 +528,16 @@ public class Instance {
 
         public Builder withMemoryFactory(Function<MemoryLimits, Memory> memoryFactory) {
             this.memoryFactory = memoryFactory;
+            return this;
+        }
+
+        public Builder withTableFactory(BiFunction<Table, Integer, TableInstance> tableFactory) {
+            this.tableFactory = tableFactory;
+            return this;
+        }
+
+        public Builder withGlobalFactory(GlobalFactory globalFactory) {
+            this.globalFactory = globalFactory;
             return this;
         }
 
@@ -1044,6 +1074,8 @@ public class Instance {
                     module.tagSection().map(TagSection::types).orElse(null),
                     exports,
                     machineFactory,
+                    tableFactory,
+                    globalFactory,
                     initialize,
                     start,
                     listener);

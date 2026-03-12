@@ -238,8 +238,8 @@ call_indirect type mismatch, validation errors, etc.)
 
 ### P0: increase test coverage
 
-**Current: 14031 tests, 0 failures, 0 errors, 2 skipped (GlobalTest).**
-31 wast files included (fac.wast added).
+**Current: 15615 tests, 0 failures, 0 errors, 4 skipped (GlobalTest 76/77, MemoryTest 6/7 — multi-memory).**
+36 wast files included.
 
 Done this session:
 - Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
@@ -265,6 +265,154 @@ Known issues:
 
 - Full float trunc range check (currently NaN-only, not overflow)
 - Enable more wast files: conversions, call, call_indirect, load, store, etc.
+
+### P1.5: NativeTable — fully native table operations
+
+#### Goal
+
+Eliminate Java trampolines for table operations. The current `CALL_INDIRECT` bounces
+through Java for every indirect call (table lookup + type check + dispatch). With
+`NativeTable`, the entire `CALL_INDIRECT` hot path runs in native code — zero FFI
+overhead.
+
+#### Architecture
+
+```
+Off-heap layout (all in Arena-managed MemorySegment):
+
+  tableBuffer (per table):
+  ┌──────────────────────────────────────────────────────┐
+  │  [0..4)    i32  size          current element count  │
+  │  [4..8)    i32  maxSize       max capacity (or 0)    │
+  │  [8..N)    i32[]  refs        funcId per element      │
+  └──────────────────────────────────────────────────────┘
+  Pre-allocated to maxSize (table limits max). If max is unset or huge,
+  use a reasonable cap. grow() only bumps the size field, no reallocation.
+
+  funcTypesArray (one per module, one i32 per function):
+  ┌──────────────────────────────────────────────────────┐
+  │  [0]  typeIdx for func 0                             │
+  │  [1]  typeIdx for func 1                             │
+  │  ...                                                 │
+  │  [N]  typeIdx for func N                             │
+  └──────────────────────────────────────────────────────┘
+  Used by CALL_INDIRECT for type checking without Java.
+
+  ctxBuffer additions:
+    TABLE_PTRS    i64    Pointer to array of table buffer pointers
+    FUNC_TYPES    i64    Pointer to funcTypesArray
+```
+
+#### Operation-by-operation design
+
+**Fully native (no trampoline):**
+
+| Operation | Native implementation |
+|---|---|
+| `CALL_INDIRECT` | 1. Read tablePtr from TABLE_PTRS[tableIdx] |
+|                 | 2. Bounds check: elemIdx < table.size → trap OOB |
+|                 | 3. Read funcId = table.refs[elemIdx] → trap if REF_NULL |
+|                 | 4. Type check: funcTypes[funcId] == expectedTypeId → trap mismatch |
+|                 | 5. Read funcPtr = funcTable[funcId] |
+|                 | 6. Call funcPtr directly (System V ABI) |
+| `TABLE.GET`    | Bounds check + read refs[index] |
+| `TABLE.SET`    | Bounds check + write refs[index] |
+| `TABLE.SIZE`   | Read size field from table header |
+| `TABLE.GROW`   | If pre-allocated to max: just bump size field + fill new slots. Return -1 if over max. |
+| `TABLE.FILL`   | Loop writing value to refs[offset..offset+size], bounds check first |
+| `TABLE.COPY`   | Memmove on refs arrays (handles overlapping src/dst), bounds check first |
+| `REF_NULL`     | Push REF_NULL_VALUE sentinel (0xFFFFFFFF = -1) |
+| `REF_IS_NULL`  | Compare value against REF_NULL_VALUE sentinel |
+| `REF_FUNC`     | Push funcId as i32 constant |
+
+**Java trampoline (rare operations):**
+
+| Operation | Why trampoline needed |
+|---|---|
+| `TABLE.INIT` | Reads from elem segments (Java-managed `Element[]` with expression initializers) |
+| `ELEM.DROP`  | Sets Java-side `Element` to empty (passive segment lifecycle) |
+| `TABLE.GROW` (fallback) | Only if not pre-allocated to max (unbounded tables) |
+
+#### NativeTable class
+
+```java
+// Extends or replaces TableInstance for native compilation.
+// refs[] live off-heap; native code reads/writes directly.
+// No Instance[] array — single-module assumption (all entries same instance).
+final class NativeTable {
+    MemorySegment buffer;    // [size:i32][max:i32][refs:i32...]
+    // Java-side accessors read/write the same off-heap memory
+    int ref(int index)       // bounds check + read from buffer
+    void setRef(int index, int value)  // bounds check + write to buffer
+    int size()               // read size from buffer header
+    int grow(int delta, int fillValue) // bump size, fill new slots
+}
+```
+
+#### CALL_INDIRECT: before vs after
+
+**Before (current — Java trampoline):**
+```
+native code:
+  store typeId, tableIdx, elemIdx, args to ctxBuffer
+  call trampolinePtr (upcall to Java)
+Java callIndirectTrampoline():
+  read typeId, tableIdx, elemIdx from ctxBuffer
+  funcId = instance.table(tableIdx).requiredRef(elemIdx)  // Java table
+  typeCheck(funcId, typeId)                                // Java
+  result = this.call(funcId, args)                         // re-enter native
+  return result
+```
+
+**After (fully native):**
+```
+native code:
+  tablePtr = load TABLE_PTRS[tableIdx]
+  tableSize = load tablePtr[0]            // i32 size field
+  brif elemIdx >= tableSize → trap OOB
+  funcId = load tablePtr[8 + elemIdx*4]   // i32 refs array
+  brif funcId == REF_NULL → trap null
+  expectedType = typeId (immediate)
+  actualType = load FUNC_TYPES[funcId]    // i32 type index
+  brif actualType != expectedType → trap type mismatch
+  funcPtr = load FUNC_TABLE[funcId*8]     // i64 function pointer
+  call_indirect funcPtr(memBase, ctxPtr, args...)
+```
+
+No FFI boundary crossing. No upcall stub. The common case is ~6 loads + 3 branches,
+all predicted not-taken on the happy path.
+
+#### Pre-allocation strategy
+
+Wasm tables usually have a declared max size (required for `table.grow`). Pre-allocate
+the refs array to max size so `TABLE.GROW` is just incrementing the size field:
+
+- If table max is declared and ≤ 1M entries: pre-allocate to max (4 bytes × 1M = 4MB)
+- If table max is undeclared or > 1M: pre-allocate to 64K entries, trampoline for grow
+  beyond that (reallocate + update pointer in ctxBuffer)
+
+Fill unused slots with REF_NULL_VALUE so TABLE.GET on uninitialized elements returns
+the correct sentinel.
+
+#### Implementation steps
+
+1. **Add ctxBuffer fields**: `TABLE_PTRS`, `FUNC_TYPES_PTR` offsets in `CtxBuffer.java`
+2. **Create `NativeTable`**: off-heap buffer with header + refs array
+3. **Create `funcTypesArray`**: off-heap i32 array, one entry per function, filled at init
+4. **Wire up in `NativeMachine`**: allocate tables, fill from elem segments, store pointers
+5. **Emit native `CALL_INDIRECT`**: replace trampoline with inline IR (bounds + null + type + call)
+6. **Emit `TABLE.GET/SET/SIZE/GROW/FILL/COPY`**: inline IR in NativeEmitters
+7. **Emit `REF_NULL/REF_IS_NULL/REF_FUNC`**: trivial constant/compare ops
+8. **Emit `TABLE.INIT/ELEM.DROP`**: trampoline to Java (rare)
+9. **Enable test files**: table.wast, call_indirect.wast, elem.wast, ref_*.wast, func_ptrs.wast
+
+#### Cross-instance note
+
+`TableInstance` tracks an `Instance[]` parallel to `refs[]` for cross-module linking
+(different table entries may belong to different instances). `NativeTable` drops this:
+all entries are assumed to be in the same instance. This is correct for single-module
+native compilation. Multi-module support (linking.wast, imports.wast) would need
+a different strategy — likely keeping the trampoline for cross-instance calls.
 
 ### P2: future work
 

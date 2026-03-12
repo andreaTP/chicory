@@ -592,71 +592,388 @@ final class NativeEmitters {
         int tableIdx = (int) ins.operands()[1];
         FunctionType targetType = (FunctionType) ctx.module.typeSection().getType(typeId);
 
-        int tableElemIdx = ctx.valueStack.pop();
+        // Pop table element index (i32)
+        int elemIdx = ctx.valueStack.pop();
 
+        // Pop call arguments
         int argCount = targetType.params().size();
         int[] argVals = new int[argCount];
         for (int i = argCount - 1; i >= 0; i--) {
             argVals[i] = ctx.valueStack.pop();
         }
 
-        int zero = ctx.bridge.exports().emitIconst32(0);
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+        int ctxPtr = b.useVar(ctx.ctxPtrVar);
 
-        ctx.bridge
-                .exports()
-                .emitStoreI32(
-                        ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                        zero,
-                        ctx.bridge.exports().emitIconst32(typeId),
-                        CtxBuffer.TYPE_ID);
-        ctx.bridge
-                .exports()
-                .emitStoreI32(
-                        ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                        zero,
-                        ctx.bridge.exports().emitIconst32(tableIdx),
-                        CtxBuffer.TABLE_IDX);
-        ctx.bridge
-                .exports()
-                .emitStoreI32(
-                        ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                        zero,
-                        tableElemIdx,
-                        CtxBuffer.ELEM_IDX);
-        ctx.bridge
-                .exports()
-                .emitStoreI32(
-                        ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                        zero,
-                        ctx.bridge.exports().emitIconst32(argCount),
-                        CtxBuffer.ARG_COUNT);
+        // 1. Load tablePtr from TABLE_PTRS[tableIdx]
+        int tablePtrsPtr = b.emitLoadI64(ctxPtr, zero, CtxBuffer.TABLE_PTRS);
+        int tableOffset = b.emitIconst32(tableIdx * 8);
+        int tablePtr = b.emitLoadI64(tablePtrsPtr, tableOffset, 0);
 
-        int argsPtr =
-                ctx.bridge
-                        .exports()
-                        .emitLoadI64(
-                                ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                                zero,
-                                CtxBuffer.ARGS_PTR);
+        // 2. Bounds check: elemIdx >= table.size → trap "undefined element"
+        //    (Wasm spec: call_indirect OOB and null-ref both produce "undefined element")
+        int tableSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+        // icmp cc=9 (UGE): unsigned greater-or-equal
+        int oobCheck = b.emitIcmp(9, b.emitUextendI64(elemIdx), b.emitUextendI64(tableSize));
+        int trapOobBlock = b.createBlock();
+        int afterOobBlock = b.createBlock();
+        b.emitBrif(oobCheck, trapOobBlock, afterOobBlock);
+        fillTrapBlock(ctx, trapOobBlock, CtxBuffer.TRAP_UNDEFINED_ELEMENT);
+        b.switchToBlock(afterOobBlock);
+
+        // 3. Load funcId from table refs: tablePtr[TABLE_REFS_OFFSET + elemIdx * 4]
+        int elemOffset = b.emitImul(elemIdx, b.emitIconst32(4));
+        int funcId = b.emitLoadI32(tablePtr, elemOffset, CtxBuffer.TABLE_REFS_OFFSET);
+
+        // 4. Null check: funcId == REF_NULL_VALUE (-1) → trap
+        int refNull = b.emitIconst32(-1); // REF_NULL_VALUE
+        int isNull = b.emitIcmp(0, b.emitUextendI64(funcId), b.emitUextendI64(refNull)); // EQ
+        int trapNullBlock = b.createBlock();
+        int afterNullBlock = b.createBlock();
+        b.emitBrif(isNull, trapNullBlock, afterNullBlock);
+        fillTrapBlock(ctx, trapNullBlock, CtxBuffer.TRAP_UNINITIALIZED_ELEMENT);
+        b.switchToBlock(afterNullBlock);
+
+        // 5. Type check: funcTypes[funcId] == typeId
+        int funcTypesPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TYPES_PTR);
+        int funcIdOffset = b.emitImul(funcId, b.emitIconst32(4));
+        int actualType = b.emitLoadI32(funcTypesPtr, funcIdOffset, 0);
+        int expectedType = b.emitIconst32(typeId);
+        int typeMismatch =
+                b.emitIcmp(1, b.emitUextendI64(actualType), b.emitUextendI64(expectedType)); // NE
+        int trapTypeBlock = b.createBlock();
+        int afterTypeBlock = b.createBlock();
+        b.emitBrif(typeMismatch, trapTypeBlock, afterTypeBlock);
+        fillTrapBlock(ctx, trapTypeBlock, CtxBuffer.TRAP_INDIRECT_CALL_TYPE_MISMATCH);
+        b.switchToBlock(afterTypeBlock);
+
+        // 6. Load function pointer: funcTable[funcId * 8]
+        int funcTablePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TABLE_PTR);
+        int funcPtrOffset = b.emitImul(funcId, b.emitIconst32(8));
+        int funcPtr = b.emitLoadI64(funcTablePtr, funcPtrOffset, 0);
+
+        // 7. Determine if callee might be multi-return (>1 return)
+        boolean calleeMultiReturn = targetType.returns().size() > 1;
+
+        // Write args to argsBuffer (for import stubs that read from it)
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        int zero2 = b.emitIconst32(0);
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar), zero2, b.emitIconst32(argCount), CtxBuffer.ARG_COUNT);
         for (int i = 0; i < argCount; i++) {
             int widened = ctx.widenToI64(argVals[i], targetType.params().get(i));
-            ctx.bridge.exports().emitStoreI64(argsPtr, zero, widened, CtxBuffer.argOffset(i));
+            b.emitStoreI64(argsPtr, zero2, widened, CtxBuffer.argOffset(i));
         }
 
-        int trampolinePtr =
-                ctx.bridge
-                        .exports()
-                        .emitLoadI64(
-                                ctx.bridge.exports().useVar(ctx.ctxPtrVar),
-                                zero,
-                                CtxBuffer.TRAMPOLINE_PTR);
+        // 8. Build SigRef and call
+        int sigRef;
+        if (calleeMultiReturn) {
+            sigRef = ctx.getOrCreateMultiReturnSigRef(targetType);
+        } else {
+            sigRef = ctx.getOrCreateSigRef(targetType);
+        }
+
+        b.pushCallArg(b.useVar(ctx.memBaseVar));
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        for (int i = 0; i < argCount; i++) {
+            b.pushCallArg(argVals[i]);
+        }
+
+        int rawResult = b.emitCallIndirect(sigRef, funcPtr);
+
+        // 9. Handle results
+        if (calleeMultiReturn) {
+            int zero3 = b.emitIconst32(0);
+            int argsPtr2 = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero3, CtxBuffer.ARGS_PTR);
+            for (int i = 0; i < targetType.returns().size(); i++) {
+                int raw = b.emitLoadI64(argsPtr2, zero3, CtxBuffer.argOffset(i));
+                ctx.valueStack.push(ctx.narrowFromI64ForType(raw, targetType.returns().get(i)));
+            }
+        } else if (!targetType.returns().isEmpty()) {
+            ctx.valueStack.push(rawResult);
+        }
+    }
+
+    // --- Table operations (fully native, no trampoline) ---
+
+    private static int loadTablePtr(EmitContext ctx, int tableIdx) {
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+        int tablePtrsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TABLE_PTRS);
+        int offset = b.emitIconst32(tableIdx * 8);
+        return b.emitLoadI64(tablePtrsPtr, offset, 0);
+    }
+
+    static void emitTableGet(EmitContext ctx, AnnotatedInstruction ins) {
+        int tableIdx = (int) ins.operands()[0];
+        int index = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int tablePtr = loadTablePtr(ctx, tableIdx);
+        int tableSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+
+        // Bounds check: index >= size → trap
+        int oob = b.emitIcmp(9, b.emitUextendI64(index), b.emitUextendI64(tableSize));
+        int trapBlock = b.createBlock();
+        int okBlock = b.createBlock();
+        b.emitBrif(oob, trapBlock, okBlock);
+        fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
+        b.switchToBlock(okBlock);
+
+        int elemOffset = b.emitImul(index, b.emitIconst32(4));
+        int ref = b.emitLoadI32(tablePtr, elemOffset, CtxBuffer.TABLE_REFS_OFFSET);
+        ctx.valueStack.push(ref);
+    }
+
+    static void emitTableSet(EmitContext ctx, AnnotatedInstruction ins) {
+        int tableIdx = (int) ins.operands()[0];
+        int value = ctx.valueStack.pop();
+        int index = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int tablePtr = loadTablePtr(ctx, tableIdx);
+        int tableSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+
+        // Bounds check
+        int oob = b.emitIcmp(9, b.emitUextendI64(index), b.emitUextendI64(tableSize));
+        int trapBlock = b.createBlock();
+        int okBlock = b.createBlock();
+        b.emitBrif(oob, trapBlock, okBlock);
+        fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
+        b.switchToBlock(okBlock);
+
+        int elemOffset = b.emitImul(index, b.emitIconst32(4));
+        b.emitStoreI32(tablePtr, elemOffset, value, CtxBuffer.TABLE_REFS_OFFSET);
+    }
+
+    static void emitTableSize(EmitContext ctx, AnnotatedInstruction ins) {
+        int tableIdx = (int) ins.operands()[0];
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+        int tablePtr = loadTablePtr(ctx, tableIdx);
+        int size = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+        ctx.valueStack.push(size);
+    }
+
+    static void emitTableGrow(EmitContext ctx, AnnotatedInstruction ins) {
+        int tableIdx = (int) ins.operands()[0];
+        int delta = ctx.valueStack.pop();
+        int fillValue = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int tablePtr = loadTablePtr(ctx, tableIdx);
+        int oldSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+        int maxSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_MAX_OFFSET);
+
+        // newSize = oldSize + delta
+        int newSize = b.emitIadd(b.emitUextendI64(oldSize), b.emitUextendI64(delta));
+
+        // if newSize > maxSize → return -1
+        int overMax = b.emitIcmp(5, newSize, b.emitUextendI64(maxSize)); // UGT
+        // if delta < 0 (unsigned: very large) → also fail
+        // Combine: newSize > max OR newSize < oldSize (overflow)
+        int overflow = b.emitIcmp(3, newSize, b.emitUextendI64(oldSize)); // ULT = overflow
+        int fail = b.emitBor(overMax, overflow);
+
+        int failBlock = b.createBlock();
+        int okBlock = b.createBlock();
+        int mergeBlock = b.createBlock();
+        int mergeParam =
+                b.appendBlockParam(
+                        mergeBlock, com.dylibso.chicory.cranelift.CraneliftBridge.TYPE_I32);
+
+        b.emitBrif(fail, failBlock, okBlock);
+
+        // Fail block: push -1
+        b.switchToBlock(failBlock);
+        b.emitJumpWithArg(mergeBlock, b.emitIconst32(-1));
+
+        // OK block: update size, fill new slots via trampoline, return oldSize
+        b.switchToBlock(okBlock);
+        int newSizeI32 = b.emitIreduceI32(newSize);
+        b.emitStoreI32(tablePtr, zero, newSizeI32, CtxBuffer.TABLE_SIZE_OFFSET);
+
+        // Fill new slots via trampoline (runtime loop)
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(oldSize), CtxBuffer.argOffset(0));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(newSizeI32), CtxBuffer.argOffset(1));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(fillValue), CtxBuffer.argOffset(2));
+        b.emitStoreI64(argsPtr, zero, tablePtr, CtxBuffer.argOffset(3)); // already i64
+
+        int tableOpsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-1), // sentinel for table grow fill
+                CtxBuffer.ARG_COUNT);
         int trampolineSig = ctx.getOrCreateTrampolineSigRef();
-        ctx.bridge.exports().pushCallArg(ctx.bridge.exports().useVar(ctx.ctxPtrVar));
-        int rawResult = ctx.bridge.exports().emitCallIndirect(trampolineSig, trampolinePtr);
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, tableOpsPtr);
 
-        if (!targetType.returns().isEmpty()) {
-            int narrowed = ctx.narrowFromI64(rawResult, targetType.returns().get(0));
-            ctx.valueStack.push(narrowed);
-        }
+        b.emitJumpWithArg(mergeBlock, oldSize);
+
+        b.switchToBlock(mergeBlock);
+        ctx.valueStack.push(mergeParam);
+    }
+
+    static void emitTableFill(EmitContext ctx, AnnotatedInstruction ins) {
+        int tableIdx = (int) ins.operands()[0];
+        int size = ctx.valueStack.pop();
+        int fillValue = ctx.valueStack.pop();
+        int offset = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int tablePtr = loadTablePtr(ctx, tableIdx);
+        int tableSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+
+        // Bounds check: offset + size > tableSize → trap
+        int end = b.emitIadd(b.emitUextendI64(offset), b.emitUextendI64(size));
+        int oob = b.emitIcmp(5, end, b.emitUextendI64(tableSize)); // UGT
+        int trapBlock = b.createBlock();
+        int okBlock = b.createBlock();
+        b.emitBrif(oob, trapBlock, okBlock);
+        fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
+        b.switchToBlock(okBlock);
+
+        // Emit fill via trampoline (runtime loop)
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(offset), CtxBuffer.argOffset(0));
+        int endI32 = b.emitIreduceI32(end);
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(endI32), CtxBuffer.argOffset(1));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(fillValue), CtxBuffer.argOffset(2));
+        b.emitStoreI64(argsPtr, zero, tablePtr, CtxBuffer.argOffset(3)); // already i64
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-2), // sentinel for table fill
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
+    static void emitTableCopy(EmitContext ctx, AnnotatedInstruction ins) {
+        int dstTableIdx = (int) ins.operands()[0];
+        int srcTableIdx = (int) ins.operands()[1];
+        int size = ctx.valueStack.pop();
+        int srcOffset = ctx.valueStack.pop();
+        int dstOffset = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int srcTablePtr = loadTablePtr(ctx, srcTableIdx);
+        int dstTablePtr = loadTablePtr(ctx, dstTableIdx);
+        int srcTableSize = b.emitLoadI32(srcTablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+        int dstTableSize = b.emitLoadI32(dstTablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
+
+        // Bounds checks
+        int srcEnd = b.emitIadd(b.emitUextendI64(srcOffset), b.emitUextendI64(size));
+        int dstEnd = b.emitIadd(b.emitUextendI64(dstOffset), b.emitUextendI64(size));
+        int srcOob = b.emitIcmp(5, srcEnd, b.emitUextendI64(srcTableSize));
+        int dstOob = b.emitIcmp(5, dstEnd, b.emitUextendI64(dstTableSize));
+        int oob = b.emitBor(srcOob, dstOob);
+
+        int trapBlock = b.createBlock();
+        int okBlock = b.createBlock();
+        b.emitBrif(oob, trapBlock, okBlock);
+        fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
+        b.switchToBlock(okBlock);
+
+        // Copy via trampoline (handles overlapping correctly)
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(argsPtr, zero, srcTablePtr, CtxBuffer.argOffset(0)); // already i64
+        b.emitStoreI64(argsPtr, zero, dstTablePtr, CtxBuffer.argOffset(1)); // already i64
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(srcOffset), CtxBuffer.argOffset(2));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(dstOffset), CtxBuffer.argOffset(3));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(size), CtxBuffer.argOffset(4));
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-3), // sentinel for table copy
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
+    static void emitTableInit(EmitContext ctx, AnnotatedInstruction ins) {
+        int elemIdx = (int) ins.operands()[0];
+        int tableIdx = (int) ins.operands()[1];
+        int size = ctx.valueStack.pop();
+        int srcOffset = ctx.valueStack.pop();
+        int dstOffset = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        // TABLE.INIT always goes through trampoline (needs elem segment data)
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(tableIdx)), CtxBuffer.argOffset(0));
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(elemIdx)), CtxBuffer.argOffset(1));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(dstOffset), CtxBuffer.argOffset(2));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(srcOffset), CtxBuffer.argOffset(3));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(size), CtxBuffer.argOffset(4));
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-4), // sentinel for table init
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
+    static void emitElemDrop(EmitContext ctx, AnnotatedInstruction ins) {
+        int elemIdx = (int) ins.operands()[0];
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        // ELEM.DROP always goes through trampoline
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(elemIdx)), CtxBuffer.argOffset(0));
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-5), // sentinel for elem drop
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
+    // --- Reference type operations ---
+
+    static void emitRefNull(EmitContext ctx) {
+        // Push REF_NULL_VALUE (-1 as i32)
+        ctx.valueStack.push(ctx.bridge.exports().emitIconst32(-1));
+    }
+
+    static void emitRefIsNull(EmitContext ctx) {
+        var b = ctx.bridge.exports();
+        int val = ctx.valueStack.pop();
+        int refNull = b.emitIconst32(-1);
+        // Compare val == REF_NULL_VALUE, result is i32 (0 or 1)
+        int isNull = b.emitIcmp(0, b.emitUextendI64(val), b.emitUextendI64(refNull)); // EQ
+        ctx.valueStack.push(isNull);
+    }
+
+    static void emitRefFunc(EmitContext ctx, AnnotatedInstruction ins) {
+        int funcIdx = (int) ins.operands()[0];
+        ctx.valueStack.push(ctx.bridge.exports().emitIconst32(funcIdx));
     }
 }

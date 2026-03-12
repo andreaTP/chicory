@@ -34,8 +34,8 @@ import java.util.ArrayList;
 final class NativeMachine implements Machine {
 
     private static final int CTX_SIZE = CtxBuffer.CTX_SIZE;
-    private static final Arena ARENA = Arena.ofShared();
 
+    private final Arena arena;
     private final Instance instance;
     private final MethodHandle[] downcalls;
     private final MemorySegment codeRegion;
@@ -43,14 +43,23 @@ final class NativeMachine implements Machine {
     private final MemorySegment funcTable;
     private final MemorySegment argsBuffer;
     private final MemorySegment globalsBuffer;
+    private final MemorySegment funcTypesArray;
+    private MemorySegment tablePtrsArray;
+    private NativeTable[] nativeTables;
+    private boolean tablesInitialized;
     private final int numImports;
     private final int globalCount;
-    private boolean globalsInitialized;
+    private boolean importGlobalsInitialized;
     // Pending exception from upcall stubs (cannot throw through native frames)
     private volatile Throwable pendingException;
 
-    NativeMachine(Instance instance) {
+    NativeMachine(
+            Instance instance,
+            Arena arena,
+            java.util.List<NativeTable> sharedTables,
+            MemorySegment sharedGlobalsBuffer) {
         this.instance = instance;
+        this.arena = arena;
         var module = instance.module();
         this.numImports =
                 (int)
@@ -65,12 +74,13 @@ final class NativeMachine implements Machine {
         this.downcalls = new MethodHandle[totalFuncs];
 
         // Allocate call context buffer
-        ctxBuffer = ARENA.allocate(CTX_SIZE, 8);
+        ctxBuffer = arena.allocate(CTX_SIZE, 8);
 
         // Allocate function pointer table (one i64 per function)
-        funcTable = ARENA.allocate((long) totalFuncs * 8, 8);
+        funcTable = arena.allocate((long) totalFuncs * 8, 8);
 
-        // Globals buffer: one i64 per global
+        // Globals buffer from factory (already has module globals written by Instance)
+        this.globalsBuffer = sharedGlobalsBuffer;
         this.globalCount =
                 (int)
                                 module.importSection().stream()
@@ -83,13 +93,31 @@ final class NativeMachine implements Machine {
                         + (module.globalSection() != null
                                 ? module.globalSection().globalCount()
                                 : 0);
-        this.globalsBuffer =
-                globalCount > 0 ? ARENA.allocate((long) globalCount * 8, 8) : MemorySegment.NULL;
 
         // Allocate args buffer (separate from ctxBuffer, no fixed arg limit)
-        this.argsBuffer = ARENA.allocate((long) CtxBuffer.ARGS_BUFFER_CAPACITY * 8, 8);
+        this.argsBuffer = arena.allocate((long) CtxBuffer.ARGS_BUFFER_CAPACITY * 8, 8);
 
-        // Create CALL_INDIRECT trampoline upcall stub
+        // Allocate funcTypes array (one i32 typeIdx per function)
+        this.funcTypesArray = arena.allocate((long) totalFuncs * 4, 4);
+        for (int i = 0; i < numImports; i++) {
+            funcTypesArray.set(ValueLayout.JAVA_INT, (long) i * 4, instance.functionType(i));
+        }
+        for (int i = 0; i < module.functionSection().functionCount(); i++) {
+            int funcId = numImports + i;
+            funcTypesArray.set(
+                    ValueLayout.JAVA_INT,
+                    (long) funcId * 4,
+                    module.functionSection().getFunctionType(i));
+        }
+
+        // NativeTables: tables are created by Instance via tableFactory, but Instance
+        // hasn't finished constructing yet (tables created after Machine). We'll
+        // populate the tablePtrs lazily on first call() once tables exist.
+        this.nativeTables = null;
+        this.tablePtrsArray = MemorySegment.NULL;
+        this.tablesInitialized = false;
+
+        // Create CALL_INDIRECT trampoline upcall stub (kept for TABLE.INIT/ELEM.DROP)
         MemorySegment trampolineStub = createTrampolineStub();
 
         // Create memory.grow upcall stub
@@ -101,6 +129,8 @@ final class NativeMachine implements Machine {
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.ARGS_PTR, argsBuffer.address());
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.GLOBALS_PTR, globalsBuffer.address());
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.MEM_GROW_PTR, memGrowStub.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.TABLE_PTRS, tablePtrsArray.address());
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.FUNC_TYPES_PTR, funcTypesArray.address());
 
         // Compile all module-defined functions
         var bridge = new CraneliftBridge();
@@ -283,7 +313,7 @@ final class NativeMachine implements Machine {
                 }
             }
 
-            return Linker.nativeLinker().upcallStub(dropper, desc, ARENA);
+            return Linker.nativeLinker().upcallStub(dropper, desc, arena);
         } catch (Exception e) {
             throw new ChicoryException("Failed to create import stub for func " + funcId, e);
         }
@@ -326,7 +356,7 @@ final class NativeMachine implements Machine {
                                     "callIndirectTrampoline",
                                     MethodType.methodType(long.class, long.class));
             var desc = FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG);
-            return Linker.nativeLinker().upcallStub(handler, desc, ARENA);
+            return Linker.nativeLinker().upcallStub(handler, desc, arena);
         } catch (Exception e) {
             throw new ChicoryException("Failed to create trampoline stub", e);
         }
@@ -336,12 +366,19 @@ final class NativeMachine implements Machine {
     private long callIndirectTrampoline(long ctxAddr) {
         try {
             var ctx = MemorySegment.ofAddress(ctxAddr).reinterpret(CTX_SIZE);
+            int argCount = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
+
+            // Negative argCount = table operation sentinel
+            if (argCount < 0) {
+                return handleTableOperation(argCount);
+            }
+
+            // Normal call_indirect path (fallback, rarely used now)
             int typeId = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.TYPE_ID);
             int tableIdx = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.TABLE_IDX);
             int elemIdx = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ELEM_IDX);
-            int argCount = ctx.get(ValueLayout.JAVA_INT, CtxBuffer.ARG_COUNT);
 
-            int funcId = instance.table(tableIdx).requiredRef(elemIdx);
+            int funcId = nativeTables[tableIdx].requiredRef(elemIdx);
 
             // Type check
             int actualTypeIdx = instance.functionType(funcId);
@@ -362,6 +399,97 @@ final class NativeMachine implements Machine {
         }
     }
 
+    private long handleTableOperation(int opCode) {
+        switch (opCode) {
+            case -1 -> { // table grow fill
+                int oldSize = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int newSize = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int fillValue = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                long tableAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                var tableBuf =
+                        MemorySegment.ofAddress(tableAddr)
+                                .reinterpret(CtxBuffer.TABLE_REFS_OFFSET + (long) newSize * 4);
+                for (int i = oldSize; i < newSize; i++) {
+                    tableBuf.set(
+                            ValueLayout.JAVA_INT,
+                            CtxBuffer.TABLE_REFS_OFFSET + (long) i * 4,
+                            fillValue);
+                }
+            }
+            case -2 -> { // table fill
+                int offset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int end = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int fillValue = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                long tableAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                var tableBuf =
+                        MemorySegment.ofAddress(tableAddr)
+                                .reinterpret(CtxBuffer.TABLE_REFS_OFFSET + (long) end * 4);
+                for (int i = offset; i < end; i++) {
+                    tableBuf.set(
+                            ValueLayout.JAVA_INT,
+                            CtxBuffer.TABLE_REFS_OFFSET + (long) i * 4,
+                            fillValue);
+                }
+            }
+            case -3 -> { // table copy
+                long srcAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                long dstAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int srcOff = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                int dstOff = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(4));
+                var srcBuf =
+                        MemorySegment.ofAddress(srcAddr)
+                                .reinterpret(
+                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + size) * 4);
+                var dstBuf =
+                        MemorySegment.ofAddress(dstAddr)
+                                .reinterpret(
+                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + size) * 4);
+                // Copy with correct overlap handling
+                if (dstOff <= srcOff) {
+                    for (int i = 0; i < size; i++) {
+                        int val =
+                                srcBuf.get(
+                                        ValueLayout.JAVA_INT,
+                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + i) * 4);
+                        dstBuf.set(
+                                ValueLayout.JAVA_INT,
+                                CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + i) * 4,
+                                val);
+                    }
+                } else {
+                    for (int i = size - 1; i >= 0; i--) {
+                        int val =
+                                srcBuf.get(
+                                        ValueLayout.JAVA_INT,
+                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + i) * 4);
+                        dstBuf.set(
+                                ValueLayout.JAVA_INT,
+                                CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + i) * 4,
+                                val);
+                    }
+                }
+            }
+            case -4 -> { // table init
+                int tableIdx = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int elemIdx = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int dstOffset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                int srcOffset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(4));
+                // Instance.table(tableIdx) returns NativeTable (set via tableFactory),
+                // so TABLE_INIT writes directly to off-heap memory. No sync needed.
+                com.dylibso.chicory.runtime.OpcodeImpl.TABLE_INIT(
+                        instance, tableIdx, elemIdx, size, srcOffset, dstOffset);
+            }
+            case -5 -> { // elem drop
+                int elemIdx = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                instance.setElement(elemIdx, null);
+            }
+            default -> throw new ChicoryException("Unknown table operation: " + opCode);
+        }
+        return 0L;
+    }
+
     // --- Memory grow upcall stub ---
 
     private MemorySegment createMemGrowStub() {
@@ -373,7 +501,7 @@ final class NativeMachine implements Machine {
                                     "memoryGrowHandler",
                                     MethodType.methodType(long.class, long.class));
             var desc = FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG);
-            return Linker.nativeLinker().upcallStub(handler, desc, ARENA);
+            return Linker.nativeLinker().upcallStub(handler, desc, arena);
         } catch (Exception e) {
             throw new ChicoryException("Failed to create memory grow stub", e);
         }
@@ -411,10 +539,12 @@ final class NativeMachine implements Machine {
      * For imported globals, we copy their current value into the buffer (read-only
      * from native code's perspective — imported mutable globals are rare).
      */
-    private void initializeNativeGlobals() {
-        if (globalsInitialized || globalCount == 0) return;
-        globalsInitialized = true;
+    private void initializeImportGlobals() {
+        if (importGlobalsInitialized || globalCount == 0) return;
+        importGlobalsInitialized = true;
 
+        // Module-defined globals are already NativeGlobalInstance (created by globalFactory).
+        // Only need to copy imported global values into the shared buffer.
         int importGlobalCount =
                 (int)
                         instance.module().importSection().stream()
@@ -425,33 +555,50 @@ final class NativeMachine implements Machine {
                                                                 .ExternalType.GLOBAL)
                                 .count();
 
-        // Copy imported global values into buffer (these remain as-is in Instance)
         for (int i = 0; i < importGlobalCount; i++) {
             globalsBuffer.set(ValueLayout.JAVA_LONG, (long) i * 8, instance.global(i).getValue());
         }
+    }
 
-        // Replace module-defined globals with NativeGlobalInstance via reflection
-        try {
-            var globalsField = instance.getClass().getDeclaredField("globals");
-            globalsField.setAccessible(true);
-            var globals = (com.dylibso.chicory.runtime.GlobalInstance[]) globalsField.get(instance);
+    private void initializeNativeTables() {
+        if (tablesInitialized) return;
+        tablesInitialized = true;
 
-            for (int i = 0; i < globals.length; i++) {
-                var old = globals[i];
-                int globalIdx = importGlobalCount + i;
-                var nativeGlobal =
-                        new NativeGlobalInstance(
-                                globalsBuffer,
-                                globalIdx,
-                                old.getValue(),
-                                old.getType(),
-                                old.getMutabilityType());
-                nativeGlobal.setInstance(instance);
-                globals[i] = nativeGlobal;
-            }
-        } catch (ReflectiveOperationException e) {
-            throw new ChicoryException("Failed to initialize native globals", e);
+        var module = instance.module();
+        int importedTableCount = instance.imports().tableCount();
+        int definedTableCount = module.tableSection().tableCount();
+        int tableCount = importedTableCount + definedTableCount;
+
+        if (tableCount == 0) {
+            this.nativeTables = new NativeTable[0];
+            return;
         }
+
+        // Instance.table(i) returns NativeTable (created by tableFactory).
+        // Just collect references and build the pointer array.
+        this.nativeTables = new NativeTable[tableCount];
+        this.tablePtrsArray = arena.allocate((long) tableCount * 8, 8);
+
+        for (int i = 0; i < tableCount; i++) {
+            var table = instance.table(i);
+            if (table instanceof NativeTable nt) {
+                nativeTables[i] = nt;
+            } else {
+                // Imported table not created by our factory — wrap it
+                var tableDef =
+                        new com.dylibso.chicory.wasm.types.Table(
+                                table.elementType(), table.limits());
+                var nt = new NativeTable(tableDef, arena);
+                for (int j = 0; j < table.size(); j++) {
+                    nt.setRef(j, table.ref(j), instance);
+                }
+                nativeTables[i] = nt;
+            }
+            tablePtrsArray.set(
+                    ValueLayout.JAVA_LONG, (long) i * 8, nativeTables[i].nativeBuffer().address());
+        }
+
+        ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.TABLE_PTRS, tablePtrsArray.address());
     }
 
     private static ChicoryException trapException(int trapCode) {
@@ -464,6 +611,12 @@ final class NativeMachine implements Machine {
             case CtxBuffer.TRAP_OOB -> new ChicoryException("out of bounds memory access");
             case CtxBuffer.TRAP_CALL_STACK_EXHAUSTED ->
                     new ChicoryException("call stack exhausted");
+            case CtxBuffer.TRAP_TABLE_OOB -> new ChicoryException("out of bounds table access");
+            case CtxBuffer.TRAP_UNDEFINED_ELEMENT -> new ChicoryException("undefined element");
+            case CtxBuffer.TRAP_UNINITIALIZED_ELEMENT ->
+                    new ChicoryException("uninitialized element");
+            case CtxBuffer.TRAP_INDIRECT_CALL_TYPE_MISMATCH ->
+                    new ChicoryException("indirect call type mismatch");
             default -> new ChicoryException("trap: unknown code " + trapCode);
         };
     }
@@ -507,8 +660,11 @@ final class NativeMachine implements Machine {
         try {
             var funcType = (FunctionType) instance.type(instance.functionType(funcId));
 
-            // Lazily replace GlobalInstance with NativeGlobalInstance (once)
-            initializeNativeGlobals();
+            // Copy imported global values into shared buffer (once)
+            initializeImportGlobals();
+
+            // Collect NativeTable refs from Instance and build pointer array (once)
+            initializeNativeTables();
 
             var mem = instance.memory();
             if (mem instanceof NativeMemory nativeMemory) {
