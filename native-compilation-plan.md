@@ -248,19 +248,16 @@ BR/RETURN/BR_TABLE DONE. Verifier errors for dead code blocks DONE.
 
 Remaining 34 failures (all were in old excluded list):
 
-1. **Multi-return runtime** (14 tests: BrTest 13/29, IfTest 9-12/109-116)
+1. **Multi-return** (24 tests: compilation + runtime)
+   - Cranelift "Too many return values" for functions with >2 returns
    - `NativeMachine.call()` returns single `long` — AIOOB on `results[1]`
-   - Fix: write multi-return values to argsBuffer in compiled code,
-     read them in `NativeMachine.call()`
-
-2. **Compilation failures** (4 functions → 10 tests)
-   - func 17 (BrIfTest 25/26): TrapException — Cranelift "Too many
-     return values" for functions with >2 returns
-   - func 41 (IfTest 93/94, LoopTest 39): TrapException — same cause
-   - func 44 (BlockTest 42): TrapException — same cause
-   - func 50 (IfTest 117-122): NoSuchElementException — stack underflow
-     in dead code after multi-return block
-   - Fix: return >2 values through argsBuffer instead of registers
+   - func 50 (IfTest 117-122): stack underflow in dead code after
+     multi-return block
+   - **Approach**: keep the fast path for single-return functions (return
+     in register, no argsBuffer overhead). For multi-return (>1), write
+     return values to argsBuffer and have `NativeMachine.call()` read
+     them back. This avoids the Cranelift register limit while keeping
+     the common single-return case zero-overhead.
 
 3. **Memory bounds** (6 tests: MemoryGrowTest 2-5/11-12)
    - "Expected exception" — no OOB checking on memory access
