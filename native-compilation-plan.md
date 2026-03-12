@@ -236,28 +236,42 @@ call_indirect type mismatch, validation errors, etc.)
 
 ## Next steps
 
-### P0 (in progress): fix remaining test failures
+### P0: increase test coverage
 
-**Current: 14023 tests, 6 failures, 0 errors, 2 skipped.**
-39 of 45 previously-excluded tests now passing, 0 regressions.
+**Current: 14023 tests, 0 failures, 0 errors, 2 skipped (GlobalTest).**
+30 wast files included. All previously-excluded tests now passing.
 
-Done:
+Done this session:
 - Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
 - IF block params (thenBlock/elseBlock with trampoline)
 - Multi-return via argsBuffer (single-return fast path, argsBuffer fallback)
 - Multi-return in NativeMachine.call() (read from argsBuffer)
 - BR_IF targeting function frame (conditional return)
 - Dead code verifier errors (unified emitEnd with scopeRestore)
+- Memory bounds checking (OOB trap before loads/stores)
 
-Remaining 6 failures:
+**Blocker: SIGSEGV when adding new wast files.**
+Adding wasts like fac.wast, call.wast, conversions.wast etc. causes the
+surefire JVM fork to crash with SIGSEGV (exit code 139). This kills the
+entire test run, making it look like tests are missing when really the
+JVM died before running them.
 
-1. **Memory bounds** (6 tests: MemoryGrowTest 2-5/11-12)
-   - "Expected exception" — no OOB checking on memory access
-   - Fix: emit bounds check before loads/stores (compare addr+offset+size
-     against memPages*65536, branch to trap block on overflow)
+Root causes to investigate:
+- Our compiled native code may produce invalid memory accesses for
+  certain function patterns (recursive calls, function pointers)
+- Panama upcall stubs may not catch all exceptions — uncaught exceptions
+  in native→Java callbacks crash the JVM
+  (hs_err: `UpcallLinker::handle_uncaught_exception`)
+- br_table with large tables creates too many Cranelift blocks,
+  potentially exhausting bridge Wasm memory
 
-2. **Global validation** (2 tests: GlobalTest 76/77)
-   - Skipped — also excluded in runtime-tests
+**Approach**: add ONE wast file at a time, verify test count stays at
+14023+N (not lower), find the exact function/test that crashes, fix it.
+
+Known issues to fix:
+- Float trunc overflow check (NaN-only, not range — 35 conversions failures)
+- br_table compilation too heavy for large tables
+- Global validation (GlobalTest 76/77 — skipped, also in runtime-tests)
 
 ### P1: increase test coverage
 
