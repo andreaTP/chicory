@@ -111,6 +111,15 @@
             <wast>stack.wast</wast>
             <wast>store.wast</wast>
             <wast>switch.wast</wast>
+            <wast>table-sub.wast</wast>
+            <wast>table.wast</wast>
+            <wast>table_copy.wast</wast>
+            <wast>table_fill.wast</wast>
+            <wast>table_get.wast</wast>
+            <wast>table_grow.wast</wast>
+            <wast>table_init.wast</wast>
+            <wast>table_set.wast</wast>
+            <wast>table_size.wast</wast>
             <wast>traps.wast</wast>
             <wast>unreachable.wast</wast>
             <wast>unwind.wast</wast>

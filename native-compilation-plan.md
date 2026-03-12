@@ -238,10 +238,10 @@ call_indirect type mismatch, validation errors, etc.)
 
 ### P0: increase test coverage
 
-**Current: 15615 tests, 0 failures, 0 errors, 4 skipped (GlobalTest 76/77, MemoryTest 6/7 — multi-memory).**
-36 wast files included.
+**Current: 15787 tests, 0 failures, 0 errors, 4 skipped (GlobalTest 76/77, MemoryTest 6/7 — multi-memory).**
+37 wast files included (incl. call_indirect.wast).
 
-Done this session:
+Done (2026-03-11 session):
 - Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
 - IF block params (thenBlock/elseBlock with trampoline)
 - Multi-return via argsBuffer (single-return fast path, argsBuffer fallback)
@@ -252,6 +252,21 @@ Done this session:
 - Stack depth guard via get_stack_pointer (wasmtime-style, 512KB reserve)
 - SigRef fix for multi-return callees (>2 returns)
 - emitZero for RefNull types
+
+Done (2026-03-12 session):
+- **NativeTable**: off-heap table buffers `[size:i32][max:i32][refs:i32...]`
+- **Fully native CALL_INDIRECT**: bounds check → null check → type check → funcTable
+  lookup → direct call. Zero Java trampolines on hot path.
+- **Canonical type map**: structurally equal FunctionTypes get the same canonical index
+  in funcTypesArray. Fixes type mismatch for modules with duplicate type definitions
+  (same approach as AOT compiler's `isFuncTypeMatch`).
+- **Instance.Builder factories**: `withTableFactory()`, `withGlobalFactory()` — removed
+  reflection hack for globals and sync hack for tables. Single source of truth.
+- **NativeMachineFactory**: instance class holding shared Arena + globals buffer
+- **Table/ref opcodes**: TABLE.GET/SET/SIZE/GROW/FILL/COPY, REF_NULL/REF_IS_NULL/REF_FUNC,
+  TABLE.INIT/ELEM.DROP (trampoline for init/drop)
+- **funcTypesArray**: off-heap i32 array with canonical type indices per function
+- call_indirect.wast enabled (172 tests, all pass)
 
 **Adding wast files**: add ONE at a time, verify test count = previous+N.
 If count drops, the JVM crashed — find which function and fix.
