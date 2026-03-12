@@ -238,8 +238,8 @@ call_indirect type mismatch, validation errors, etc.)
 
 ### P0: increase test coverage
 
-**Current: 14023 tests, 0 failures, 0 errors, 2 skipped (GlobalTest).**
-30 wast files included. All previously-excluded tests now passing.
+**Current: 14031 tests, 0 failures, 0 errors, 2 skipped (GlobalTest).**
+31 wast files included (fac.wast added).
 
 Done this session:
 - Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters)
@@ -249,28 +249,16 @@ Done this session:
 - BR_IF targeting function frame (conditional return)
 - Dead code verifier errors (unified emitEnd with scopeRestore)
 - Memory bounds checking (OOB trap before loads/stores)
+- Stack depth guard via get_stack_pointer (wasmtime-style, 512KB reserve)
+- SigRef fix for multi-return callees (>2 returns)
+- emitZero for RefNull types
 
-**Blocker: SIGSEGV when adding new wast files.**
-Adding wasts like fac.wast, call.wast, conversions.wast etc. causes the
-surefire JVM fork to crash with SIGSEGV (exit code 139). This kills the
-entire test run, making it look like tests are missing when really the
-JVM died before running them.
+**Adding wast files**: add ONE at a time, verify test count = previous+N.
+If count drops, the JVM crashed — find which function and fix.
 
-Root causes to investigate:
-- Our compiled native code may produce invalid memory accesses for
-  certain function patterns (recursive calls, function pointers)
-- Panama upcall stubs may not catch all exceptions — uncaught exceptions
-  in native→Java callbacks crash the JVM
-  (hs_err: `UpcallLinker::handle_uncaught_exception`)
-- br_table with large tables creates too many Cranelift blocks,
-  potentially exhausting bridge Wasm memory
-
-**Approach**: add ONE wast file at a time, verify test count stays at
-14023+N (not lower), find the exact function/test that crashes, fix it.
-
-Known issues to fix:
+Known issues:
 - Float trunc overflow check (NaN-only, not range — 35 conversions failures)
-- br_table compilation too heavy for large tables
+- br_table compilation too heavy for large tables (excluded)
 - Global validation (GlobalTest 76/77 — skipped, also in runtime-tests)
 
 ### P1: increase test coverage
