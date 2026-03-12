@@ -122,7 +122,8 @@ cranelift-compiler/                     Native compiler + spec tests
 
 - **NativeMemory shortcomings** — leaks, no bounds checking (SIGSEGV on OOB)
 - **Float trunc overflow check** — only NaN check implemented, not range check
-- **Two-pass compiler refactoring** — in progress (see Refactor plan below)
+- **Multi-return via argsBuffer** — functions with >2 returns need argsBuffer path
+- **Multi-return in NativeMachine.call()** — read results from argsBuffer
 
 ### Current opcode support
 
@@ -237,29 +238,41 @@ call_indirect type mismatch, validation errors, etc.)
 
 ## Next steps
 
-### P0 (in progress): fix remaining excluded tests
+### P0 (in progress): fix remaining test failures
 
-Two-pass compiler refactoring (NativeAnalyzer + NativeEmitters) is DONE.
-Remaining failures by category:
+Two-pass compiler refactoring DONE. IF block params DONE. Multi-return
+BR/RETURN/BR_TABLE DONE. Verifier errors for dead code blocks DONE.
+11 previously-excluded tests now passing, 0 regressions.
 
-1. **Multi-return compilation** (~25 tests: IfTest, LoopTest, BlockTest, BrIfTest)
-   - Cranelift "Too many return values to fit in registers" for >2 returns
-   - Verifier errors in dead code with multi-return blocks
-   - Fix: return multi-values through argsBuffer instead of registers
+**Current: 14023 tests, 8 failures, 26 errors, 2 skipped.**
 
-2. **Multi-return runtime** (BrTest.test13/29, IfTest.test9-12)
+Remaining 34 failures (all were in old excluded list):
+
+1. **Multi-return runtime** (14 tests: BrTest 13/29, IfTest 9-12/109-116)
    - `NativeMachine.call()` returns single `long` — AIOOB on `results[1]`
-   - Fix: read multi-return values from argsBuffer after native call
+   - Fix: write multi-return values to argsBuffer in compiled code,
+     read them in `NativeMachine.call()`
 
-3. **Memory bounds** (MemoryGrowTest.test2-5/11-12)
-   - "Expected exception to be thrown" — no OOB checking
-   - Fix: emit bounds check before memory loads/stores
+2. **Compilation failures** (4 functions → 10 tests)
+   - func 17 (BrIfTest 25/26): TrapException — Cranelift "Too many
+     return values" for functions with >2 returns
+   - func 41 (IfTest 93/94, LoopTest 39): TrapException — same cause
+   - func 44 (BlockTest 42): TrapException — same cause
+   - func 50 (IfTest 117-122): NoSuchElementException — stack underflow
+     in dead code after multi-return block
+   - Fix: return >2 values through argsBuffer instead of registers
 
-4. **Wrong values** (IfTest.test99/105)
-   - `expected: <3> but was: <0>` — likely dead code value propagation
-   - Fix: debug specific functions
+3. **Memory bounds** (6 tests: MemoryGrowTest 2-5/11-12)
+   - "Expected exception" — no OOB checking on memory access
+   - Fix: emit bounds check before loads/stores
 
-5. **Global validation** (GlobalTest.test76/77) — excluded, also excluded in runtime-tests
+4. **Wrong values** (2 tests: IfTest 99/105)
+   - `expected: <3> but was: <0>` — cascading from func 41/50 compile
+     failure making module instance null
+   - Will be fixed when compilation failures are resolved
+
+5. **Global validation** (2 tests: GlobalTest 76/77)
+   - Skipped — also excluded in runtime-tests
 
 ### P1: increase test coverage
 
