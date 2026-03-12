@@ -73,7 +73,11 @@
             <wast>br_if.wast</wast>
             <wast>call.wast</wast>
             <wast>call_indirect.wast</wast>
+            <wast>comments.wast</wast>
             <wast>const.wast</wast>
+            <wast>custom.wast</wast>
+            <wast>endianness.wast</wast>
+            <wast>exports.wast</wast>
             <wast>f32.wast</wast>
             <wast>f32_bitwise.wast</wast>
             <wast>f32_cmp.wast</wast>
@@ -92,6 +96,7 @@
             <wast>i32.wast</wast>
             <wast>i64.wast</wast>
             <wast>if.wast</wast>
+            <wast>inline-module.wast</wast>
             <wast>int_exprs.wast</wast>
             <wast>int_literals.wast</wast>
             <wast>labels.wast</wast>
@@ -105,9 +110,15 @@
             <wast>memory_grow.wast</wast>
             <wast>memory_redundancy.wast</wast>
             <wast>memory_size.wast</wast>
+            <wast>memory_trap.wast</wast>
+            <wast>names.wast</wast>
             <wast>nop.wast</wast>
+            <wast>ref_func.wast</wast>
+            <wast>ref_is_null.wast</wast>
+            <wast>ref_null.wast</wast>
             <wast>return.wast</wast>
             <wast>select.wast</wast>
+            <wast>skip-stack-guard-page.wast</wast>
             <wast>stack.wast</wast>
             <wast>store.wast</wast>
             <wast>switch.wast</wast>
@@ -119,9 +130,17 @@
             <wast>table_init.wast</wast>
             <wast>table_set.wast</wast>
             <wast>table_size.wast</wast>
+            <wast>token.wast</wast>
             <wast>traps.wast</wast>
+            <wast>type.wast</wast>
             <wast>unreachable.wast</wast>
+            <wast>unreached-invalid.wast</wast>
+            <wast>unreached-valid.wast</wast>
             <wast>unwind.wast</wast>
+            <wast>utf8-custom-section-id.wast</wast>
+            <wast>utf8-import-field.wast</wast>
+            <wast>utf8-import-module.wast</wast>
+            <wast>utf8-invalid-encoding.wast</wast>
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests (multi-memory proposal) -->
           <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
@@ -133,25 +152,15 @@
             <wast>binary.wast</wast>
             <wast>br_table.wast</wast>
             <wast>bulk.wast</wast>
-            <wast>comments.wast</wast>
             <wast>conversions.wast</wast>
-            <wast>custom.wast</wast>
             <wast>data.wast</wast>
             <wast>elem.wast</wast>
-            <wast>endianness.wast</wast>
-            <wast>exports.wast</wast>
             <wast>imports.wast</wast>
-            <wast>inline-module.wast</wast>
             <wast>linking.wast</wast>
             <wast>memory_copy.wast</wast>
             <wast>memory_fill.wast</wast>
             <wast>memory_init.wast</wast>
-            <wast>memory_trap.wast</wast>
-            <wast>names.wast</wast>
             <wast>obsolete-keywords.wast</wast>
-            <wast>ref_func.wast</wast>
-            <wast>ref_is_null.wast</wast>
-            <wast>ref_null.wast</wast>
             <wast>simd_address.wast</wast>
             <wast>simd_align.wast</wast>
             <wast>simd_bit_shift.wast</wast>
@@ -210,17 +219,8 @@
             <wast>simd_store32_lane.wast</wast>
             <wast>simd_store64_lane.wast</wast>
             <wast>simd_store8_lane.wast</wast>
-            <wast>skip-stack-guard-page.wast</wast>
             <wast>start.wast</wast>
             <wast>table_grow.wast</wast>
-            <wast>token.wast</wast>
-            <wast>type.wast</wast>
-            <wast>unreached-invalid.wast</wast>
-            <wast>unreached-valid.wast</wast>
-            <wast>utf8-custom-section-id.wast</wast>
-            <wast>utf8-import-field.wast</wast>
-            <wast>utf8-import-module.wast</wast>
-            <wast>utf8-invalid-encoding.wast</wast>
           </excludedWasts>
         </configuration>
         <executions>
