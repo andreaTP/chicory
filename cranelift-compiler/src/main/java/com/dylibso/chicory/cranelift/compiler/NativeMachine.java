@@ -200,7 +200,12 @@ final class NativeMachine implements Machine {
 
         ValueLayout returnLayout = null;
         if (!funcType.returns().isEmpty()) {
-            returnLayout = valTypeToLayout(funcType.returns().get(0));
+            if (funcType.returns().size() > 1) {
+                // Multi-return: native function returns single i64 dummy
+                returnLayout = ValueLayout.JAVA_LONG;
+            } else {
+                returnLayout = valTypeToLayout(funcType.returns().get(0));
+            }
         }
 
         FunctionDescriptor desc;
@@ -559,6 +564,17 @@ final class NativeMachine implements Machine {
                 return new long[0];
             }
 
+            if (funcType.returns().size() > 1) {
+                // Multi-return: read values from argsBuffer
+                long[] results = new long[funcType.returns().size()];
+                for (int i = 0; i < results.length; i++) {
+                    long raw = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(i));
+                    results[i] = narrowReturnValue(raw, funcType.returns().get(i));
+                }
+                return results;
+            }
+
+            // Single return: read from register (fast path)
             var returnType = funcType.returns().get(0);
             if (returnType.equals(ValType.I32)) {
                 return new long[] {((Integer) result).longValue()};
@@ -569,7 +585,6 @@ final class NativeMachine implements Machine {
             } else if (returnType.equals(ValType.F64)) {
                 return new long[] {Value.doubleToLong((Double) result)};
             } else {
-                // Reference types and others: treat as i64
                 return new long[] {(Long) result};
             }
         } catch (ChicoryException e) {
@@ -577,5 +592,18 @@ final class NativeMachine implements Machine {
         } catch (Throwable e) {
             throw new ChicoryException("Native call failed for func " + funcId, e);
         }
+    }
+
+    private static long narrowReturnValue(long raw, ValType type) {
+        if (type.equals(ValType.I32)) {
+            return (int) raw;
+        }
+        if (type.equals(ValType.F32)) {
+            return Value.floatToLong(Float.intBitsToFloat((int) raw));
+        }
+        if (type.equals(ValType.F64)) {
+            return Value.doubleToLong(Double.longBitsToDouble(raw));
+        }
+        return raw; // I64
     }
 }
