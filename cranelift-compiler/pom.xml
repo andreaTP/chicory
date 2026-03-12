@@ -125,10 +125,7 @@
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests (multi-memory proposal) -->
           <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
-            SpecV1MemoryTest.test6, SpecV1MemoryTest.test7,
-            SpecV1FuncPtrsTest.test4,
-            SpecV1FuncTest.test57, SpecV1FuncTest.test58, SpecV1FuncTest.test59, SpecV1FuncTest.test60,
-            SpecV1UnwindTest.test5</excludedTests>
+            SpecV1MemoryTest.test6, SpecV1MemoryTest.test7</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>

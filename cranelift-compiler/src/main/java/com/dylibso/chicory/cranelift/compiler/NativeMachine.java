@@ -336,7 +336,7 @@ final class NativeMachine implements Machine {
             if (funcId < numImports) {
                 var importFunc = instance.imports().function(funcId);
                 long[] result = importFunc.handle().apply(instance, args);
-                return result.length > 0 ? result[0] : 0L;
+                return (result != null && result.length > 0) ? result[0] : 0L;
             } else {
                 // Uncompiled module function — throw
                 throw new ChicoryException("Function " + funcId + " not compiled");

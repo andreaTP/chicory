@@ -1420,6 +1420,16 @@ final class NativeCompiler {
                 for (int i = argCount - 1; i >= 0; i--) {
                     args[i] = ctx.valueStack.pop();
                 }
+                // Add block params to returnBlock so brif can pass values
+                int[] returnParams = new int[argCount];
+                var returns = target.blockType.returns();
+                for (int i = 0; i < argCount; i++) {
+                    returnParams[i] =
+                            bridge.exports()
+                                    .appendBlockParam(
+                                            returnBlock,
+                                            EmitContext.valTypeToBridgeType(returns.get(i)));
+                }
                 for (int a : args) {
                     bridge.exports().pushCallArg(a);
                 }
@@ -1428,9 +1438,9 @@ final class NativeCompiler {
                 for (int a : args) {
                     ctx.valueStack.push(a);
                 }
-                // Return block: emit return with args
+                // Return block: emit return with block params (not original args)
                 bridge.exports().switchToBlock(returnBlock);
-                emitReturnWithArgs(ctx, args, argCount);
+                emitReturnWithArgs(ctx, returnParams, argCount);
             } else {
                 bridge.exports().emitBrif(condition, returnBlock, fallthroughBlock);
                 bridge.exports().switchToBlock(returnBlock);
