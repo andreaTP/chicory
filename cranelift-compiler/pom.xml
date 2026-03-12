@@ -89,14 +89,16 @@
             <wast>local_set.wast</wast>
             <wast>local_tee.wast</wast>
             <wast>loop.wast</wast>
+            <wast>memory.wast</wast>
             <wast>memory_grow.wast</wast>
             <wast>memory_size.wast</wast>
             <wast>nop.wast</wast>
             <wast>return.wast</wast>
             <wast>select.wast</wast>
           </includedWasts>
-          <!-- [RT] = also excluded in runtime-tests -->
-          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
+          <!-- [RT] = also excluded in runtime-tests (multi-memory proposal) -->
+          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
+            SpecV1MemoryTest.test6, SpecV1MemoryTest.test7</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>
@@ -126,7 +128,6 @@
             <wast>left-to-right.wast</wast>
             <wast>linking.wast</wast>
             <wast>load.wast</wast>
-            <wast>memory.wast</wast>
             <wast>memory_copy.wast</wast>
             <wast>memory_fill.wast</wast>
             <wast>memory_init.wast</wast>
