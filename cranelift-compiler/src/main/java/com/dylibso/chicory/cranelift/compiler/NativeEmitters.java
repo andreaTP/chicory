@@ -635,11 +635,12 @@ final class NativeEmitters {
         fillTrapBlock(ctx, trapNullBlock, CtxBuffer.TRAP_UNINITIALIZED_ELEMENT);
         b.switchToBlock(afterNullBlock);
 
-        // 5. Type check: funcTypes[funcId] == typeId
+        // 5. Type check: funcTypes[funcId] == canonicalType (structural equality)
         int funcTypesPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TYPES_PTR);
         int funcIdOffset = b.emitImul(funcId, b.emitIconst32(4));
         int actualType = b.emitLoadI32(funcTypesPtr, funcIdOffset, 0);
-        int expectedType = b.emitIconst32(typeId);
+        int canonicalTypeId = ctx.canonicalTypeMap[typeId];
+        int expectedType = b.emitIconst32(canonicalTypeId);
         int typeMismatch =
                 b.emitIcmp(1, b.emitUextendI64(actualType), b.emitUextendI64(expectedType)); // NE
         int trapTypeBlock = b.createBlock();

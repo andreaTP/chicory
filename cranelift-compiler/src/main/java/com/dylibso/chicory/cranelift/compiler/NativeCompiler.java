@@ -31,6 +31,7 @@ final class NativeCompiler {
     private final CraneliftBridge bridge;
     private final WasmModule module;
     private final int numImports;
+    private final int[] canonicalTypeMap;
 
     NativeCompiler(CraneliftBridge bridge, WasmModule module) {
         this.bridge = bridge;
@@ -40,6 +41,34 @@ final class NativeCompiler {
                         module.importSection().stream()
                                 .filter(i -> i.importType() == ExternalType.FUNCTION)
                                 .count();
+        this.canonicalTypeMap = buildCanonicalTypeMap(module);
+    }
+
+    /**
+     * Build a map from raw type index to canonical type index.
+     * Structurally equal FunctionTypes get the same canonical index,
+     * enabling correct call_indirect type checking with duplicate types.
+     */
+    static int[] buildCanonicalTypeMap(WasmModule module) {
+        var ts = module.typeSection();
+        int count = ts.subTypeCount();
+        int[] map = new int[count];
+        var seen = new java.util.HashMap<FunctionType, Integer>();
+        for (int i = 0; i < count; i++) {
+            var type = ts.getType(i);
+            if (type instanceof FunctionType ft) {
+                Integer canonical = seen.get(ft);
+                if (canonical != null) {
+                    map[i] = canonical;
+                } else {
+                    seen.put(ft, i);
+                    map[i] = i;
+                }
+            } else {
+                map[i] = i; // non-function types keep their own index
+            }
+        }
+        return map;
     }
 
     // --- Control frame ---
@@ -255,7 +284,8 @@ final class NativeCompiler {
                         memBaseVar,
                         ctxPtrVar,
                         new HashMap<>(),
-                        multiReturn);
+                        multiReturn,
+                        canonicalTypeMap);
 
         // --- Emission loop ---
         Deque<ControlFrame> controlStack = new ArrayDeque<>();

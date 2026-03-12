@@ -97,17 +97,19 @@ final class NativeMachine implements Machine {
         // Allocate args buffer (separate from ctxBuffer, no fixed arg limit)
         this.argsBuffer = arena.allocate((long) CtxBuffer.ARGS_BUFFER_CAPACITY * 8, 8);
 
-        // Allocate funcTypes array (one i32 typeIdx per function)
+        // Allocate funcTypes array with canonical type indices.
+        // Structurally equal FunctionTypes get the same canonical index,
+        // enabling correct call_indirect type checking with duplicate types.
+        int[] canonicalTypeMap = NativeCompiler.buildCanonicalTypeMap(module);
         this.funcTypesArray = arena.allocate((long) totalFuncs * 4, 4);
         for (int i = 0; i < numImports; i++) {
-            funcTypesArray.set(ValueLayout.JAVA_INT, (long) i * 4, instance.functionType(i));
+            int rawType = instance.functionType(i);
+            funcTypesArray.set(ValueLayout.JAVA_INT, (long) i * 4, canonicalTypeMap[rawType]);
         }
         for (int i = 0; i < module.functionSection().functionCount(); i++) {
             int funcId = numImports + i;
-            funcTypesArray.set(
-                    ValueLayout.JAVA_INT,
-                    (long) funcId * 4,
-                    module.functionSection().getFunctionType(i));
+            int rawType = module.functionSection().getFunctionType(i);
+            funcTypesArray.set(ValueLayout.JAVA_INT, (long) funcId * 4, canonicalTypeMap[rawType]);
         }
 
         // NativeTables: tables are created by Instance via tableFactory, but Instance

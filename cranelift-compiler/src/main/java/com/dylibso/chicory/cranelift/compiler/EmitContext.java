@@ -23,6 +23,7 @@ final class EmitContext {
     final int ctxPtrVar;
     final Map<String, Integer> sigRefCache;
     final boolean multiReturn;
+    final int[] canonicalTypeMap;
 
     EmitContext(
             CraneliftBridge bridge,
@@ -34,7 +35,8 @@ final class EmitContext {
             int memBaseVar,
             int ctxPtrVar,
             Map<String, Integer> sigRefCache,
-            boolean multiReturn) {
+            boolean multiReturn,
+            int[] canonicalTypeMap) {
         this.bridge = bridge;
         this.valueStack = valueStack;
         this.module = module;
@@ -45,6 +47,7 @@ final class EmitContext {
         this.ctxPtrVar = ctxPtrVar;
         this.sigRefCache = sigRefCache;
         this.multiReturn = multiReturn;
+        this.canonicalTypeMap = canonicalTypeMap;
     }
 
     // --- Helpers used by emitters ---
