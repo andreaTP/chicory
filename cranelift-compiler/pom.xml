@@ -78,6 +78,7 @@
             <wast>f64.wast</wast>
             <wast>f64_bitwise.wast</wast>
             <wast>f64_cmp.wast</wast>
+            <wast>fac.wast</wast>
             <wast>float_literals.wast</wast>
             <wast>global.wast</wast>
             <wast>i32.wast</wast>
@@ -95,7 +96,9 @@
             <wast>select.wast</wast>
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests -->
-          <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
+          <!-- assert_exhaustion in fac.wast crashes JVM (no stack depth guard) -->
+          <excludedTests>SpecV1FacTest.test7,
+            SpecV1GlobalTest.test76, SpecV1GlobalTest.test77</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>
@@ -112,7 +115,6 @@
             <wast>elem.wast</wast>
             <wast>endianness.wast</wast>
             <wast>exports.wast</wast>
-            <wast>fac.wast</wast>
             <wast>float_exprs.wast</wast>
             <wast>float_memory.wast</wast>
             <wast>float_misc.wast</wast>
