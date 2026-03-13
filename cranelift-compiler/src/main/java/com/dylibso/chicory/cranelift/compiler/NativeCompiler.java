@@ -797,6 +797,12 @@ final class NativeCompiler {
             case MEMORY_FILL:
                 NativeEmitters.emitMemoryFill(ctx);
                 break;
+            case MEMORY_INIT:
+                NativeEmitters.emitMemoryInit(ctx, ins);
+                break;
+            case DATA_DROP:
+                NativeEmitters.emitDataDrop(ctx, ins);
+                break;
 
             // --- Misc ---
             case NOP:

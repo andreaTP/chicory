@@ -1052,6 +1052,52 @@ final class NativeEmitters {
         b.emitCallIndirect(trampolineSig, trampolinePtr);
     }
 
+    static void emitMemoryInit(EmitContext ctx, AnnotatedInstruction ins) {
+        int segmentId = (int) ins.operands()[0];
+        int size = ctx.valueStack.pop();
+        int srcOffset = ctx.valueStack.pop();
+        int dstOffset = ctx.valueStack.pop();
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(segmentId)), CtxBuffer.argOffset(0));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(dstOffset), CtxBuffer.argOffset(1));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(srcOffset), CtxBuffer.argOffset(2));
+        b.emitStoreI64(argsPtr, zero, b.emitUextendI64(size), CtxBuffer.argOffset(3));
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-8), // sentinel for memory.init
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
+    static void emitDataDrop(EmitContext ctx, AnnotatedInstruction ins) {
+        int segmentId = (int) ins.operands()[0];
+        var b = ctx.bridge.exports();
+        int zero = b.emitIconst32(0);
+
+        int argsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.ARGS_PTR);
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(segmentId)), CtxBuffer.argOffset(0));
+
+        b.emitStoreI32(
+                b.useVar(ctx.ctxPtrVar),
+                zero,
+                b.emitIconst32(-9), // sentinel for data.drop
+                CtxBuffer.ARG_COUNT);
+        int trampolinePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
+        int trampolineSig = ctx.getOrCreateTrampolineSigRef();
+        b.pushCallArg(b.useVar(ctx.ctxPtrVar));
+        b.emitCallIndirect(trampolineSig, trampolinePtr);
+    }
+
     // --- Reference type operations ---
 
     static void emitRefNull(EmitContext ctx) {

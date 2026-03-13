@@ -486,6 +486,17 @@ final class NativeMachine implements Machine {
                 int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
                 instance.memory().fill((byte) val, dst, dst + size);
             }
+            case -8 -> { // memory.init
+                int segmentId = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int dst = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int src = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                instance.memory().initPassiveSegment(segmentId, dst, src, size);
+            }
+            case -9 -> { // data.drop
+                int segmentId = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                instance.memory().drop(segmentId);
+            }
             default -> throw new ChicoryException("Unknown table operation: " + opCode);
         }
         return 0L;

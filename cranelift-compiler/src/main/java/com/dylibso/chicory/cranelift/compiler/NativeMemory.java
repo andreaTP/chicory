@@ -124,6 +124,13 @@ public final class NativeMemory implements Memory {
     @Override
     public void initPassiveSegment(int segmentId, int dest, int offset, int size) {
         var seg = dataSegments[segmentId];
+        if (seg == null || seg == com.dylibso.chicory.wasm.types.PassiveDataSegment.EMPTY) {
+            if (size > 0) {
+                throw new com.dylibso.chicory.runtime.WasmRuntimeException(
+                        "out of bounds memory access");
+            }
+            return;
+        }
         write(dest, seg.data(), offset, size);
     }
 
@@ -133,6 +140,12 @@ public final class NativeMemory implements Memory {
 
     @Override
     public void write(int addr, byte[] data, int offset, int size) {
+        long limit = segment.byteSize();
+        if (Integer.toUnsignedLong(offset) + Integer.toUnsignedLong(size) > data.length
+                || Integer.toUnsignedLong(addr) + Integer.toUnsignedLong(size) > limit) {
+            throw new com.dylibso.chicory.runtime.WasmRuntimeException(
+                    "out of bounds memory access");
+        }
         MemorySegment.copy(MemorySegment.ofArray(data), offset, segment, addr, size);
     }
 
