@@ -139,7 +139,8 @@ final class CtxBuffer {
     static final int TRAP_UNINITIALIZED_ELEMENT = 10;
 
     // --- NativeTable buffer layout ---
-    // Each table buffer: [size:i32 @ 0][max:i32 @ 4][refs:i32... @ 8]
+    // Each table buffer: [size:i32 @ 0][max:i32 @ 4][entries... @ 8]
+    // Each entry is 16 bytes: [canonicalTypeIdx:i32][funcId:i32][funcPtr:i64]
 
     /** Offset of the i32 size field in a table buffer. */
     static final int TABLE_SIZE_OFFSET = 0;
@@ -147,8 +148,20 @@ final class CtxBuffer {
     /** Offset of the i32 max field in a table buffer. */
     static final int TABLE_MAX_OFFSET = 4;
 
-    /** Offset of the first i32 ref entry in a table buffer. */
-    static final int TABLE_REFS_OFFSET = 8;
+    /** Offset of the first table entry in a table buffer. */
+    static final int TABLE_ENTRIES_OFFSET = 8;
+
+    /** Size of each table entry in bytes. */
+    static final int TABLE_ENTRY_SIZE = 16;
+
+    /** Offset of canonicalTypeIdx (i32) within a table entry. */
+    static final int ENTRY_TYPE_IDX_OFFSET = 0;
+
+    /** Offset of funcId (i32) within a table entry. */
+    static final int ENTRY_FUNC_ID_OFFSET = 4;
+
+    /** Offset of funcPtr (i64) within a table entry. */
+    static final int ENTRY_FUNC_PTR_OFFSET = 8;
 
     /** Returns the byte offset for the i-th call argument within the args buffer. */
     static int argOffset(int i) {

@@ -612,9 +612,7 @@ final class NativeEmitters {
         int tablePtr = b.emitLoadI64(tablePtrsPtr, tableOffset, 0);
 
         // 2. Bounds check: elemIdx >= table.size → trap "undefined element"
-        //    (Wasm spec: call_indirect OOB and null-ref both produce "undefined element")
         int tableSize = b.emitLoadI32(tablePtr, zero, CtxBuffer.TABLE_SIZE_OFFSET);
-        // icmp cc=9 (UGE): unsigned greater-or-equal
         int oobCheck = b.emitIcmp(9, b.emitUextendI64(elemIdx), b.emitUextendI64(tableSize));
         int trapOobBlock = b.createBlock();
         int afterOobBlock = b.createBlock();
@@ -622,23 +620,31 @@ final class NativeEmitters {
         fillTrapBlock(ctx, trapOobBlock, CtxBuffer.TRAP_UNDEFINED_ELEMENT);
         b.switchToBlock(afterOobBlock);
 
-        // 3. Load funcId from table refs: tablePtr[TABLE_REFS_OFFSET + elemIdx * 4]
-        int elemOffset = b.emitImul(elemIdx, b.emitIconst32(4));
-        int funcId = b.emitLoadI32(tablePtr, elemOffset, CtxBuffer.TABLE_REFS_OFFSET);
+        // 3. Calculate entry offset: elemIdx * 16 (TABLE_ENTRY_SIZE)
+        int entryOffset = b.emitImul(elemIdx, b.emitIconst32(CtxBuffer.TABLE_ENTRY_SIZE));
 
-        // 4. Null check: funcId == REF_NULL_VALUE (-1) → trap
-        int refNull = b.emitIconst32(-1); // REF_NULL_VALUE
-        int isNull = b.emitIcmp(0, b.emitUextendI64(funcId), b.emitUextendI64(refNull)); // EQ
+        // 4. Load funcPtr from entry: tablePtr[ENTRIES_OFFSET + entryOffset + FUNC_PTR_OFFSET]
+        int funcPtr =
+                b.emitLoadI64(
+                        tablePtr,
+                        entryOffset,
+                        CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_FUNC_PTR_OFFSET);
+
+        // 5. Null check: funcPtr == 0 → trap
+        int zero64 = b.emitIconst64(0, 0);
+        int isNull = b.emitIcmp(0, funcPtr, zero64); // EQ
         int trapNullBlock = b.createBlock();
         int afterNullBlock = b.createBlock();
         b.emitBrif(isNull, trapNullBlock, afterNullBlock);
         fillTrapBlock(ctx, trapNullBlock, CtxBuffer.TRAP_UNINITIALIZED_ELEMENT);
         b.switchToBlock(afterNullBlock);
 
-        // 5. Type check: funcTypes[funcId] == canonicalType (structural equality)
-        int funcTypesPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TYPES_PTR);
-        int funcIdOffset = b.emitImul(funcId, b.emitIconst32(4));
-        int actualType = b.emitLoadI32(funcTypesPtr, funcIdOffset, 0);
+        // 6. Type check: entry.typeIdx == expectedCanonicalType
+        int actualType =
+                b.emitLoadI32(
+                        tablePtr,
+                        entryOffset,
+                        CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_TYPE_IDX_OFFSET);
         int canonicalTypeId = ctx.canonicalTypeMap[typeId];
         int expectedType = b.emitIconst32(canonicalTypeId);
         int typeMismatch =
@@ -648,11 +654,6 @@ final class NativeEmitters {
         b.emitBrif(typeMismatch, trapTypeBlock, afterTypeBlock);
         fillTrapBlock(ctx, trapTypeBlock, CtxBuffer.TRAP_INDIRECT_CALL_TYPE_MISMATCH);
         b.switchToBlock(afterTypeBlock);
-
-        // 6. Load function pointer: funcTable[funcId * 8]
-        int funcTablePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TABLE_PTR);
-        int funcPtrOffset = b.emitImul(funcId, b.emitIconst32(8));
-        int funcPtr = b.emitLoadI64(funcTablePtr, funcPtrOffset, 0);
 
         // 7. Determine if callee might be multi-return (>1 return)
         boolean calleeMultiReturn = targetType.returns().size() > 1;
@@ -667,7 +668,7 @@ final class NativeEmitters {
             b.emitStoreI64(argsPtr, zero2, widened, CtxBuffer.argOffset(i));
         }
 
-        // 8. Build SigRef and call
+        // 8. Build SigRef and call (funcPtr loaded directly from table entry)
         int sigRef;
         if (calleeMultiReturn) {
             sigRef = ctx.getOrCreateMultiReturnSigRef(targetType);
@@ -723,9 +724,13 @@ final class NativeEmitters {
         fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
         b.switchToBlock(okBlock);
 
-        int elemOffset = b.emitImul(index, b.emitIconst32(4));
-        int ref = b.emitLoadI32(tablePtr, elemOffset, CtxBuffer.TABLE_REFS_OFFSET);
-        // Table stores i32 refs, but ref types are i64 on the value stack.
+        // Load funcId from 16-byte entry: entry.funcId at offset +4
+        int entryOffset = b.emitImul(index, b.emitIconst32(CtxBuffer.TABLE_ENTRY_SIZE));
+        int ref =
+                b.emitLoadI32(
+                        tablePtr,
+                        entryOffset,
+                        CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_FUNC_ID_OFFSET);
         // Sign-extend so REF_NULL_VALUE (-1 as i32) stays -1 as i64.
         ctx.valueStack.push(b.emitSextendI64(ref));
     }
@@ -733,7 +738,7 @@ final class NativeEmitters {
     static void emitTableSet(EmitContext ctx, AnnotatedInstruction ins) {
         int tableIdx = (int) ins.operands()[0];
         // Value is i64 on stack (ref type), narrow to i32 for table storage
-        int value = ctx.bridge.exports().emitIreduceI32(ctx.valueStack.pop());
+        int funcId = ctx.bridge.exports().emitIreduceI32(ctx.valueStack.pop());
         int index = ctx.valueStack.pop();
         var b = ctx.bridge.exports();
         int zero = b.emitIconst32(0);
@@ -749,8 +754,45 @@ final class NativeEmitters {
         fillTrapBlock(ctx, trapBlock, CtxBuffer.TRAP_TABLE_OOB);
         b.switchToBlock(okBlock);
 
-        int elemOffset = b.emitImul(index, b.emitIconst32(4));
-        b.emitStoreI32(tablePtr, elemOffset, value, CtxBuffer.TABLE_REFS_OFFSET);
+        // Calculate entry offset for 16-byte entries
+        int entryOffset = b.emitImul(index, b.emitIconst32(CtxBuffer.TABLE_ENTRY_SIZE));
+        int entryTypeOff = CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_TYPE_IDX_OFFSET;
+        int entryFuncIdOff = CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_FUNC_ID_OFFSET;
+        int entryFuncPtrOff = CtxBuffer.TABLE_ENTRIES_OFFSET + CtxBuffer.ENTRY_FUNC_PTR_OFFSET;
+
+        // Check if value is REF_NULL (-1)
+        int refNull = b.emitIconst32(-1);
+        int isNull = b.emitIcmp(0, b.emitUextendI64(funcId), b.emitUextendI64(refNull)); // EQ
+
+        int nullBlock = b.createBlock();
+        int nonNullBlock = b.createBlock();
+        int mergeBlock = b.createBlock();
+        b.emitBrif(isNull, nullBlock, nonNullBlock);
+
+        // Null path: write null entry
+        b.switchToBlock(nullBlock);
+        b.emitStoreI32(tablePtr, entryOffset, b.emitIconst32(0), entryTypeOff);
+        b.emitStoreI32(tablePtr, entryOffset, refNull, entryFuncIdOff);
+        b.emitStoreI64(tablePtr, entryOffset, b.emitIconst64(0, 0), entryFuncPtrOff);
+        b.emitJump(mergeBlock);
+
+        // Non-null path: resolve funcId → funcPtr+typeIdx
+        b.switchToBlock(nonNullBlock);
+        // Load funcPtr from funcTable[funcId * 8]
+        int funcTablePtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TABLE_PTR);
+        int funcPtrOffset = b.emitImul(funcId, b.emitIconst32(8));
+        int funcPtr = b.emitLoadI64(funcTablePtr, funcPtrOffset, 0);
+        // Load typeIdx from funcTypesArray[funcId * 4]
+        int funcTypesPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.FUNC_TYPES_PTR);
+        int typeIdxOffset = b.emitImul(funcId, b.emitIconst32(4));
+        int typeIdx = b.emitLoadI32(funcTypesPtr, typeIdxOffset, 0);
+        // Write full 16-byte entry
+        b.emitStoreI32(tablePtr, entryOffset, typeIdx, entryTypeOff);
+        b.emitStoreI32(tablePtr, entryOffset, funcId, entryFuncIdOff);
+        b.emitStoreI64(tablePtr, entryOffset, funcPtr, entryFuncPtrOff);
+        b.emitJump(mergeBlock);
+
+        b.switchToBlock(mergeBlock);
     }
 
     static void emitTableSize(EmitContext ctx, AnnotatedInstruction ins) {

@@ -410,12 +410,11 @@ final class NativeMachine implements Machine {
                 long tableAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
                 var tableBuf =
                         MemorySegment.ofAddress(tableAddr)
-                                .reinterpret(CtxBuffer.TABLE_REFS_OFFSET + (long) newSize * 4);
+                                .reinterpret(
+                                        CtxBuffer.TABLE_ENTRIES_OFFSET
+                                                + (long) newSize * CtxBuffer.TABLE_ENTRY_SIZE);
                 for (int i = oldSize; i < newSize; i++) {
-                    tableBuf.set(
-                            ValueLayout.JAVA_INT,
-                            CtxBuffer.TABLE_REFS_OFFSET + (long) i * 4,
-                            fillValue);
+                    writeTableEntry(tableBuf, i, fillValue);
                 }
             }
             case -2 -> { // table fill
@@ -425,50 +424,38 @@ final class NativeMachine implements Machine {
                 long tableAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
                 var tableBuf =
                         MemorySegment.ofAddress(tableAddr)
-                                .reinterpret(CtxBuffer.TABLE_REFS_OFFSET + (long) end * 4);
+                                .reinterpret(
+                                        CtxBuffer.TABLE_ENTRIES_OFFSET
+                                                + (long) end * CtxBuffer.TABLE_ENTRY_SIZE);
                 for (int i = offset; i < end; i++) {
-                    tableBuf.set(
-                            ValueLayout.JAVA_INT,
-                            CtxBuffer.TABLE_REFS_OFFSET + (long) i * 4,
-                            fillValue);
+                    writeTableEntry(tableBuf, i, fillValue);
                 }
             }
-            case -3 -> { // table copy
+            case -3 -> { // table copy (16-byte entries)
                 long srcAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
                 long dstAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
                 int srcOff = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
                 int dstOff = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
                 int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(4));
+                long entrySize = CtxBuffer.TABLE_ENTRY_SIZE;
                 var srcBuf =
                         MemorySegment.ofAddress(srcAddr)
                                 .reinterpret(
-                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + size) * 4);
+                                        CtxBuffer.TABLE_ENTRIES_OFFSET
+                                                + (long) (srcOff + size) * entrySize);
                 var dstBuf =
                         MemorySegment.ofAddress(dstAddr)
                                 .reinterpret(
-                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + size) * 4);
-                // Copy with correct overlap handling
+                                        CtxBuffer.TABLE_ENTRIES_OFFSET
+                                                + (long) (dstOff + size) * entrySize);
+                // Copy 16-byte entries with correct overlap handling
                 if (dstOff <= srcOff) {
                     for (int i = 0; i < size; i++) {
-                        int val =
-                                srcBuf.get(
-                                        ValueLayout.JAVA_INT,
-                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + i) * 4);
-                        dstBuf.set(
-                                ValueLayout.JAVA_INT,
-                                CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + i) * 4,
-                                val);
+                        copyTableEntry(srcBuf, srcOff + i, dstBuf, dstOff + i);
                     }
                 } else {
                     for (int i = size - 1; i >= 0; i--) {
-                        int val =
-                                srcBuf.get(
-                                        ValueLayout.JAVA_INT,
-                                        CtxBuffer.TABLE_REFS_OFFSET + (long) (srcOff + i) * 4);
-                        dstBuf.set(
-                                ValueLayout.JAVA_INT,
-                                CtxBuffer.TABLE_REFS_OFFSET + (long) (dstOff + i) * 4,
-                                val);
+                        copyTableEntry(srcBuf, srcOff + i, dstBuf, dstOff + i);
                     }
                 }
             }
@@ -478,8 +465,8 @@ final class NativeMachine implements Machine {
                 int dstOffset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
                 int srcOffset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
                 int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(4));
-                // Instance.table(tableIdx) returns NativeTable (set via tableFactory),
-                // so TABLE_INIT writes directly to off-heap memory. No sync needed.
+                // Instance.table(tableIdx) returns NativeTable (set via tableFactory).
+                // NativeTable.setRef resolves funcId → funcPtr+typeIdx via funcResolver.
                 com.dylibso.chicory.runtime.OpcodeImpl.TABLE_INIT(
                         instance, tableIdx, elemIdx, size, srcOffset, dstOffset);
             }
@@ -490,6 +477,52 @@ final class NativeMachine implements Machine {
             default -> throw new ChicoryException("Unknown table operation: " + opCode);
         }
         return 0L;
+    }
+
+    /**
+     * Write a 16-byte table entry. If funcId is REF_NULL_VALUE, writes a null entry.
+     * For funcref values (funcId within valid range), resolves funcId → funcPtr+typeIdx.
+     * For externref values (opaque refs outside funcTable range), stores as-is with funcPtr=0.
+     */
+    private void writeTableEntry(MemorySegment tableBuf, int index, int funcId) {
+        long base = CtxBuffer.TABLE_ENTRIES_OFFSET + (long) index * CtxBuffer.TABLE_ENTRY_SIZE;
+        if (funcId == Value.REF_NULL_VALUE) {
+            tableBuf.set(ValueLayout.JAVA_INT, base + CtxBuffer.ENTRY_TYPE_IDX_OFFSET, 0);
+            tableBuf.set(
+                    ValueLayout.JAVA_INT,
+                    base + CtxBuffer.ENTRY_FUNC_ID_OFFSET,
+                    Value.REF_NULL_VALUE);
+            tableBuf.set(ValueLayout.JAVA_LONG, base + CtxBuffer.ENTRY_FUNC_PTR_OFFSET, 0L);
+        } else {
+            int totalFuncs = (int) (funcTable.byteSize() / 8);
+            if (funcId >= 0 && funcId < totalFuncs) {
+                // Funcref: resolve funcId → funcPtr+typeIdx
+                long funcPtr = funcTable.get(ValueLayout.JAVA_LONG, (long) funcId * 8);
+                int typeIdx = funcTypesArray.get(ValueLayout.JAVA_INT, (long) funcId * 4);
+                tableBuf.set(ValueLayout.JAVA_INT, base + CtxBuffer.ENTRY_TYPE_IDX_OFFSET, typeIdx);
+                tableBuf.set(ValueLayout.JAVA_INT, base + CtxBuffer.ENTRY_FUNC_ID_OFFSET, funcId);
+                tableBuf.set(
+                        ValueLayout.JAVA_LONG, base + CtxBuffer.ENTRY_FUNC_PTR_OFFSET, funcPtr);
+            } else {
+                // Externref: store opaque ref value, not callable
+                tableBuf.set(ValueLayout.JAVA_INT, base + CtxBuffer.ENTRY_TYPE_IDX_OFFSET, 0);
+                tableBuf.set(ValueLayout.JAVA_INT, base + CtxBuffer.ENTRY_FUNC_ID_OFFSET, funcId);
+                tableBuf.set(ValueLayout.JAVA_LONG, base + CtxBuffer.ENTRY_FUNC_PTR_OFFSET, 0L);
+            }
+        }
+    }
+
+    /** Copy a single 16-byte table entry from src[srcIdx] to dst[dstIdx]. */
+    private static void copyTableEntry(
+            MemorySegment src, int srcIdx, MemorySegment dst, int dstIdx) {
+        long srcBase = CtxBuffer.TABLE_ENTRIES_OFFSET + (long) srcIdx * CtxBuffer.TABLE_ENTRY_SIZE;
+        long dstBase = CtxBuffer.TABLE_ENTRIES_OFFSET + (long) dstIdx * CtxBuffer.TABLE_ENTRY_SIZE;
+        int typeIdx = src.get(ValueLayout.JAVA_INT, srcBase + CtxBuffer.ENTRY_TYPE_IDX_OFFSET);
+        int funcId = src.get(ValueLayout.JAVA_INT, srcBase + CtxBuffer.ENTRY_FUNC_ID_OFFSET);
+        long funcPtr = src.get(ValueLayout.JAVA_LONG, srcBase + CtxBuffer.ENTRY_FUNC_PTR_OFFSET);
+        dst.set(ValueLayout.JAVA_INT, dstBase + CtxBuffer.ENTRY_TYPE_IDX_OFFSET, typeIdx);
+        dst.set(ValueLayout.JAVA_INT, dstBase + CtxBuffer.ENTRY_FUNC_ID_OFFSET, funcId);
+        dst.set(ValueLayout.JAVA_LONG, dstBase + CtxBuffer.ENTRY_FUNC_PTR_OFFSET, funcPtr);
     }
 
     // --- Memory grow upcall stub ---
@@ -596,11 +629,22 @@ final class NativeMachine implements Machine {
                 }
                 nativeTables[i] = nt;
             }
+
             tablePtrsArray.set(
                     ValueLayout.JAVA_LONG, (long) i * 8, nativeTables[i].nativeBuffer().address());
         }
 
         ctxBuffer.set(ValueLayout.JAVA_LONG, CtxBuffer.TABLE_PTRS, tablePtrsArray.address());
+    }
+
+    /** Package-private: used by NativeTable to resolve funcId → funcPtr across modules. */
+    MemorySegment getFuncTable() {
+        return funcTable;
+    }
+
+    /** Package-private: used by NativeTable to resolve funcId → canonicalTypeIdx across modules. */
+    MemorySegment getFuncTypesArray() {
+        return funcTypesArray;
     }
 
     private static ChicoryException trapException(int trapCode) {
