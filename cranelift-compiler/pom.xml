@@ -109,6 +109,7 @@
             <wast>loop.wast</wast>
             <wast>memory.wast</wast>
             <wast>memory_copy.wast</wast>
+            <wast>memory_fill.wast</wast>
             <wast>memory_grow.wast</wast>
             <wast>memory_redundancy.wast</wast>
             <wast>memory_size.wast</wast>
@@ -160,7 +161,6 @@
             <wast>data.wast</wast>
             <wast>imports.wast</wast>
             <wast>linking.wast</wast>
-            <wast>memory_fill.wast</wast>
             <wast>memory_init.wast</wast>
             <wast>obsolete-keywords.wast</wast>
             <wast>simd_address.wast</wast>
