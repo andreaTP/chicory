@@ -225,7 +225,25 @@ public final class NativeMemory implements Memory {
     }
 
     @Override
+    public void copy(int dest, int src, int size) {
+        long limit = segment.byteSize();
+        if (Integer.toUnsignedLong(src) + Integer.toUnsignedLong(size) > limit
+                || Integer.toUnsignedLong(dest) + Integer.toUnsignedLong(size) > limit) {
+            throw new com.dylibso.chicory.runtime.WasmRuntimeException(
+                    "out of bounds memory access");
+        }
+        MemorySegment.copy(segment, src, segment, dest, size);
+    }
+
+    @Override
     public void fill(byte value, int fromIndex, int toIndex) {
+        long limit = segment.byteSize();
+        if (Integer.toUnsignedLong(fromIndex) > limit
+                || Integer.toUnsignedLong(toIndex) > limit
+                || fromIndex > toIndex) {
+            throw new com.dylibso.chicory.runtime.WasmRuntimeException(
+                    "out of bounds memory access");
+        }
         segment.asSlice(fromIndex, toIndex - fromIndex).fill(value);
     }
 

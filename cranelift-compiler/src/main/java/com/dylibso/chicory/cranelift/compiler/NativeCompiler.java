@@ -791,6 +791,12 @@ final class NativeCompiler {
             case MEMORY_GROW:
                 NativeEmitters.emitMemoryGrow(ctx);
                 break;
+            case MEMORY_COPY:
+                NativeEmitters.emitMemoryCopy(ctx);
+                break;
+            case MEMORY_FILL:
+                NativeEmitters.emitMemoryFill(ctx);
+                break;
 
             // --- Misc ---
             case NOP:

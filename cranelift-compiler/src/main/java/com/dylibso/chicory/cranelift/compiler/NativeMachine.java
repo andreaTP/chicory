@@ -474,6 +474,18 @@ final class NativeMachine implements Machine {
                 int elemIdx = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
                 instance.setElement(elemIdx, null);
             }
+            case -6 -> { // memory.copy
+                int dst = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int src = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                instance.memory().copy(dst, src, size);
+            }
+            case -7 -> { // memory.fill
+                int dst = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));
+                int val = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
+                int size = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
+                instance.memory().fill((byte) val, dst, dst + size);
+            }
             default -> throw new ChicoryException("Unknown table operation: " + opCode);
         }
         return 0L;
