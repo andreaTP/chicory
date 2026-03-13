@@ -92,10 +92,18 @@ Key features:
 
 ## Next priorities
 
-### P1: Enable remaining bulk memory wasts
-- **memory_fill.wast** — memory.fill already implemented, just needs enabling
-- **memory_init.wast, data.wast** — implement MEMORY_INIT + DATA_DROP opcodes
-- **bulk.wast** — depends on all bulk memory ops
+### DONE: Fix native resource leak (JVM crash after ~25K tests)
+
+**Fixed.** `java.lang.ref.Cleaner` on NativeMachine closes Arena + munmaps code region
+when GC'd (safety net). Future: add `AutoCloseable` on `NativeMachineFactory` for
+explicit deterministic cleanup.
+
+### P1: Enable remaining wasts
+- **memory_init.wast, data.wast** — memory.init + data.drop already implemented,
+  just needs enabling + testing
+- **address.wast, align.wast** — memory access patterns (likely OOB-related)
+- **start.wast** — start function execution
+- **conversions.wast** — float trunc overflow (NaN-only check, not range)
 
 ### P1: Native memory.copy/fill (optimization)
 Current memory.copy/fill go through Java trampoline (native → upcall → Java).
@@ -106,10 +114,8 @@ For large copies the memcpy dominates; for small copies the upcall overhead matt
 - Benchmark on real workloads (SQLite, Prism)
 - Wrap Cranelift bridge with Chicory build-time compiler (wabt/wasm-tools pattern)
 - `Machine` implementation with hybrid dispatch (native + interpreter fallback)
-- NativeMemory lifecycle management (Arena cleanup)
 - Contribute ud2 configurability to Cranelift upstream
 - Float trunc range check (not just NaN)
-- address.wast / align.wast investigation
 
 ## How to build and test
 
