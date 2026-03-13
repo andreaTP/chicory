@@ -13,10 +13,18 @@
   <name>Chicory - JMH</name>
   <description>JMH tests for the Chicory runtime</description>
 
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.dylibso.chicory</groupId>
       <artifactId>compiler</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>cranelift-compiler</artifactId>
     </dependency>
     <dependency>
       <groupId>com.dylibso.chicory</groupId>

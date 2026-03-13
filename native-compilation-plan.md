@@ -32,8 +32,8 @@ cranelift-bridge/                       Thin Cranelift FFI wrapper
 
 cranelift-compiler/                     Native compiler + spec tests
 └── src/main/java/.../compiler/
-    ├── NativeMachineFactory.java       Public API (shared Arena + globals buffer)
-    ├── NativeMachine.java              Machine impl with Panama downcalls
+    ├── NativeMachineFactory.java       Public API (AutoCloseable, shared Arena)
+    ├── NativeMachine.java              Machine impl with Panama downcalls + Cleaner
     ├── NativeCompiler.java             Thin orchestrator (analyzer → emitters)
     ├── NativeAnalyzer.java             Pre-pass: reachability via exitBlockDepth
     ├── NativeValueStack.java           Scope-aware Cranelift value ID stack
@@ -48,8 +48,9 @@ cranelift-compiler/                     Native compiler + spec tests
 
 ## Current state
 
-**25667 tests, 0 failures, 0 errors, 9 skipped** (78 wast files).
-Requires Java 25.
+**28015 tests, 0 failures, 0 errors, 103 skipped** (92 non-simd wast files).
+Only `obsolete-keywords.wast` and simd wasts remain excluded.
+All happy-path (assert_return) tests pass. Requires Java 25.
 
 Key features:
 - All i32/i64/f32/f64 arithmetic/comparison/conversion opcodes (~120 total)
@@ -59,64 +60,78 @@ Key features:
 - CALL_INDIRECT: funcPtr+typeIdx loaded directly from 16-byte table entry
 - Multi-return via argsBuffer (single-return fast path in register)
 - NativeTable: 16-byte anyfunc entries with cross-module resolution
-- Bulk memory: memory.copy, memory.fill (via trampoline)
-- Table ops: GET/SET/SIZE/GROW/FILL/COPY/INIT, ELEM.DROP (native + trampoline)
+- Bulk memory: memory.copy, memory.fill, memory.init, data.drop
+- Table ops: GET/SET/SIZE/GROW/FILL/COPY/INIT, ELEM.DROP
 - Trap pre-checks: div-by-zero, INT_MIN/-1, unreachable, float trunc NaN
 - Stack depth guard via get_stack_pointer (512KB reserve)
 - Off-heap globals, tables, memory — no sync between Java and native
+- Resource cleanup: Cleaner (GC safety net) + AutoCloseable (deterministic)
 
-## Excluded wasts
+## Skipped tests (103 across 92 wast files — error-path only)
 
-### Happy-path failures (need new opcodes or fixes)
-- **bulk.wast** — needs memory.init, data.drop
-- **memory_fill.wast** — memory.fill implemented, needs enabling + testing
-- **memory_init.wast** — needs memory.init, data.drop
-- **conversions.wast** — float trunc overflow (NaN-only check, not range)
-- **data.wast** — needs data segment operations
-- **address.wast, align.wast** — memory access patterns (likely OOB-related)
-- **start.wast** — start function execution
+All skipped tests are assert_trap or validation tests. Zero happy-path failures.
 
-### Multi-module / linking
-- **imports.wast, linking.wast** — cross-module linking
-- **table_grow.wast** — has linking tests (register/instantiate)
-
-### Validation / parse-only
-- **binary.wast, binary-leb128.wast** — binary format validation
-- **obsolete-keywords.wast** — parse-level rejection
-- **br_table.wast** — compilation too heavy for large tables
-
-### Known issues
-- Float trunc overflow check (NaN-only, not range — 35 conversions failures)
-- br_table compilation too heavy for large tables (excluded)
-- Global validation (GlobalTest 76/77 — skipped, also in runtime-tests)
+| Category | Count | Root cause |
+|---|---|---|
+| address.wast OOB | 28 | Large static offset + addr overflows i32 bounds check |
+| conversions.wast trunc | 35 | Float trunc overflow: NaN-only check, not range |
+| binary.wast validation | 10 | Parser: MalformedException not thrown |
+| imports.wast | 10 | Mix: OOB, setup (f32 stub fixed), validation |
+| align.wast validation | 5 | Parser: MalformedException vs InvalidException |
+| elem.wast | 5 | Validation/linking exceptions |
+| linking.wast | 3 | Exception type + wrong result (multi-module) |
+| global/memory/bulk | 4 | Message mismatch, validation |
+| data.wast | 2 | InvalidException not thrown |
+| start.wast | 1 | UninstantiableException vs ChicoryException |
 
 ## Next priorities
 
-### DONE: Fix native resource leak (JVM crash after ~25K tests)
+### P1: Fix address.wast OOB (28 tests)
+Bounds check uses `addr + offset + accessSize > memPages * 65536` with i32 addr.
+When static offset is large (e.g. 65536), `addr + offset` overflows i32. Fix:
+use i64 for the bounds computation, or split into `offset + accessSize > memSize`
+and `addr > memSize - offset - accessSize`.
 
-**Fixed.** `java.lang.ref.Cleaner` on NativeMachine closes Arena + munmaps code region
-when GC'd (safety net). Future: add `AutoCloseable` on `NativeMachineFactory` for
-explicit deterministic cleanup.
+### P1: Fix conversions.wast trunc overflow (35 tests)
+Current float-to-int trunc only checks NaN (fcmp NE x,x). Need range check:
+`x < INT_MIN_as_float || x > INT_MAX_as_float → trap`. Each trunc variant
+(i32/i64 × f32/f64 × signed/unsigned) has different range bounds.
 
-### P1: Fix remaining excluded tests (103 skipped across 92 wast files)
+### P1: Hybrid Machine — JVM compiler dispatch + Cranelift function bodies
 
-Error-path only — all happy-path tests pass. Categories:
-- **30 address.wast**: large-offset OOB loads don't trap (bounds check overflow)
-- **35 conversions.wast**: float trunc overflow (NaN-only check, not range)
-- **17 binary/align/data/imports/linking/start**: parser/validation exception types
-- **21 misc**: elem, global, memory, bulk message mismatches
+Benchmark results (iterFact, input=1000):
+```
+Interpreter:   6,314 ops/s    (1x)
+JVM compiled:  996,429 ops/s  (158x)
+Native:        911,764 ops/s  (144x)   ← within 9% of JVM compiled
+```
 
-### P1: Native memory.copy/fill (optimization)
+But for trivial calls (input=5), native is 24x slower than JVM compiled due to
+Panama `invokeWithArguments` + `Object[]` allocation on every `call()`. The JVM
+compiler uses `invokestatic` (zero-overhead after JIT).
+
+**Idea**: use the JVM bytecode compiler for the `Machine.call()` dispatch layer
+(tableswitch → invokestatic), but have the function bodies call into Cranelift-
+compiled native code. Best of both worlds:
+- JVM compiler handles call dispatch, arg unboxing, result boxing (JIT-friendly)
+- Cranelift handles the actual computation (native speed, no JVM bytecode limits)
+- Native-to-native calls within the module stay in Cranelift (no boundary crossing)
+- Only the entry point from Java crosses the Panama boundary
+
+Alternative (simpler): optimize the current `call()` path:
+- Replace `invokeWithArguments` with per-signature `invokeExact` (pre-bound handles)
+- Eliminate `Object[]` allocation (typed parameters)
+- Cache ctxBuffer memBase writes (only update after memory.grow)
+- Estimated 10-20x improvement on small inputs
+
+### P2: Native memory.copy/fill (optimization)
 Current memory.copy/fill go through Java trampoline (native → upcall → Java).
 Emit as native `memmove`/`memset` with inline OOB checks — no trampoline needed.
-For large copies the memcpy dominates; for small copies the upcall overhead matters.
 
 ### P2: Future work
 - Benchmark on real workloads (SQLite, Prism)
 - Wrap Cranelift bridge with Chicory build-time compiler (wabt/wasm-tools pattern)
-- `Machine` implementation with hybrid dispatch (native + interpreter fallback)
 - Contribute ud2 configurability to Cranelift upstream
-- Float trunc range check (not just NaN)
 
 ## How to build and test
 

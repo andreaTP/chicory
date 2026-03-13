@@ -1,6 +1,8 @@
 package com.dylibso.chicory.bench;
 
 import com.dylibso.chicory.compiler.MachineFactoryCompiler;
+import com.dylibso.chicory.cranelift.compiler.NativeMachineFactory;
+import com.dylibso.chicory.cranelift.compiler.NativeMemory;
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasm.Parser;
@@ -23,7 +25,9 @@ import org.openjdk.jmh.infra.Blackhole;
 @Warmup(iterations = 2)
 @Measurement(iterations = 5)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Fork(1)
+@Fork(
+        value = 1,
+        jvmArgs = {"--enable-preview", "--enable-native-access=ALL-UNNAMED"})
 public class BenchmarkFactorialExecution {
 
     private static final File ITERFACT =
@@ -34,6 +38,7 @@ public class BenchmarkFactorialExecution {
 
     ExportFunction iterFactInt;
     ExportFunction iterFactCompiled;
+    ExportFunction iterFactNative;
 
     @Setup
     public void setup() {
@@ -45,6 +50,17 @@ public class BenchmarkFactorialExecution {
                         .withMachineFactory(MachineFactoryCompiler::compile)
                         .build();
         iterFactCompiled = factorialCompiled.export("iterFact");
+
+        var module = Parser.parse(ITERFACT);
+        var factory = new NativeMachineFactory(module);
+        var factorialNative =
+                Instance.builder(module)
+                        .withMachineFactory(factory::compile)
+                        .withTableFactory(factory::createTable)
+                        .withGlobalFactory(factory::createGlobal)
+                        .withMemoryFactory(NativeMemory::new)
+                        .build();
+        iterFactNative = factorialNative.export("iterFact");
     }
 
     @Benchmark
@@ -57,5 +73,11 @@ public class BenchmarkFactorialExecution {
     @BenchmarkMode(Mode.Throughput)
     public void benchmarkCompiled(Blackhole bh) {
         bh.consume(iterFactCompiled.apply(input));
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.Throughput)
+    public void benchmarkNative(Blackhole bh) {
+        bh.consume(iterFactNative.apply(input));
     }
 }
