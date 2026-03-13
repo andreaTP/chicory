@@ -76,6 +76,7 @@
             <wast>comments.wast</wast>
             <wast>const.wast</wast>
             <wast>custom.wast</wast>
+            <wast>elem.wast</wast>
             <wast>endianness.wast</wast>
             <wast>exports.wast</wast>
             <wast>f32.wast</wast>
@@ -144,7 +145,10 @@
           </includedWasts>
           <!-- [RT] = also excluded in runtime-tests (multi-memory proposal) -->
           <excludedTests>SpecV1GlobalTest.test76, SpecV1GlobalTest.test77,
-            SpecV1MemoryTest.test6, SpecV1MemoryTest.test7</excludedTests>
+            SpecV1MemoryTest.test6, SpecV1MemoryTest.test7,
+            SpecV1ElemTest.test14, SpecV1ElemTest.test15, SpecV1ElemTest.test34, SpecV1ElemTest.test36,
+            SpecV1ElemTest.test72, SpecV1ElemTest.test73, SpecV1ElemTest.test76, SpecV1ElemTest.test77, SpecV1ElemTest.test78,
+            SpecV1ElemTest.test97</excludedTests>
           <excludedWasts>
             <wast>address.wast</wast>
             <wast>align.wast</wast>
@@ -154,7 +158,6 @@
             <wast>bulk.wast</wast>
             <wast>conversions.wast</wast>
             <wast>data.wast</wast>
-            <wast>elem.wast</wast>
             <wast>imports.wast</wast>
             <wast>linking.wast</wast>
             <wast>memory_copy.wast</wast>
