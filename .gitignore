@@ -31,3 +31,5 @@ scripts/jmh-tmp
 /zig-source
 /zig-testsuite
 cranelift-compiler/hs_err_pid*.log
+
+.claude
