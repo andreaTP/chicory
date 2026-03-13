@@ -15,6 +15,7 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.ref.Cleaner;
 import java.util.ArrayList;
 
 /**
@@ -34,11 +35,13 @@ import java.util.ArrayList;
 final class NativeMachine implements Machine {
 
     private static final int CTX_SIZE = CtxBuffer.CTX_SIZE;
+    private static final Cleaner CLEANER = Cleaner.create();
 
     private final Arena arena;
     private final Instance instance;
     private final MethodHandle[] downcalls;
     private final MemorySegment codeRegion;
+    private final long codeRegionSize;
     private final MemorySegment ctxBuffer;
     private final MemorySegment funcTable;
     private final MemorySegment argsBuffer;
@@ -150,6 +153,7 @@ final class NativeMachine implements Machine {
         }
         totalSize = Math.max(totalSize, 4096);
         totalSize = align(totalSize, 4096);
+        this.codeRegionSize = totalSize;
 
         try {
             codeRegion = PanamaExecutor.mmapCode(totalSize);
@@ -212,6 +216,27 @@ final class NativeMachine implements Machine {
             }
         } catch (Throwable e) {
             throw new ChicoryException("Failed to set up native code", e);
+        }
+
+        // Register cleanup: close arena (frees all off-heap allocations + upcall stubs)
+        // and munmap the executable code region when this NativeMachine is GC'd.
+        CLEANER.register(this, new CleanupAction(arena, codeRegion, codeRegionSize));
+    }
+
+    private record CleanupAction(Arena arena, MemorySegment codeRegion, long codeRegionSize)
+            implements Runnable {
+        @Override
+        public void run() {
+            try {
+                arena.close();
+            } catch (Exception e) {
+                // ignore — may already be closed
+            }
+            try {
+                PanamaExecutor.munmap(codeRegion, codeRegionSize);
+            } catch (Throwable e) {
+                // ignore cleanup errors
+            }
         }
     }
 
