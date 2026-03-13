@@ -98,12 +98,13 @@ Key features:
 when GC'd (safety net). Future: add `AutoCloseable` on `NativeMachineFactory` for
 explicit deterministic cleanup.
 
-### P1: Enable remaining wasts
-- **memory_init.wast, data.wast** — memory.init + data.drop already implemented,
-  just needs enabling + testing
-- **address.wast, align.wast** — memory access patterns (likely OOB-related)
-- **start.wast** — start function execution
-- **conversions.wast** — float trunc overflow (NaN-only check, not range)
+### P1: Fix remaining excluded tests (103 skipped across 92 wast files)
+
+Error-path only — all happy-path tests pass. Categories:
+- **30 address.wast**: large-offset OOB loads don't trap (bounds check overflow)
+- **35 conversions.wast**: float trunc overflow (NaN-only check, not range)
+- **17 binary/align/data/imports/linking/start**: parser/validation exception types
+- **21 misc**: elem, global, memory, bulk message mismatches
 
 ### P1: Native memory.copy/fill (optimization)
 Current memory.copy/fill go through Java trampoline (native → upcall → Java).

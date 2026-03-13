@@ -337,13 +337,13 @@ final class NativeMachine implements Machine {
                         MethodType.methodType(void.class, targetParamTypes.toArray(new Class[0]));
                 dropper = dropper.asType(voidType);
             } else if (!funcType.returns().isEmpty()) {
-                var retType = funcType.returns().get(0);
-                if (retType.equals(ValType.I32)) {
+                var retClass = valTypeToJavaClass(funcType.returns().get(0));
+                if (!retClass.equals(long.class)) {
                     dropper =
                             MethodHandles.explicitCastArguments(
                                     dropper,
                                     MethodType.methodType(
-                                            int.class, targetParamTypes.toArray(new Class[0])));
+                                            retClass, targetParamTypes.toArray(new Class[0])));
                 }
             }
 
