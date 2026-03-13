@@ -850,6 +850,8 @@ final class NativeEmitters {
         b.emitStoreI64(argsPtr, zero, b.emitUextendI64(newSizeI32), CtxBuffer.argOffset(1));
         b.emitStoreI64(argsPtr, zero, b.emitUextendI64(fillValue), CtxBuffer.argOffset(2));
         b.emitStoreI64(argsPtr, zero, tablePtr, CtxBuffer.argOffset(3)); // already i64
+        b.emitStoreI64(
+                argsPtr, zero, b.emitUextendI64(b.emitIconst32(tableIdx)), CtxBuffer.argOffset(4));
 
         int tableOpsPtr = b.emitLoadI64(b.useVar(ctx.ctxPtrVar), zero, CtxBuffer.TRAMPOLINE_PTR);
         b.emitStoreI32(

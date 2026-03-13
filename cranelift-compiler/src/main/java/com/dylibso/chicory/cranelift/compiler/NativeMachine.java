@@ -440,6 +440,7 @@ final class NativeMachine implements Machine {
                 int newSize = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(1));
                 int fillValue = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(2));
                 long tableAddr = argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(3));
+                int tblIdx = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(4));
                 var tableBuf =
                         MemorySegment.ofAddress(tableAddr)
                                 .reinterpret(
@@ -448,6 +449,8 @@ final class NativeMachine implements Machine {
                 for (int i = oldSize; i < newSize; i++) {
                     writeTableEntry(tableBuf, i, fillValue);
                 }
+                // Update TableLimits so import validation sees the grown size
+                nativeTables[tblIdx].limits().grow(newSize - oldSize);
             }
             case -2 -> { // table fill
                 int offset = (int) argsBuffer.get(ValueLayout.JAVA_LONG, CtxBuffer.argOffset(0));

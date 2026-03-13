@@ -132,6 +132,7 @@
             <wast>table_copy.wast</wast>
             <wast>table_fill.wast</wast>
             <wast>table_get.wast</wast>
+            <wast>table_grow.wast</wast>
             <wast>table_init.wast</wast>
             <wast>table_set.wast</wast>
             <wast>table_size.wast</wast>
@@ -223,7 +224,6 @@
             <wast>simd_store64_lane.wast</wast>
             <wast>simd_store8_lane.wast</wast>
             <wast>start.wast</wast>
-            <wast>table_grow.wast</wast>
           </excludedWasts>
         </configuration>
         <executions>
