@@ -31,13 +31,14 @@ import java.util.List;
  * by both the table/global factories and the NativeMachine. This ensures tables
  * and globals are created directly in off-heap memory — no sync or reflection needed.
  */
-public final class NativeMachineFactory {
+public final class NativeMachineFactory implements AutoCloseable {
 
     private final Arena arena = Arena.ofShared();
     private final WasmModule module;
     private final List<NativeTable> nativeTables = new ArrayList<>();
     private MemorySegment globalsBuffer;
     private int globalIndex;
+    private NativeMachine nativeMachine;
 
     public NativeMachineFactory(WasmModule module) {
         this.module = module;
@@ -74,6 +75,14 @@ public final class NativeMachineFactory {
     }
 
     public Machine compile(Instance instance) {
-        return new NativeMachine(instance, arena, nativeTables, globalsBuffer);
+        this.nativeMachine = new NativeMachine(instance, arena, nativeTables, globalsBuffer);
+        return nativeMachine;
+    }
+
+    @Override
+    public void close() {
+        if (nativeMachine != null) {
+            nativeMachine.close();
+        }
     }
 }

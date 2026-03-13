@@ -53,6 +53,7 @@ final class NativeMachine implements Machine {
     private final int numImports;
     private final int globalCount;
     private boolean importGlobalsInitialized;
+    private final Cleaner.Cleanable cleanable;
     // Pending exception from upcall stubs (cannot throw through native frames)
     private volatile Throwable pendingException;
 
@@ -219,8 +220,14 @@ final class NativeMachine implements Machine {
         }
 
         // Register cleanup: close arena (frees all off-heap allocations + upcall stubs)
-        // and munmap the executable code region when this NativeMachine is GC'd.
-        CLEANER.register(this, new CleanupAction(arena, codeRegion, codeRegionSize));
+        // and munmap the executable code region. Runs on explicit close() or when GC'd.
+        this.cleanable =
+                CLEANER.register(this, new CleanupAction(arena, codeRegion, codeRegionSize));
+    }
+
+    /** Explicitly release all native resources (arena + code region). Idempotent. */
+    void close() {
+        cleanable.clean();
     }
 
     private record CleanupAction(Arena arena, MemorySegment codeRegion, long codeRegionSize)
